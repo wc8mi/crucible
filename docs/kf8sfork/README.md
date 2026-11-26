@@ -97,6 +97,27 @@ clarity and average level, or measure decoded audio with a consistent receiver s
 (internal or speaker mic), distance, mode, gain/AGC, RX AGC on the receiving end and any clipping or distortion.
 Test DMR separately; it does not use the P25 PCM target. Software cannot repair an input already clipped in hardware.
 
+## DMR and YSF TX levels
+
+**Settings > Talk & listen** has **DMR TX level**, **YSF TX level** and **Mic input**:
+
+| Setting | Values | What it does |
+|---|---|---|
+| DMR TX level | Off, -30 to -12 dBFS (2 dB steps) | The level the leveler holds your voice at before the AMBE encoder, for DMR and NXDN. A level replaces the codec's own AGC. Off keeps Mic gain and Mic AGC |
+| YSF TX level | the same | The same for YSF |
+| Mic input | -7 to +8 | The microphone's analog level into digital audio. Lower it if your audio sounds distorted at every TX level |
+
+Set them with two radios. No diagnostic screen is involved:
+
+1. On radio B, turn on **Settings > Display > RX audio levels** and that mode's **RX AGC**.
+2. Talk on radio A at your normal voice and distance.
+3. On B's main screen, read the first number in `AGC in > out dBFS`: the level B decoded. The second is after B's
+   own AGC; ignore it.
+4. Step A's TX level until B reads the level you want. Swap the radios and repeat, once on DMR and once on YSF.
+
+Report the TX level each radio needed for the same decoded reading, with the mode and microphone used. If the radios
+agree, that value can become the default AGC target.
+
 ## Restored receive display
 
 The recent digital RF signal-display enhancement has been removed from the branch because it crowded the screen.
