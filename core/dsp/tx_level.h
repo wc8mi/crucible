@@ -111,13 +111,30 @@ static inline uint16_t tx_level_process(tx_level_t *s, const int16_t *in, int16_
 	return peak;
 }
 // The TX level settings' choices (Settings > Talk & listen, DMR and YSF TX level): 0 Off, the manual gain with the
-// peak limiter; 1..10 an RMS target of -30..-12 dBFS in 2 dB steps, relative to 32768
+// peak limiter; 1..10 the level a reference receiver hears, -40..-22 dBFS RMS in 2 dB steps (docs/spec/radio-features.md
+// 3.6). The encoder target is that level plus the board's trim for the profile (board_t.tx_level_trim_db), clamped
+// to TX_LEVEL_TARGET_MIN..MAX
 #define TX_LEVEL_CHOICES	11u
-#define TX_LEVEL_CHOICE_DBFS(c)	(-32 + 2 * (int)(c))	// c 1..10
-static inline uint16_t tx_level_choice_rms(uint8_t choice)
+#define TX_LEVEL_CHOICE_DBFS(c)	(-42 + 2 * (int)(c))	// c 1..10
+#define TX_LEVEL_TARGET_MIN	(-42)	// dBFS RMS, the encoder target's range
+#define TX_LEVEL_TARGET_MAX	(-10)
+
+// RMS relative to 32768 for a level in whole dBFS, clamped to TX_LEVEL_TARGET_MIN..MAX
+static inline uint16_t tx_level_dbfs_rms(int dbfs)
 {
-	static const uint16_t rms[TX_LEVEL_CHOICES] = { 0, 1036, 1305, 1642, 2068, 2603, 3277, 4125, 5193, 6538, 8231 };
-	return choice < TX_LEVEL_CHOICES ? rms[choice] : 0u;
+	static const uint16_t rms[TX_LEVEL_TARGET_MAX - TX_LEVEL_TARGET_MIN + 1] = {
+		260, 292, 328, 368, 413, 463, 519, 583, 654, 734, 823, 924, 1036, 1163, 1305, 1464, 1642,
+		1843, 2068, 2320, 2603, 2920, 3277, 3677, 4125, 4629, 5193, 5827, 6538, 7336, 8231, 9235, 10362 };
+	if (dbfs < TX_LEVEL_TARGET_MIN) dbfs = TX_LEVEL_TARGET_MIN;
+	if (dbfs > TX_LEVEL_TARGET_MAX) dbfs = TX_LEVEL_TARGET_MAX;
+	return rms[dbfs - TX_LEVEL_TARGET_MIN];
+}
+
+// The encoder target for a choice and the board's trim (dB): 0 for Off or a choice out of range
+static inline uint16_t tx_level_target_rms(uint8_t choice, int8_t trim_db)
+{
+	if (choice == 0 || choice >= TX_LEVEL_CHOICES) return 0u;
+	return tx_level_dbfs_rms(TX_LEVEL_CHOICE_DBFS(choice) + trim_db);
 }
 
 #endif

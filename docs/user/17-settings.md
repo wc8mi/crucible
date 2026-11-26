@@ -75,8 +75,8 @@ Some settings are on the menu before the feature behind them exists, or don't ap
 | FM broadcast step | 200 kHz, 100 kHz | 200 kHz | The VFO step in the broadcast band. 200 kHz lands on the odd tenths (88.1, 88.3), the stations in the Americas. You can still type any frequency. Only on radios with a broadcast receiver ([Air band and FM broadcast](07-channels-zones-vfo.md#air-band-and-fm-broadcast)) | Works |
 | Mic gain | 0 to 10 | 5 | Microphone level, 2 dB a step. 5 is the radio's normal level. Sets DMR and P25, and FM on the radios that set the level in their microphone path ([Radio reference](23-radios.md)). Digital peak protection holds back loud peaks before encoding when built in. A change counts from the next transmission. The row shows "AGC" and is dimmed when AGC applies to the selected mode. P25 uses the saved step when its AGC is off or compiled out | Works (DMR); FM not checked on air |
 | Mic AGC | On, Off | Off | Automatically adjusts microphone level for digital voice. P25 builds with `CONFIG_P25_TX_AGC` target -20 dBFS RMS before encoding. DMR uses the codec's own AGC and retains the board's fixed AMBE calibration, unless a DMR or YSF TX level is set: then the TX level levels instead. When AGC applies, it takes over from the manual step. Software cannot repair audio already clipped by the microphone input | P25 host tested; on-device checks pending |
-| DMR TX level | Off, -30 to -12 dBFS | Off | The level the radio holds your voice at before the DMR (and NXDN) encoder, 2 dB a step. Off uses Mic gain and Mic AGC as above. A level replaces the codec's AGC. To choose one, see [Setting a TX level](#setting-a-tx-level). Requires `CONFIG_TX_MIC_LIMITER` | Host tested; on-air checks pending |
-| YSF TX level | Off, -30 to -12 dBFS | Off | The same for YSF transmissions. Only in builds with YSF | Host tested; on-air checks pending |
+| DMR TX level | Off, -40 to -22 dBFS | Off | The level a receiver hears your voice at on DMR (and NXDN), 2 dB a step. -34 suits Yaesu receivers. The radio corrects for its own codec, so the same value sounds the same on every radio that has the correction ([which radios](../feature-matrix.md)). Off uses Mic gain and Mic AGC as above. A level replaces the codec's AGC. To choose one, see [Setting a TX level](#setting-a-tx-level). Requires `CONFIG_TX_MIC_LIMITER` | Host tested; on-air checks pending |
+| YSF TX level | Off, -40 to -22 dBFS | Off | The same for YSF transmissions. Only in builds with YSF | Host tested; on-air checks pending |
 | Mic input | -7 to +8 | 0 | The microphone's analog level into the radio's digital audio, before any of the above. Lower it if your voice sounds harsh or distorted at every TX level: a TX level can't repair a clipped input. Applies at once. Dimmed on radios without it ([which radios](../feature-matrix.md)) | Host tested; on-air checks pending |
 | Mic noise reduction | On, Off | On | Reduces steady background noise (fans, engines, wind) in what you send on DMR, also between words. Turn it off if a steady sound you want heard is cut. Dimmed on radios whose voice codec can't do it | Needs an on-air check (DMR) |
 | Monitor by default | On, Off | Off | Digital monitor (DMR: every talkgroup, promiscuous; Tier III: every talkgroup's call on the system) goes on each time you select a DMR channel, and a scan started from it keeps it on at every channel. **Back** on Home turns it off until the next channel | Works |
@@ -210,15 +210,17 @@ When the keys lock by themselves and what still works while they are locked ([Ke
 
 #### Setting a TX level
 
-You need two radios. Do this once on a DMR channel and once on a YSF channel.
+Set **DMR TX level** and **YSF TX level** to the level you want receivers to hear. For Yaesu receivers, set -34.
+
+To check the level, you need two radios. Do this once on a DMR channel and once on a YSF channel.
 
 1. On the receiving radio, turn on **Settings > Display > RX audio levels** and that mode's **RX AGC**
    ([Digital receive audio levels](#digital-receive-audio-levels)). The row reads `AGC in > out dBFS`.
 2. Transmit from the other radio, speaking normally at your usual distance, for a few seconds.
 3. Read **in** on the receiving radio: the level it decoded. **out** is after its own AGC, so ignore it.
-4. Step the transmitting radio's **DMR TX level** or **YSF TX level** and repeat until **in** reads the level you
-   want.
-5. Swap the radios and set the other one the same way.
+4. Compare **in** with the TX level. A difference of a few dB is normal: each receiver decodes a little differently.
+
+If the difference is large, report it with both radios' names, the mode and the microphone you used.
 
 #### P25 calibration
 

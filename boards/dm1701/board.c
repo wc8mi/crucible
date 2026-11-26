@@ -165,6 +165,8 @@ const board_t board = {
 	.power = &uvf_power,
 	.flash = &stm32_spi_flash,
 	.chip_reg = uvf_chip_reg,
+	// DMR: +4 dB for -34 dBFS at a Yaesu receiver (body mic, one voice: provisional, ADR 002). YSF not measured
+	.tx_level_trim_db = { 4, 0 },
 	.hw_line = uvf_hw_line,
 #if CONFIG_DIAG
 	.diag_line = uvf_diag_line,

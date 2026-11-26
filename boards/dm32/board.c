@@ -144,6 +144,8 @@ const board_t board = {
 #endif
 	.system = &hrc_system,
 	.chip_reg = dm32_chip_reg,
+	// DMR: +8 dB for -34 dBFS at a Yaesu receiver (body mic, one voice: provisional, ADR 002). YSF not measured
+	.tx_level_trim_db = { 8, 0 },
 	.hw_line = hw_line,
 #if CONFIG_BCAST_FM
 	.bcast = &rda5807m_hal,

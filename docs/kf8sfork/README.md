@@ -103,7 +103,7 @@ Test DMR separately; it does not use the P25 PCM target. Software cannot repair 
 
 | Setting | Values | What it does |
 |---|---|---|
-| DMR TX level | Off, -30 to -12 dBFS (2 dB steps) | The level the leveler holds your voice at before the AMBE encoder, for DMR and NXDN. A level replaces the codec's own AGC. Off keeps Mic gain and Mic AGC |
+| DMR TX level | Off, -40 to -22 dBFS (2 dB steps) | The level a Yaesu receiver hears, for DMR and NXDN: -34 suits Yaesu radios. The radio adds its own trim (ADR 002: DM-32UV +8, DM-1701 +4, provisional). A level replaces the codec's own AGC. Off keeps Mic gain and Mic AGC |
 | YSF TX level | the same | The same for YSF |
 | Mic input | -7 to +8 | The microphone's analog level into digital audio. Lower it if your audio sounds distorted at every TX level |
 
@@ -115,8 +115,9 @@ Set them with two radios. No diagnostic screen is involved:
    own AGC; ignore it.
 4. Step A's TX level until B reads the level you want. Swap the radios and repeat, once on DMR and once on YSF.
 
-Report the TX level each radio needed for the same decoded reading, with the mode and microphone used. If the radios
-agree, that value can become the default AGC target.
+Since ADR 002 the setting is the on-air level: at -34 every radio with a measured trim should read about -34 on the
+Yaesu. Report a radio that reads more than 2 dB off, with the mode and microphone used. Saved levels from before
+the change shift by the radio's trim: pick the level again after the update.
 
 ## Restored receive display
 

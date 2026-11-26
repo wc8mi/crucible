@@ -256,6 +256,30 @@ static void test_meter(void)
 	}
 }
 
+// The TX level choices are on-air levels; the board's trim moves the encoder target (ADR 002)
+static void test_choice_trim(void)
+{
+	// the table is 32768 * 10^(dB/20), every dB of the range
+	for (int db = TX_LEVEL_TARGET_MIN; db <= TX_LEVEL_TARGET_MAX; db++)
+		CHECK(tx_level_dbfs_rms(db) == (uint16_t)lrint(32768.0 * pow(10.0, db / 20.0)));
+	CHECK(tx_level_dbfs_rms(TX_LEVEL_TARGET_MIN - 5) == tx_level_dbfs_rms(TX_LEVEL_TARGET_MIN));
+	CHECK(tx_level_dbfs_rms(0) == tx_level_dbfs_rms(TX_LEVEL_TARGET_MAX));
+	// choices 1..10 are -40..-22 dBFS; -34 is choice 4
+	CHECK(TX_LEVEL_CHOICE_DBFS(1) == -40 && TX_LEVEL_CHOICE_DBFS(10) == -22 && TX_LEVEL_CHOICE_DBFS(4) == -34);
+	// Off and out of range: no target, whatever the trim
+	CHECK(tx_level_target_rms(0, 8) == 0 && tx_level_target_rms(TX_LEVEL_CHOICES, 0) == 0);
+	// the maintainer's measurements: -34 on air is -26 at the encoder with +8, -30 with +4
+	CHECK(tx_level_target_rms(4, 8) == tx_level_dbfs_rms(-26));
+	CHECK(tx_level_target_rms(4, 4) == tx_level_dbfs_rms(-30));
+	CHECK(tx_level_target_rms(4, 0) == tx_level_dbfs_rms(-34));
+	// the sum is clamped to the encoder target's range
+	CHECK(tx_level_target_rms(10, 20) == tx_level_dbfs_rms(TX_LEVEL_TARGET_MAX));
+	CHECK(tx_level_target_rms(1, -10) == tx_level_dbfs_rms(TX_LEVEL_TARGET_MIN));
+	// each choice step is 2 dB louder
+	for (uint8_t c = 2; c < TX_LEVEL_CHOICES; c++)
+		CHECK(tx_level_target_rms(c, 0) > tx_level_target_rms((uint8_t)(c - 1), 0));
+}
+
 int main(void)
 {
 	test_dc();
@@ -264,6 +288,7 @@ int main(void)
 	test_board_calibration();
 	test_ceiling();
 	test_meter();
+	test_choice_trim();
 	printf("txLevelTest: %u checks, %u failed\n", checks, failures);
 	return failures != 0;
 }

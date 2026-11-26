@@ -367,10 +367,15 @@ The board stores the user offset and applies it on its normal transmit entry. It
 software PCM calibration does not change the VOX measurement. Without `CONFIG_DMR` and without a hardware gain
 hook the Mic gain row is dimmed.
 
-**TX level (`CONFIG_TX_MIC_LIMITER`).** Settings > Talk & listen > DMR TX level and YSF TX level choose the AMBE
-leveling target of each profile: Off, or an RMS target of -30 to -12 dBFS in 2 dB steps
-(`tx_level_choice_rms()`, `core/dsp/tx_level.h`). Off keeps the manual gain with the peak limiter, as above. A
-target runs the same controller as P25 AGC (`tx_level_process`) and clears the codec's internal AGC option
+**TX level (`CONFIG_TX_MIC_LIMITER`).** Settings > Talk & listen > DMR TX level and YSF TX level choose the on-air level
+of each profile: Off, or -40 to -22 dBFS RMS in 2 dB steps, the decoded level a reference receiver reads. The AMBE
+leveling target is that level plus the board's trim for the profile (`board_t.tx_level_trim_db`, [0] DMR, [1] YSF,
+whole dB), clamped to -42..-10 dBFS (`tx_level_target_rms()`, `core/dsp/tx_level.h`). The trim holds what differs
+between radios at the same encoder input: each runs its own codec build, and the leveler counts microphone noise
+that the codec's noise reduction then removes. A board measures its trims against a Yaesu receiver (the reference
+receiver), one per profile, with the setting at -34 dBFS: trim = -34 minus the decoded reading. 0 means not
+measured. [feature-matrix.md](../feature-matrix.md) lists which radios have them. Off keeps the manual gain with
+the peak limiter, as above. A target runs the same controller as P25 AGC (`tx_level_process`) and clears the codec's internal AGC option
 (`VOCODER_OPT_AGC`) for that transmission, so the two don't fight. The YSF engine selects its profile before it
 keys (`ambeVoiceTxProfile`); every other AMBE transmission (DMR, NXDN) uses the DMR profile. The profile is latched
 when the transmission starts.
@@ -381,9 +386,10 @@ before any software gain, so it is the control for clipping at the ADC: a target
 board applies it through `hal_radio_t.mic_input` in the radio task, at once when in digital mode and again on each
 digital mode entry. Boards without the hook dim the row; [feature-matrix.md](../feature-matrix.md) lists them.
 
-**Setting a target.** Two radios: one transmits, the other's receive audio levels row
-([rx-agc.md](rx-agc.md)) shows the decoded level of each call before its receive AGC (the `in` figure). Step the
-transmitting radio's TX level until the receiver reads the level wanted, then swap. The debug link's
+**Checking a level.** Two radios: one transmits, the other's receive audio levels row
+([rx-agc.md](rx-agc.md)) shows the decoded level of each call before its receive AGC (the `in` figure). With the
+trims right, the reading matches the setting on any transmitting radio. A receiver other than the reference reads
+its own codec build's level, which can differ by a few dB. The debug link's
 `dmr_tx_audio` view shows `voice.tx_profile`, `voice.tx_target_rms`, `voice.tx_target_dmr` and
 `voice.tx_target_ysf`.
 

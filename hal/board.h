@@ -161,6 +161,10 @@ typedef struct {
 	// Writes val when write, then sets *val to the register as read back (a write-only register: the value written).
 	// False for a chip, page or register it doesn't offer. NULL: none
 	bool (*chip_reg)(uint8_t chip, uint8_t page, uint8_t reg, uint32_t *val, bool write);
+	// Optional: the DMR and YSF TX level's trim, in dB, [0] DMR and NXDN, [1] YSF (ambe_tx_profile_t order). The encoder
+	// target is the on-air level a person picks plus this, so every radio sounds the same to a reference receiver
+	// (core/dsp/tx_level.h, docs/spec/radio-features.md 3.6). Measured on the air; 0 = not measured
+	int8_t tx_level_trim_db[2];
 
 	// Optional: hardware options a person states because software can't read them (hal_hwopt.h): Settings >
 	// Advanced > Hardware and the debug link's HWOPT. NULL / 0 = none. Only in a build whose board.mk says

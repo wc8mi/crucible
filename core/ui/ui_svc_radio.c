@@ -28,6 +28,7 @@
 #if CONFIG_DMR
 #include "dmr/ambe/ambeVoice.h"
 #include "dsp/tx_level.h"
+_Static_assert(AMBE_TX_PROFILES == sizeof board.tx_level_trim_db, "board_t has a TX level trim for each profile");
 #endif
 #if CONFIG_NXDN
 #include "radio/radio_nxdn.h"
@@ -529,11 +530,13 @@ void ui_svc_apply(uint8_t id, int32_t value)
 		apply_mic_gain(value, ui_svc_setting_get(UI_SET_MIC_AGC) != 0);
 		return;
 #if CONFIG_TX_MIC_LIMITER
-	case UI_SET_TX_LEVEL_DMR:	// the leveling target of a profile (ambeVoice.h); 0 = the manual gain
-	case UI_SET_TX_LEVEL_YSF:
-		ambeVoiceSetTxTarget(id == UI_SET_TX_LEVEL_DMR ? AMBE_TX_DMR : AMBE_TX_YSF,
-				     tx_level_choice_rms((uint8_t)(value < 0 ? 0 : value)));
+	case UI_SET_TX_LEVEL_DMR:	// the on-air level of a profile plus the board's trim (ambeVoice.h); 0 = the manual gain
+	case UI_SET_TX_LEVEL_YSF: {
+		const ambe_tx_profile_t profile = id == UI_SET_TX_LEVEL_DMR ? AMBE_TX_DMR : AMBE_TX_YSF;
+		ambeVoiceSetTxTarget(profile, tx_level_target_rms((uint8_t)(value < 0 ? 0 : value),
+								  board.tx_level_trim_db[profile]));
 		return;
+	}
 	case UI_SET_MIC_INPUT:		// the board's analog input gain (hal_radio_t.mic_input), in the radio task
 		if (board.radio->mic_input != NULL)
 			radio_req_mic_input((int8_t)value);
