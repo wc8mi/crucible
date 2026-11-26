@@ -1,0 +1,799 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-26T00:00:00Z",
+  "title": "Design System: Crucible flasher",
+  "extensions": {
+    "colorMeta": {
+      "hot-core": {
+        "role": "primary",
+        "displayName": "Hot-Core Orange",
+        "canonical": "#ff7738",
+        "tonalRamp": [
+          "#3c1e10",
+          "#6c2f13",
+          "#a23e10",
+          "#f24f03",
+          "#f3783f",
+          "#eca483",
+          "#eecdbe",
+          "#f8f0ec"
+        ]
+      },
+      "hot-core-lift": {
+        "role": "primary",
+        "displayName": "Hot-Core Lift",
+        "canonical": "#ff8a52",
+        "tonalRamp": [
+          "#3c1e10",
+          "#6c3013",
+          "#a23f10",
+          "#f25003",
+          "#f3793f",
+          "#eca583",
+          "#eecebe",
+          "#f8f0ec"
+        ]
+      },
+      "hot-core-press": {
+        "role": "primary",
+        "displayName": "Hot-Core Press",
+        "canonical": "#f0682b",
+        "tonalRamp": [
+          "#3a1f13",
+          "#663119",
+          "#99411a",
+          "#e25313",
+          "#e77b4b",
+          "#e5a68a",
+          "#ebcec1",
+          "#f7f0ed"
+        ]
+      },
+      "flame": {
+        "role": "secondary",
+        "displayName": "Flame",
+        "canonical": "#ffc45d",
+        "tonalRamp": [
+          "#3c2c10",
+          "#6c4c13",
+          "#a26d10",
+          "#f29b03",
+          "#f3b13f",
+          "#ecc683",
+          "#eeddbe",
+          "#f8f4ec"
+        ]
+      },
+      "iron": {
+        "role": "primary",
+        "displayName": "Pour Iron",
+        "canonical": "#1a120c",
+        "tonalRamp": [
+          "#2e251e",
+          "#503d2f",
+          "#74553e",
+          "#a6744e",
+          "#ba9478",
+          "#cbb5a4",
+          "#dfd5cd",
+          "#f4f2f0"
+        ]
+      },
+      "cooling": {
+        "role": "tertiary",
+        "displayName": "Cooling Metal",
+        "canonical": "#9c3410",
+        "tonalRamp": [
+          "#381d14",
+          "#642e1b",
+          "#953c1e",
+          "#dc4b19",
+          "#e27650",
+          "#e2a38d",
+          "#eacdc3",
+          "#f7f0ed"
+        ]
+      },
+      "cooling-mid": {
+        "role": "tertiary",
+        "displayName": "Cooling Metal, Mid",
+        "canonical": "#c84a13",
+        "tonalRamp": [
+          "#391f14",
+          "#65311b",
+          "#96421d",
+          "#dd5418",
+          "#e37c4f",
+          "#e3a78c",
+          "#eacec2",
+          "#f7f0ed"
+        ]
+      },
+      "mould-iron": {
+        "role": "tertiary",
+        "displayName": "Mould Iron",
+        "canonical": "#2a231d",
+        "tonalRamp": [
+          "#2a2622",
+          "#483f38",
+          "#67584c",
+          "#907965",
+          "#a99889",
+          "#c1b7ae",
+          "#dbd6d2",
+          "#f3f2f1"
+        ]
+      },
+      "iron-black": {
+        "role": "neutral",
+        "displayName": "Iron-Black",
+        "canonical": "#14100d",
+        "tonalRamp": [
+          "#2b2622",
+          "#493e36",
+          "#69574a",
+          "#947761",
+          "#ac9686",
+          "#c3b6ac",
+          "#dbd5d1",
+          "#f3f2f1"
+        ]
+      },
+      "iron-plate": {
+        "role": "neutral",
+        "displayName": "Iron Plate",
+        "canonical": "#1e1915",
+        "tonalRamp": [
+          "#2a2622",
+          "#483f38",
+          "#66584c",
+          "#8f7865",
+          "#a99789",
+          "#c1b7ae",
+          "#dad6d2",
+          "#f3f2f1"
+        ]
+      },
+      "iron-plate-raised": {
+        "role": "neutral",
+        "displayName": "Raised Plate",
+        "canonical": "#2a231d",
+        "tonalRamp": [
+          "#2a2622",
+          "#483f38",
+          "#67584c",
+          "#907965",
+          "#a99889",
+          "#c1b7ae",
+          "#dbd6d2",
+          "#f3f2f1"
+        ]
+      },
+      "iron-seam": {
+        "role": "neutral",
+        "displayName": "Iron Seam",
+        "canonical": "#3d332b",
+        "tonalRamp": [
+          "#2a2622",
+          "#473f38",
+          "#66584d",
+          "#8f7866",
+          "#a99789",
+          "#c1b7af",
+          "#dad6d2",
+          "#f3f2f1"
+        ]
+      },
+      "ash-text": {
+        "role": "neutral",
+        "displayName": "Ash",
+        "canonical": "#f2ece6",
+        "tonalRamp": [
+          "#2d261f",
+          "#4e4032",
+          "#705942",
+          "#a07a55",
+          "#b5997d",
+          "#c8b8a7",
+          "#ded6cf",
+          "#f4f2f0"
+        ]
+      },
+      "ash-muted": {
+        "role": "neutral",
+        "displayName": "Ash, Muted",
+        "canonical": "#b9aca0",
+        "tonalRamp": [
+          "#2a2623",
+          "#473f39",
+          "#64594e",
+          "#8d7a68",
+          "#a7988b",
+          "#c0b7b0",
+          "#dad6d3",
+          "#f3f2f1"
+        ]
+      },
+      "ash-faint": {
+        "role": "neutral",
+        "displayName": "Ash, Faint",
+        "canonical": "#968a80",
+        "tonalRamp": [
+          "#282624",
+          "#443f3c",
+          "#605952",
+          "#86796f",
+          "#a29890",
+          "#bdb7b3",
+          "#d8d6d4",
+          "#f3f2f2"
+        ]
+      },
+      "ember-link": {
+        "role": "neutral",
+        "displayName": "Ember Link",
+        "canonical": "#ff9e6a",
+        "tonalRamp": [
+          "#3c2010",
+          "#6c3213",
+          "#a24310",
+          "#f25603",
+          "#f37e3f",
+          "#eca883",
+          "#eecfbe",
+          "#f8f0ec"
+        ]
+      },
+      "ember-soft": {
+        "role": "neutral",
+        "displayName": "Ember Soft",
+        "canonical": "#3a1f12",
+        "tonalRamp": [
+          "#32221b",
+          "#573828",
+          "#804c33",
+          "#b9643c",
+          "#c8886a",
+          "#d3ae9c",
+          "#e3d2c9",
+          "#f5f1ef"
+        ]
+      },
+      "greensand": {
+        "role": "neutral",
+        "displayName": "Greensand",
+        "canonical": "#d8dbd4",
+        "tonalRamp": [
+          "#272824",
+          "#40443c",
+          "#5a6053",
+          "#7c8570",
+          "#9aa191",
+          "#b8bcb3",
+          "#d7d8d4",
+          "#f2f3f2"
+        ]
+      },
+      "greensand-plate": {
+        "role": "neutral",
+        "displayName": "Greensand Plate",
+        "canonical": "#eff1ec",
+        "tonalRamp": [
+          "#272a23",
+          "#414739",
+          "#5b644e",
+          "#7e8d68",
+          "#9ca78b",
+          "#b9c0b0",
+          "#d7dad3",
+          "#f2f3f1"
+        ]
+      },
+      "greensand-raised": {
+        "role": "neutral",
+        "displayName": "Raised Sand",
+        "canonical": "#c8ccc3",
+        "tonalRamp": [
+          "#262824",
+          "#40433c",
+          "#5a5f53",
+          "#7b8471",
+          "#9aa092",
+          "#b8bcb3",
+          "#d6d8d4",
+          "#f2f3f2"
+        ]
+      },
+      "greensand-seam": {
+        "role": "neutral",
+        "displayName": "Sand Seam",
+        "canonical": "#aeb2a8",
+        "tonalRamp": [
+          "#272825",
+          "#40423d",
+          "#5a5e55",
+          "#7c8273",
+          "#9a9e94",
+          "#b8bbb4",
+          "#d6d8d5",
+          "#f2f3f2"
+        ]
+      },
+      "soot-text": {
+        "role": "neutral",
+        "displayName": "Soot",
+        "canonical": "#1c1612",
+        "tonalRamp": [
+          "#2b2521",
+          "#493e36",
+          "#695649",
+          "#947560",
+          "#ad9585",
+          "#c3b5ac",
+          "#dbd5d1",
+          "#f4f2f1"
+        ]
+      },
+      "soot-muted": {
+        "role": "neutral",
+        "displayName": "Soot, Muted",
+        "canonical": "#4c4f47",
+        "tonalRamp": [
+          "#272725",
+          "#40423d",
+          "#5a5d55",
+          "#7c8174",
+          "#9a9e94",
+          "#b8bab5",
+          "#d7d7d5",
+          "#f2f3f2"
+        ]
+      },
+      "soot-faint": {
+        "role": "neutral",
+        "displayName": "Soot, Faint",
+        "canonical": "#595c54",
+        "tonalRamp": [
+          "#272725",
+          "#40423e",
+          "#5a5d56",
+          "#7c8075",
+          "#9a9d95",
+          "#b8bab5",
+          "#d6d7d5",
+          "#f2f3f2"
+        ]
+      },
+      "rust-link": {
+        "role": "neutral",
+        "displayName": "Rust Link",
+        "canonical": "#a33d0b",
+        "tonalRamp": [
+          "#3a2013",
+          "#673219",
+          "#994319",
+          "#e35712",
+          "#e77e4b",
+          "#e6a88a",
+          "#ebcfc1",
+          "#f7f0ed"
+        ]
+      },
+      "ember-soft-light": {
+        "role": "neutral",
+        "displayName": "Ember Soft (light)",
+        "canonical": "#f7d9c8",
+        "tonalRamp": [
+          "#372216",
+          "#61371e",
+          "#904a23",
+          "#d46221",
+          "#dc8656",
+          "#dfad90",
+          "#e8d1c4",
+          "#f7f1ee"
+        ]
+      },
+      "ok-dark": {
+        "role": "status",
+        "displayName": "Ok Dark",
+        "canonical": "#86d6a0",
+        "tonalRamp": [
+          "#1b3122",
+          "#2a5638",
+          "#357d4d",
+          "#3fb566",
+          "#6dc589",
+          "#9ed2af",
+          "#cae2d2",
+          "#eff5f1"
+        ]
+      },
+      "warn-dark": {
+        "role": "status",
+        "displayName": "Warn Dark",
+        "canonical": "#f2bd57",
+        "tonalRamp": [
+          "#392c13",
+          "#664c1a",
+          "#986d1b",
+          "#e19b14",
+          "#e6b14c",
+          "#e5c68b",
+          "#ebddc2",
+          "#f7f4ed"
+        ]
+      },
+      "warn-soft-dark": {
+        "role": "status",
+        "displayName": "Warn Soft Dark",
+        "canonical": "#33270f",
+        "tonalRamp": [
+          "#322a1a",
+          "#584827",
+          "#816731",
+          "#bc9039",
+          "#caa968",
+          "#d4c19b",
+          "#e3dbc9",
+          "#f5f3ef"
+        ]
+      },
+      "bad-dark": {
+        "role": "status",
+        "displayName": "Bad Dark",
+        "canonical": "#ff8f80",
+        "tonalRamp": [
+          "#3c1510",
+          "#6c1e13",
+          "#a22110",
+          "#f21f03",
+          "#f3543f",
+          "#ec8f83",
+          "#eec4be",
+          "#f8eeec"
+        ]
+      },
+      "ok-light": {
+        "role": "status",
+        "displayName": "Ok Light",
+        "canonical": "#1d6b35",
+        "tonalRamp": [
+          "#1a3321",
+          "#265936",
+          "#2f8349",
+          "#36bf60",
+          "#66cc85",
+          "#99d6ac",
+          "#c8e4d1",
+          "#eff6f1"
+        ]
+      },
+      "warn-light": {
+        "role": "status",
+        "displayName": "Warn Light",
+        "canonical": "#7c5100",
+        "tonalRamp": [
+          "#3c2d10",
+          "#6c4d13",
+          "#a27010",
+          "#f29f03",
+          "#f3b53f",
+          "#ecc883",
+          "#eedebe",
+          "#f8f4ec"
+        ]
+      },
+      "warn-soft-light": {
+        "role": "status",
+        "displayName": "Warn Soft Light",
+        "canonical": "#f5e7c8",
+        "tonalRamp": [
+          "#362c17",
+          "#5f4b21",
+          "#8c6c27",
+          "#cd9a28",
+          "#d7b05b",
+          "#dcc593",
+          "#e7ddc5",
+          "#f6f4ee"
+        ]
+      },
+      "bad-light": {
+        "role": "status",
+        "displayName": "Bad Light",
+        "canonical": "#a3241a",
+        "tonalRamp": [
+          "#361916",
+          "#60241f",
+          "#8e2c24",
+          "#d13024",
+          "#da6158",
+          "#de9792",
+          "#e8c7c5",
+          "#f7efee"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The page h1 only; uppercase casting mark."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Panel h2s; uppercase casting mark."
+      },
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "CRUCIBLE in the hot-core band only."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "h3 inside panels, sentence case, system sans."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All reading text."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "The one line under the h1, muted, 72ch max."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Stepper steps and buttons."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Release names, versions, hashes, the build stamp; tabular numerals."
+      }
+    },
+    "themes": {
+      "default": "dark",
+      "light": {
+        "trigger": "prefers-color-scheme: light unless data-theme=dark; always with data-theme=light",
+        "ground": "greensand",
+        "plate": "greensand-plate",
+        "raised": "greensand-raised",
+        "seam": "greensand-seam",
+        "text": [
+          "soot-text",
+          "soot-muted",
+          "soot-faint"
+        ],
+        "link": "rust-link",
+        "focus": "rust-link",
+        "accentSoft": "ember-soft-light",
+        "status": {
+          "ok": "ok-light",
+          "warn": "warn-light",
+          "warnSoft": "warn-soft-light",
+          "bad": "bad-light"
+        }
+      },
+      "dark": {
+        "ground": "iron-black",
+        "plate": "iron-plate",
+        "raised": "iron-plate-raised",
+        "seam": "iron-seam",
+        "text": [
+          "ash-text",
+          "ash-muted",
+          "ash-faint"
+        ],
+        "link": "ember-link",
+        "focus": "flame",
+        "accentSoft": "ember-soft",
+        "status": {
+          "ok": "ok-dark",
+          "warn": "warn-dark",
+          "warnSoft": "warn-soft-dark",
+          "bad": "bad-dark"
+        }
+      },
+      "invariant": [
+        "mould-iron is the pour channel in both themes",
+        "hot-core, flame and iron do not change with the theme"
+      ]
+    },
+    "shadows": [
+      {
+        "name": "plate-dark",
+        "value": "0 1px 1px rgb(0 0 0 / 35%), 0 6px 18px rgb(0 0 0 / 28%)",
+        "purpose": "Panels and the sticky action bar, dark theme."
+      },
+      {
+        "name": "plate-light",
+        "value": "0 1px 1px rgb(40 24 12 / 8%), 0 6px 16px rgb(40 24 12 / 9%)",
+        "purpose": "Panels and the action bar, light theme."
+      },
+      {
+        "name": "mould",
+        "value": "inset 0 1px 2px rgb(0 0 0 / 45%)",
+        "purpose": "The pour's iron channel."
+      },
+      {
+        "name": "live-edge",
+        "value": "inset 0 -2px 0 #ffc45d",
+        "purpose": "Current stepper step and picked release row."
+      }
+    ],
+    "focus": [
+      {
+        "name": "focus-ring",
+        "value": "outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 2px",
+        "purpose": "All focusable elements; flame in dark, rust in light, iron inside the band."
+      }
+    ],
+    "motion": [
+      {
+        "name": "pour-fill",
+        "value": "width 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The pour's fill advancing."
+      },
+      {
+        "name": "cx-melt",
+        "value": "opacity 1 to 0.35, 1.1s ease-in-out infinite alternate",
+        "purpose": "The live flame edge while a pour is active."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "no transition; flame edge held at opacity 1",
+        "purpose": "prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "narrow",
+        "value": "760px",
+        "purpose": "Upstream's responsive switch, unchanged."
+      }
+    ],
+    "fonts": [
+      {
+        "family": "Barlow Condensed",
+        "weights": [
+          600,
+          700
+        ],
+        "files": "site/crucible/fonts/",
+        "license": "OFL-1.1",
+        "subsets": [
+          "latin",
+          "latin-ext"
+        ]
+      }
+    ],
+    "scope": "Crucible flasher page only; markup and flow are upstream's, Crucible owns tools/crucible_site.py's shell and site/crucible/crucible.css."
+  },
+  "components": [
+    {
+      "name": "Hot-Core Band",
+      "kind": "nav",
+      "refersTo": "band",
+      "description": "Full-width hot-core header: single-cut mark and CRUCIBLE wordmark in iron, theme toggle right.",
+      "html": "<header class=\"ds-band\"><a class=\"ds-brand\" href=\"#\"><svg viewBox=\"0 0 70 80\" aria-hidden=\"true\"><path fill=\"currentColor\" fill-rule=\"evenodd\" d=\"M9 0H22V18H55Q65 18 65 28V34H70V47H65V70Q65 80 55 80H14Q4 80 4 70V49H0V35H4V26Q4 21 9 19Z M15 44H25Q23 36 38 26Q36 33 42 36Q47 38 46 44H55L49 65Q47 70 41 70H29Q22 70 20 64Z\"/></svg><span class=\"ds-word\">Crucible</span></a><button class=\"ds-toggle\" type=\"button\" aria-label=\"Switch light and dark\"><svg viewBox=\"0 0 20 20\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"10\" r=\"7.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"/><path d=\"M10 2.5a7.5 7.5 0 0 1 0 15z\" fill=\"currentColor\"/></svg></button></header>",
+      "css": ".ds-band{display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:60px;padding:0 1rem;background:#ff7738;color:#1a120c;border-bottom:1px solid rgb(0 0 0 / 22%)}.ds-brand{display:inline-flex;align-items:center;gap:.6rem;color:#1a120c;text-decoration:none}.ds-brand svg{width:26px;height:30px}.ds-word{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;font-size:1.7rem;text-transform:uppercase;letter-spacing:.06em;line-height:1}.ds-toggle{display:inline-grid;place-items:center;width:40px;height:40px;padding:0;border-radius:4px;background:transparent;border:1px solid rgb(26 18 12 / 35%);color:#1a120c;cursor:pointer}.ds-toggle svg{width:20px;height:20px}.ds-toggle:hover{background:rgb(26 18 12 / 10%)}.ds-band :focus-visible{outline:2px solid #1a120c;outline-offset:3px;border-radius:2px}"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one hot-core action per step: Connect, then Install.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Connect</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;min-height:36px;padding:.4rem .95rem;border-radius:3px;border:1px solid #ff7738;background:#ff7738;color:#1a120c;font:inherit;font-weight:600;cursor:pointer}.ds-btn-primary:hover{background:#ff8a52;border-color:#ff8a52}.ds-btn-primary:active{background:#f0682b}.ds-btn-primary:focus-visible{outline:2px solid var(--focus,#ffc45d);outline-offset:3px}"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Secondary actions in the action bar: Start Over, Report a Problem.",
+      "html": "<button class=\"ds-btn-quiet\" type=\"button\">Start Over</button>",
+      "css": ".ds-btn-quiet{display:inline-flex;align-items:center;min-height:36px;padding:.4rem .95rem;border-radius:3px;border:1px solid transparent;background:transparent;color:var(--muted,#b9aca0);font:inherit;font-weight:600;cursor:pointer}.ds-btn-quiet:hover{background:var(--surface-2,#2a231d);color:var(--text,#f2ece6)}.ds-btn-quiet:focus-visible{outline:2px solid var(--focus,#ffc45d);outline-offset:3px}"
+    },
+    {
+      "name": "Plate",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Iron plate panel: square shoulders, full border, condensed uppercase h2.",
+      "html": "<section class=\"ds-plate\"><h2>Update from a release</h2><p>Radio: Example radio. Runs now: 5f034440.</p></section>",
+      "css": ".ds-plate{background:var(--surface,#1e1915);color:var(--text,#f2ece6);border:1px solid var(--border,#3d332b);border-radius:4px;padding:1.25rem;box-shadow:var(--shadow,0 1px 1px rgb(0 0 0 / 35%),0 6px 18px rgb(0 0 0 / 28%))}.ds-plate h2{margin:0 0 1rem;font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-weight:700;font-size:clamp(1.35rem,2.2vw,1.65rem);line-height:1.1;text-transform:uppercase;letter-spacing:.03em}.ds-plate p{margin:0}"
+    },
+    {
+      "name": "Caution Notice",
+      "kind": "custom",
+      "refersTo": "notice-caution",
+      "description": "Tinted plate with a full border, never a side bar; the standing stay-on-page line is a caution.",
+      "html": "<p class=\"ds-notice\"><strong>Do not switch to another app while a radio transfer is active.</strong></p>",
+      "css": ".ds-notice{margin:0;padding:.75rem 1rem;border-radius:3px;background:var(--warn-soft,#33270f);color:var(--text,#f2ece6);border:1px solid color-mix(in srgb,var(--warn,#f2bd57) 55%,transparent)}"
+    },
+    {
+      "name": "Stepper",
+      "kind": "nav",
+      "refersTo": "stepper-step-current",
+      "description": "Plates in a row; the current step is hot with a flame bottom edge, done steps carry a drawn check.",
+      "html": "<ol class=\"ds-stepper\"><li class=\"ds-done\"><span class=\"ds-n\"><svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M3 8.5l3 3 7-7\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\"/></svg></span>Update</li><li aria-current=\"step\"><span class=\"ds-n\">2</span>Install</li><li><span class=\"ds-n\">3</span>Verify</li></ol>",
+      "css": ".ds-stepper{display:flex;gap:.5rem;list-style:none;margin:0;padding:0}.ds-stepper li{display:flex;align-items:center;gap:.5rem;padding:.25rem .75rem .25rem .25rem;border-radius:3px;background:var(--surface,#1e1915);border:1px solid var(--border,#3d332b);color:var(--muted,#b9aca0);font-size:.875rem;font-weight:600}.ds-n{display:inline-grid;place-items:center;min-width:1.4rem;height:1.4rem;border-radius:2px;background:var(--surface-2,#2a231d);font-variant-numeric:tabular-nums}.ds-n svg{width:.85rem;height:.85rem}.ds-done .ds-n{color:var(--ok,#86d6a0)}.ds-stepper li[aria-current]{color:var(--text,#f2ece6);border-color:#ff7738;box-shadow:inset 0 -2px 0 #ffc45d}.ds-stepper li[aria-current] .ds-n{background:#ff7738;color:#1a120c}"
+    },
+    {
+      "name": "Release Row",
+      "kind": "custom",
+      "refersTo": "release-row-picked",
+      "description": "A release plate; the picked row takes the hot-core border, ember tint and flame bottom edge.",
+      "html": "<label class=\"ds-release ds-picked\"><input type=\"radio\" checked name=\"r\"><b>crucible-c617b8b4-261126-3</b><span class=\"ds-tag\">Test build</span></label>",
+      "css": ".ds-release{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.75rem;padding:.75rem;border:1px solid var(--border,#3d332b);border-radius:3px;background:var(--surface,#1e1915);color:var(--text,#f2ece6);cursor:pointer}.ds-release input{margin:0;accent-color:#ff7738}.ds-release b{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:.95em;font-variant-numeric:tabular-nums}.ds-picked{border-color:#ff7738;background:var(--accent-soft,#3a1f12);box-shadow:inset 0 -2px 0 #ffc45d}.ds-tag{font-size:.72rem;font-weight:700;padding:.1rem .5rem;border-radius:3px;background:var(--warn-soft,#33270f);color:var(--warn,#f2bd57)}"
+    },
+    {
+      "name": "The Pour",
+      "kind": "custom",
+      "refersTo": "pour",
+      "description": "Signature progress bar: molten fill cooling behind a pulsing flame edge in an iron mould; sets without flame when stopped.",
+      "html": "<div class=\"ds-pour ds-active\" role=\"progressbar\" aria-valuenow=\"62\" aria-valuemin=\"0\" aria-valuemax=\"100\"><span style=\"width:62%\"></span></div>",
+      "css": ".ds-pour{width:100%;height:14px;border-radius:2px;background:#2a231d;box-shadow:inset 0 1px 2px rgb(0 0 0 / 45%);overflow:hidden}.ds-pour>span{position:relative;display:block;height:100%;border-radius:2px;background:linear-gradient(90deg,#9c3410,#ff7738);transition:width .4s cubic-bezier(.16,1,.3,1)}.ds-pour.ds-active>span{background:linear-gradient(90deg,#9c3410 0%,#c84a13 40%,#ff7738 82%,#ffc45d 100%)}.ds-pour.ds-active>span::after{content:'';position:absolute;top:0;right:0;bottom:0;width:10px;background:#ffc45d;animation:ds-melt 1.1s ease-in-out infinite alternate}@keyframes ds-melt{from{opacity:1}to{opacity:.35}}@media (prefers-reduced-motion:reduce){.ds-pour>span{transition:none}.ds-pour.ds-active>span::after{animation:none;opacity:1}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Single Pour",
+    "overview": "Updating a radio is one heat, one casting, watched until it sets. The page is cast iron and molten metal. Hot-core orange is the committed shell color: a full-width band at the top carrying the single-cut mark and the CRUCIBLE wordmark in iron. Flame marks only the live edge. Everything else is iron plate on an iron-black ground (dark) or greensand grey (light).\n\nDensity is operational: one column, one flasher plate, a stepper, one primary action. Headings are condensed uppercase, like letters cast into iron. Reading text stays in the system sans. Mono appears only for versions, hashes and the build stamp.\n\nThe page refuses the grey installer wizard with a blue accent. Light mode refuses cream: its ground is moulding sand, grey with a green cast.",
+    "keyCharacteristics": [
+      "Hot-core band across the top; the mark and wordmark in iron.",
+      "Condensed uppercase casting-mark headings (Barlow Condensed 700).",
+      "Plates with square shoulders (3-4px), full borders, no side bars.",
+      "Flame appears only at a live edge: the pour's leading edge, focus, the current step, the picked release.",
+      "Every progress bar is a pour that cools behind its edge and sets when it stops.",
+      "Dark is the default; light follows the system setting unless the visitor picked dark."
+    ],
+    "rules": [
+      {
+        "name": "The Live Edge Rule",
+        "body": "Flame marks only something live or chosen right now: the pour's leading edge, focus, the current step, the picked release. It never fills an area and never decorates a static element.",
+        "section": "colors"
+      },
+      {
+        "name": "The Greensand Rule",
+        "body": "The light ground is grey with a green cast (greensand). No cream, beige or warm off-white.",
+        "section": "colors"
+      },
+      {
+        "name": "The Brand Pair Rule",
+        "body": "Hot-core and flame are the only brand hues. Upstream's RadioFoundry accent never appears.",
+        "section": "colors"
+      },
+      {
+        "name": "The Casting Mark Rule",
+        "body": "Only h1, h2 and the wordmark use the condensed face, always uppercase. Body, labels and h3 stay in the system sans.",
+        "section": "typography"
+      },
+      {
+        "name": "The Machine Text Rule",
+        "body": "Mono is for strings a machine wrote (release names, hashes, the build stamp). Numerals in mono, code and the stamp are tabular.",
+        "section": "typography"
+      },
+      {
+        "name": "The Bottom Edge Rule",
+        "body": "A chosen or current item takes a 2px flame bottom edge, drawn inset. Never a side stripe.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do put hot-core only where the brand speaks or the user acts: band, primary button, current step, pour.",
+      "Do keep flame on a live edge only (The Live Edge Rule).",
+      "Do mark the current or chosen item with a 2px inset flame bottom edge.",
+      "Do keep every plate square-shouldered (2-4px) with a full 1px border.",
+      "Do set h1, h2 and the wordmark in Barlow Condensed 700, uppercase.",
+      "Do keep the pour's mould iron (#2a231d) in both themes and drop the flame when the pour stops.",
+      "Do keep all text WCAG AA in both themes; on sand, use rust instead of flame for focus.",
+      "Do restyle upstream classes from crucible.css; leave the flasher's markup and flow upstream's."
+    ],
+    "donts": [
+      "Don't use side-stripe borders (border-left accents) on notices, rows or panels.",
+      "Don't use cream, beige or warm off-white for the light ground.",
+      "Don't use pills (999px) or soft 7-10px corners.",
+      "Don't use the condensed face for body text, labels or h3.",
+      "Don't tone a standing caution as an error.",
+      "Don't use RadioFoundry's accent colors or name RadioFoundry as the product.",
+      "Don't add eyebrows or kickers above headings."
+    ]
+  }
+}
