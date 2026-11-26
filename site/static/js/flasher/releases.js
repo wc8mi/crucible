@@ -54,6 +54,12 @@ export function forRadio(index, board, options = {}, { tests = false } = {}) {
 	return out;
 }
 
+// Whether the list shows pre-releases: when asked, or when the radio has no full release yet (a project that only
+// publishes pre-releases would otherwise offer nothing)
+export function showTests(index, board, options = {}, asked = false) {
+	return asked || forRadio(index, board, options).length === 0;
+}
+
 // How many pre-releases for this radio the list hides
 export function hiddenTests(index, board, options = {}) {
 	return forRadio(index, board, options, { tests: true }).filter((e) => e.release.prerelease).length;

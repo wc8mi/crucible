@@ -1126,8 +1126,9 @@ function updateView() {
 // word, since newer firmware may have changed what it keeps in settings
 function releasePick(out, status, draw) {
 	const p = S.now.probe, ix = S.data.index, opts = S.buildOptions || {};
-	const list = rel.forRadio(ix, S.board.id, opts, { tests: !!S.showTests });
-	const hidden = S.showTests ? 0 : rel.hiddenTests(ix, S.board.id, opts);
+	const withTests = rel.showTests(ix, S.board.id, opts, !!S.showTests);
+	const list = rel.forRadio(ix, S.board.id, opts, { tests: withTests });
+	const hidden = withTests ? 0 : rel.hiddenTests(ix, S.board.id, opts);
 	if (S.pick && !list.includes(S.pick)) S.pick = list.find((e) => e.release === S.pick.release) || null;
 	S.pick ||= list[0] || null;
 	if (S.firmware && S.firmware.tag !== S.pick?.release.tag) S.firmware = null;

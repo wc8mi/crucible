@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FORMAT, parseIndex, forRadio, hiddenTests, optionsMatch, direction, optionMismatches, checkManifest, noteBlocks, ReleaseError }
+import { FORMAT, parseIndex, forRadio, hiddenTests, showTests, optionsMatch, direction, optionMismatches, checkManifest, noteBlocks, ReleaseError }
 	from "../static/js/flasher/releases.js";
 
 const img = (board, git, git_time, options = {}) => ({ board, options, git, git_time, size: 100,
@@ -50,6 +50,15 @@ test("only images for the board and its exact options fit; tests hidden unless a
 	assert.deepEqual(forRadio(ix, "boardo", { POWER: "10w" }), []);
 	assert.deepEqual(forRadio(ix, "boardo"), [], "an option the radio has must be chosen");
 	assert.deepEqual(forRadio(ix, "nope"), []);
+});
+
+test("pre-releases show when asked or when the radio has no full release", () => {
+	const ix = parseIndex(INDEX);
+	assert.equal(showTests(ix, "boardx"), false);
+	assert.equal(showTests(ix, "boardx", {}, true), true);
+	const only = parseIndex({ format: FORMAT, releases: [{ tag: "p-1", prerelease: true, images: [img("boardx", "1111111", 100)] }] });
+	assert.equal(showTests(only, "boardx"), true);
+	assert.deepEqual(forRadio(only, "boardx", {}, { tests: showTests(only, "boardx") }).map((e) => e.release.tag), ["p-1"]);
 });
 
 test("options match only when equal both ways", () => {
