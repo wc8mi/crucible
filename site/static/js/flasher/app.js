@@ -153,7 +153,8 @@ const API = "https://api.radiofoundry.org/v1/";
 // minimal non-invasive reporting for helping the RadioFoundry project track programming failures; opt out with
 // ?reporting=0
 // A page that offers prebuilt releases (<body data-releases="index.json">: releases.js) updates from them, never from the
-// build service; with data-reporting="off" it sends nothing to the project's services either (a fork's own page)
+// build service; with data-reporting="off" it sends nothing to the project's services either (a fork's own page): no
+// flash log, no problem report or stock file upload (the report dialog saves a file instead), no build lookup
 const RELEASES = document.body.dataset.releases || "";
 const NO_REPORTING = document.body.dataset.reporting === "off";
 const FLASH_LOG = !NO_REPORTING && new URLSearchParams(location.search).get("reporting") !== "0";
@@ -223,7 +224,7 @@ async function api(method, path, body) {
 // from the radio. problem (explain.js): what went wrong; for a fault in the page its message goes with the user's note.
 // Not offered in a simulation
 function analysisOffer(cand, boardId, problem = null) {
-	if (!cand || S.sim) return null;
+	if (!cand || S.sim || NO_REPORTING) return null;
 	const internal = problem?.problem === "internal";
 	const dump = problem?.problem === "dump";
 	const status = h("p", { class: "small" });
@@ -988,7 +989,7 @@ async function connectForUpdate(status) {
 // or when the service doesn't answer in time: the update then goes by off= alone
 async function buildRecord(p, r) {
 	const v = p.version || {};
-	if (S.sim || v.preset !== "custom" || v.off === undefined || !p.git) return null;
+	if (S.sim || NO_REPORTING || v.preset !== "custom" || v.off === undefined || !p.git) return null;
 	const q = new URLSearchParams({ board: r.id, git: p.git, off: v.off,
 		options: Object.entries(S.buildOptions || {}).map(([k, x]) => `${k}=${x}`).sort().join(",") });
 	try {
@@ -1142,7 +1143,7 @@ function releasePick(out, status, draw) {
 		return h("label", { class: `release-row${e === S.pick ? " picked" : ""}` },
 			h("input", { type: "radio", name: "release", checked: e === S.pick, onchange: () => choose(e) }),
 			h("span", { class: "release-name" }, h("b", {}, e.release.name),
-				h("span", { class: "release-meta small muted" }, [e.release.tag, date(e.release.published)].filter(Boolean).join(" · "))),
+				h("span", { class: "release-meta small muted" }, [e.release.name !== e.release.tag && e.release.tag, date(e.release.published)].filter(Boolean).join(" · "))),
 			h("span", { class: "release-tags" }, tags.map(([k, key]) => h("span", { class: `release-tag release-tag-${k}` }, t(key)))));
 	});
 	const notes = S.pick ? rel.noteBlocks(S.pick.release.notes) : [];
@@ -3375,7 +3376,8 @@ function kitView(api) {
 
 async function main() {
 	showBetaNotice();	// before the data loads: the first thing a visitor reads, once per session
-	initReporting({ tool: "flasher", context: reportContext, attachments: reportAttachments, backend: { api: API, meta: reportMeta, practice: () => !!S.sim || SIM_HASH.test(location.hash) } });
+	initReporting({ tool: "flasher", context: reportContext, attachments: reportAttachments, backend: NO_REPORTING ? null
+		: { api: API, meta: reportMeta, practice: () => !!S.sim || SIM_HASH.test(location.hash) } });
 	if (!FLASH_LOG) document.getElementById("flash-log-off")?.replaceWith(t("flash.log.is_off"));
 	// the privacy contact is put together here, so address scrapers don't find it in the page or the repository
 	const mail = ["tseuqer-ycavirp-rdo", "moc.relwofrecneps"].map((x) => [...x].reverse().join("")).join("@");
