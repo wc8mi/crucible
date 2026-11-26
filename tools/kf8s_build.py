@@ -579,7 +579,8 @@ def main():
         shutil.copy2(ROOT / name, package / name)
     shutil.copytree(ROOT / 'LICENSES', package / 'LICENSES')
     copy_firmware_notices(package, images, build_env)
-    archive = out / f'{"crucible" if product else "radiofoundry"}-{version}.zip'
+    # a Crucible label already starts with crucible-; the older labels get radiofoundry- in front
+    archive = out / (f'{version}.zip' if product else f'radiofoundry-{version}.zip')
     digest = write_archive(package, archive, images)
     print(f'ZIP: {archive}\nSHA256: {digest}')
 
