@@ -326,12 +326,12 @@ details.more summary { padding: 1rem 0 .2rem; cursor: pointer; font-weight: 600;
 <section data-screen="gate" data-where="">
 	<div class="narrow">
 		<h1>Use Chrome or Edge</h1>
-		<p class="lead">This browser cannot connect to a radio. Open this page in one of these browsers.</p>
+		<p class="lead">This browser cannot connect to a radio. Open this page on a computer in one of these browsers.</p>
 		<div class="browsers">
-			<a href="https://www.google.com/chrome/"><b>Chrome</b><span>Computer or Android phone</span></a>
+			<a href="https://www.google.com/chrome/"><b>Chrome</b><span>Windows, Mac or Linux computer</span></a>
 			<a href="https://www.microsoft.com/edge"><b>Edge</b><span>Windows, Mac or Linux computer</span></a>
 		</div>
-		<p class="note">Safari, Firefox and all iPhone browsers cannot connect to a radio. Opera on a computer can also connect.</p>
+		<p class="note">Safari, Firefox and phone browsers cannot install Crucible. Opera on a computer can also connect.</p>
 	</div>
 </section>
 
@@ -650,17 +650,19 @@ details.more summary { padding: 1rem 0 .2rem; cursor: pointer; font-weight: 600;
 							<path d="M44 40V8a3 3 0 0 1 6 0v32"/>
 							<rect x="30" y="40" width="40" height="104" rx="7"/>
 							<path d="M70 62h6v18h-6" stroke="var(--hot)"/>
+							<rect x="56" y="26" width="10" height="14" rx="2" stroke="var(--hot)"/>
 						</g>
-						<circle cx="60" cy="33" r="4" fill="var(--warn)"/>
-						<text x="67" y="30">LED</text>
+						<circle cx="36" cy="33" r="4" fill="var(--warn)"/>
+						<text x="29" y="36" text-anchor="end">LED</text>
+						<text x="69" y="31">Knob</text>
 						<text x="80" y="74">Jack</text>
 					</svg>
 					<ol class="do">
-						<li>Set the radio to OFF.</li>
+						<li>Turn the volume knob to OFF.</li>
 						<li>Connect the programming cable to the speaker-mic jack and to the computer.</li>
 						<li>Click <b>Connect</b>.</li>
 						<li>Select the cable in the list.</li>
-						<li>Set the radio to ON. Do not hold a key.</li>
+						<li>Turn the volume knob to ON. Do not hold a key.</li>
 					</ol>
 				</div>
 				<div class="expect"><svg viewBox="0 0 40 52" aria-hidden="true"><use href="#ledtop"/></svg><span><b>The LED blinks yellow slowly.</b>This is correct.</span></div>

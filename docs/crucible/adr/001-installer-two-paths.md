@@ -24,13 +24,13 @@
 |---|---|---|---|
 | DM-1701 | Hold PTT and SK1, turn on. Screen stays dark. | None. Save channels with the CPS. | Baofeng V02.06 or Radioddity V02.01 to V02.03 |
 | MD-UV380 | Hold PTT and SK1, turn on. Screen stays dark. Pick 5 W or 10 W from the label. | None. Save channels with the CPS. | Any supported TYT or Retevis file |
-| DM-32UV | Cable in the speaker-mic jack. Turn on with no keys. LED blinks yellow slowly; at the end it flashes green three times. | The installer reads the radio memory (required). | Not needed: the codec comes from the backup |
+| DM-32UV | Cable in the speaker-mic jack. Turn on with the volume knob, no keys. LED blinks yellow slowly; at the end it flashes green three times. | The installer reads the radio memory (required). | Not needed: the codec comes from the backup |
 | MD-9600 | Disconnect DC. Hold P1 and the orange key, connect DC. Backlight blinks. | Optional "Back up now" before install. | A file from the board family (V1-V3, V4, V4A/V5) |
 
 ## Decision
 
-1. **A gate before anything.** A browser without Web Serial and WebUSB sees one screen: "Use Chrome or Edge" (Chrome
-   on a computer or Android, Edge on Windows, Mac or Linux). Nothing else loads.
+1. **A gate before anything.** A browser without Web Serial and WebUSB sees one screen: "Use Chrome or Edge" on a
+   Windows, Mac or Linux computer. Phones are not offered at launch. Nothing else loads.
 2. **Terms once per computer.** Four numbered items (experimental, no warranty, an install can cause damage, the user
    is responsible) and one checkbox. The checkbox starts clear; Continue stays disabled until it is set. The answer is kept in `localStorage`. The footer repeats "No warranty. For
    tinkerers." on every screen.
@@ -134,17 +134,19 @@ Desktop, dark theme. The light theme and phone captures are in [001/screens/](00
 | ![Update: manufacturer's firmware](001/screens/21-e-wrongfw-dark-desktop.png) 21. Update: manufacturer's firmware | ![Update: in progress](001/screens/22-u-pour-dark-desktop.png) 22. Update: in progress |
 | ![Update: done](001/screens/23-u-done-dark-desktop.png) 23. Update: done | ![Radio not found](001/screens/24-e-notfound-dark-desktop.png) 24. Radio not found |
 
-## Open questions for the maintainer
+## Maintainer answers
 
-1. Is a radio photo better than the line drawings? Photos need permission or our own pictures of each radio.
-2. Should the terms checkbox return after each new Crucible release, or only once per computer?
-3. MD-9600: the prototype shows the backup as a step with "Continue without a backup". Keep it a step, or make it a link like on Update?
-4. Is "test release" the right word for every release until one is stable?
-5. "Tinkerers" (people who experiment) or "tinkers"? The page uses "tinkerers".
-6. DM-32UV: is it set to OFF and ON with a power key or with the volume knob? The page says "Set the radio to OFF"
-   until a radio confirms it.
-7. The gate names Chrome on Android. Confirm that the installer connects to each radio from an Android phone before
-   the page ships; if it does not, the gate says "Chrome on a computer".
+KF8S answered the open questions on 2026-11-26.
+
+| No. | Question | Answer |
+|---|---|---|
+| 1 | Photos or line drawings of the radios | Line drawings. They work in both themes, need no photo rights, and can mark the keys to hold. |
+| 2 | When the terms show | Once per computer. The footer repeats "No warranty. For tinkerers." |
+| 3 | MD-9600 backup | A numbered step that the user can skip behind a caution. |
+| 4 | The name for a release that is not stable | "Test release". |
+| 5 | "Tinkerers" or "tinkers" | "Tinkerers". |
+| 6 | DM-32UV off and on | The volume knob. "Turn the volume knob to OFF/ON." |
+| 7 | Android | Computers only at launch. The gate names Chrome and Edge on a computer. Add Android after each radio passes a test from a phone. |
 
 ## Plan
 
@@ -165,4 +167,4 @@ Desktop, dark theme. The light theme and phone captures are in [001/screens/](00
 | 1 | Finish (Impeccable) | Fix: eyebrow tags, condensed face on labels, seed reference, version picker states, door weight, token drift, dark-screen drawing |
 | 2 | Finish (Impeccable) | Fix: radio facts box as a two-column grid at every width |
 | 3 | Finish (Impeccable) | Fix: e-stopped names the step instead of a number; DM-32UV LED sign gets its own drawing |
-| 4 | Finish (Impeccable) | Ship. Not covered: motion (step close, pour edge), the picker's disabled default state (decision 7 only), the Android check (open question 7) |
+| 4 | Finish (Impeccable) | Ship. Not covered: motion (step close, pour edge), the picker's disabled default state (decision 7 only), the Android check (answer 7: computers only at launch) |
