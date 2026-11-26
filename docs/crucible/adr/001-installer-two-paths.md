@@ -5,7 +5,7 @@
 
 | | |
 |---|---|
-| Status | Proposed (reviews accepted; waiting for the maintainer) |
+| Status | Accepted (KF8S, 2026-11-26) |
 | Date | 2026-11-26 |
 | Decides | The page at tinker.wc8mi.net/crucible/ |
 | Material | [001/prototype.html](001/prototype.html) (open with a local web server from the repository root), [001/screens/](001/screens/) |
