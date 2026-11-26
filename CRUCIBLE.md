@@ -95,15 +95,19 @@ python3 tools/kf8s_build.py --self-test
 python3 tools/kf8s_build.py --jobs 8
 ```
 
-The wrapper refuses other branches and dirty trees. It fetches upstream main and requires that commit to be an
-ancestor of the build. It builds every board and band/power option in the board registry, runs each image's stack
+The wrapper refuses other branches and dirty trees. It fetches RadioFoundry's main (the remote whose URL is
+crucible.toml `upstream`, else `origin`) and requires that commit to be an ancestor of the build. It builds each
+radio in crucible.toml `[radios]` with every band/power option (`--board` narrows that), runs each image's stack
 check, rejects build warnings, and packages codec-free images with flasher manifests and license notices.
 
 Every image, manifest and ZIP in one batch uses:
 
 ```
-kf8s-<upstream-main-short-hash>-<main-short-hash>-<yymmdd>-<sequence>
+crucible-<upstream-main-short-hash>-<main-short-hash>-<yymmdd>-<sequence>
 ```
+
+The ZIP is `crucible-<label>.zip`; its README says the build is Crucible's and sends help to Crucible's issues. The
+old `kf8sfork` and `kf8sforkysf` branches still build every board under the `kf8s-` and `kf8sysf-` labels.
 
 Hashes have eight characters. Dates use America/Detroit. The sequence starts at 1 each day and increments once
 per build attempt, including failed attempts, so a label is never reused. The counter is local Git metadata shared

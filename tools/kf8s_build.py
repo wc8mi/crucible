@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
 # Copyright (c) 2026 David Behnke
-"""Build and package all registry images with a private label (kf8sfork, or the kf8sforkysf YSF experiment). Other branches refuse this wrapper."""
+"""Build and package a release with a private label: Crucible's radios from main (crucible-...), or every board from the
+old kf8sfork and kf8sforkysf branches. Other branches refuse this wrapper."""
 import argparse
 from datetime import datetime
 import fcntl
@@ -25,6 +26,8 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools' / 'rfoundry'))
 from rfoundry import boards, manifest as release_manifest  # noqa: E402
+sys.path.insert(0, str(ROOT / 'tools'))
+import crucible  # noqa: E402
 
 # These notices match the project's pinned toolchains. Keep the notice pins in sync when changing toolchains.
 # ARM 13.3.Rel1 pins Newlib/Nano to this commit. The C-SKY toolchain pins the 4.5.0.20241231 tarball.
@@ -48,8 +51,20 @@ def git(*args):
     return subprocess.check_output(['git', '-C', str(ROOT), *args], text=True).strip()
 
 
-# The branches allowed a private label, and the label's prefix: the YSF experiment is kept apart from KF8S builds
-BRANCH_PREFIX = {'kf8sfork': 'kf8s', 'kf8sforkysf': 'kf8sysf'}
+# The branches allowed a private label, and the label's prefix: Crucible releases come from main; the older KF8S and
+# YSF experiment labels stay for their branches
+BRANCH_PREFIX = {'main': 'crucible', 'kf8sfork': 'kf8s', 'kf8sforkysf': 'kf8sysf'}
+
+
+def upstream_remote():
+    """The remote that is RadioFoundry (crucible.toml upstream); origin when nothing matches."""
+    url = crucible.config(ROOT).get('project', {}).get('upstream', '') if crucible.active(ROOT) else ''
+    want = url.rstrip('/').removesuffix('.git').lower()
+    for line in git('remote', '-v').splitlines():
+        name, remote_url = line.split()[:2]
+        if want and remote_url.rstrip('/').removesuffix('.git').lower().replace('git@github.com:', 'https://github.com/') == want:
+            return name
+    return 'origin'
 
 
 def require_branch(branch):
@@ -249,7 +264,7 @@ def write_archive(package, archive, images):
     return digest
 
 
-def package_readme(version, parrot, without_aes, ysf=False):
+def package_readme(version, parrot, without_aes, ysf=False, product=None):
     aes = ('DMR AES is disabled in this package. AES channels are unavailable and PTT is rejected.\n'
            if without_aes else "DMR AES follows each board's default. See the image manifest.\n")
     diagnostic = ('P25 calibration diagnostic enabled wherever P25 is built. See build.json for overrides.\n'
@@ -265,11 +280,13 @@ def package_readme(version, parrot, without_aes, ysf=False):
                   'The test does not save a new AGC setting. Raw audio is erased after the sweep or on exit; no RF is sent.\n'
                   if parrot else 'The codec diagnostic is off. The DMR IP gateway retains its board defaults.\n')
     return (
-        f'{version}\nPrivate KF8S test build based on RadioFoundry. Contact: dbehnke (KF8S).\n'
+        (f'{version}\n{product["name"]} pre-release, based on RadioFoundry (MIT) and not affiliated with it.\n'
+         f'Help and bug reports: {product["issues"]} (not RadioFoundry).\n'
+         if product else f'{version}\nPrivate KF8S test build based on RadioFoundry. Contact: dbehnke (KF8S).\n') +
         'Includes transmit and receive audio AGC, dual caller display, and optional P25 caller lookup.\n'
         f'{aes}{diagnostic}'
-        + ('YSF TEST: experimental YSF (C4FM DN) receive and transmit, untested on the radio. Made room for by\n'
-           'leaving DMR and P25 trunking out of this build. Report any YSF behavior with the version above.\n'
+        + ('YSF TEST: experimental YSF (C4FM DN) receive and transmit, incomplete. DMR and P25 trunking are\n'
+           'left out of this build. Report any YSF behavior with the version above.\n'
            if ysf else '') +
         'An upgrade from older settings resets receive AGC to Off and hides the audio levels display.\n'
         'An ambiguous legacy counter blocks AES transmission until recovery. On AES-enabled images, open\n'
@@ -280,7 +297,8 @@ def package_readme(version, parrot, without_aes, ysf=False):
         'Never restore older settings backups after AES use or downgrade to firmware that lacks this migration.\n'
         'Enable P25 contact lookup under Settings > Talk & listen (default Off).\n'
         'Match the image and its band/power option to your hardware. See the board reference.\n'
-        'Use each image with its JSON manifest in the RadioFoundry web flasher.\n'
+        + (f'Flash with the {product["name"]} flasher, {product["flasher"]}, or use each image with its JSON manifest.\n'
+           if product else 'Use each image with its JSON manifest in the RadioFoundry web flasher.\n') +
         'Images contain no AMBE codec. Follow the flasher instructions to preserve or supply your codec.\n'
         'P25 remains unavailable where upstream has not implemented it. See the feature matrix.\n'
         'Keep LICENSE, AUTHORS, CONTRIBUTORS, LICENSES/ and notices/ with redistributed downloads.\n')
@@ -330,7 +348,8 @@ def test_release_notices():
 
 def self_test():
     assert require_branch('kf8sfork') == 'kf8s' and require_branch('kf8sforkysf') == 'kf8sysf'
-    for branch in ('main', 'feat/p25-contact-lookup', 'feat/audio-rx-agc', 'HEAD'):
+    assert require_branch('main') == 'crucible'
+    for branch in ('feat/p25-contact-lookup', 'feat/audio-rx-agc', 'HEAD'):
         try:
             require_branch(branch)
         except ValueError:
@@ -422,6 +441,11 @@ def self_test():
     assert 'DMR AES is disabled' in diagnostic_readme and 'disables DMR IP gateway' in diagnostic_readme
     assert all('Settings > Advanced > AES recovery' in readme for readme in (default_readme, diagnostic_readme))
     assert 'YSF TEST' in package_readme('test-version', False, False, ysf=True) and 'YSF' not in default_readme
+    product = {'name': 'Crucible', 'issues': 'https://example.invalid/issues', 'flasher': 'https://example.invalid/f/'}
+    crucible_readme = package_readme('test-version', False, False, ysf=True, product=product)
+    assert 'Crucible pre-release' in crucible_readme and 'not RadioFoundry' in crucible_readme
+    assert 'https://example.invalid/f/' in crucible_readme and 'RadioFoundry web flasher' not in crucible_readme
+    assert 'Private KF8S' not in crucible_readme and 'Private KF8S' in default_readme
     assert 'Settings > Advanced > P25 calibration' in diagnostic_readme and 'Limited blocks' in diagnostic_readme
     test_release_notices()
     print('kf8s build: branch guards, daily sequence, provenance, archive, notice and README checks passed')
@@ -452,10 +476,17 @@ def main():
     if args.parrot:
         profile_flags += [f'CONFIG_{feature}=n' for feature in
                           ('DMR_IP_GATEWAY', 'USB_NETWORK', 'NET_PPP', 'APRS', 'SFR', 'HOTSPOT', 'SATELLITE_TLE')]
-    selected = [board for board in boards.BOARDS.values() if not args.board or board.id in args.board]
-    subprocess.run(['git', 'fetch', 'origin', 'main'], cwd=ROOT, check=True)
-    subprocess.run(['git', 'merge-base', '--is-ancestor', 'origin/main', 'HEAD'], cwd=ROOT, check=True)
-    upstream_full = git('rev-parse', 'origin/main')
+    # Crucible's releases carry only its radios (crucible.toml); the old labels build every board
+    product = crucible.config(ROOT)['project'] if prefix == 'crucible' else None
+    shipped = crucible.board_ids(ROOT) if product else sorted(boards.BOARDS)
+    if args.board and set(args.board) - set(shipped):
+        raise ValueError('not a board this release ships: ' + ', '.join(sorted(set(args.board) - set(shipped))))
+    selected = [boards.BOARDS[b] for b in shipped if not args.board or b in args.board]
+    source_repo = product['repo'].removeprefix('https://github.com/') if product else 'dbehnke/RadioFoundry'
+    remote = upstream_remote()
+    subprocess.run(['git', 'fetch', remote, 'main'], cwd=ROOT, check=True)
+    subprocess.run(['git', 'merge-base', '--is-ancestor', f'{remote}/main', 'HEAD'], cwd=ROOT, check=True)
+    upstream_full = git('rev-parse', f'{remote}/main')
     commit_full = git('rev-parse', 'HEAD')
     commit_stamp = git('rev-parse', '--short=8', 'HEAD')
     upstream, commit = upstream_full[:8], commit_full[:8]
@@ -484,7 +515,7 @@ def main():
             parrot = args.parrot and 'P25' in baseline
             image_flags = [*profile_flags, 'CONFIG_P25_PARROT=' + ('y' if parrot else 'n')]
             flags = [f'BOARD={board.id}', f'BUILD={build}', f'RFOUNDRY_RELEASE={version}',
-                     'BUILD_SOURCE=fork', 'BUILD_SOURCE_REPO=dbehnke/RadioFoundry', *image_flags, *option_flags]
+                     'BUILD_SOURCE=fork', f'BUILD_SOURCE_REPO={source_repo}', *image_flags, *option_flags]
             print('building ' + name, flush=True)
             log = out / (name + '.log')
             run_logged(build_command(board, ['make', f'-j{args.jobs}', *flags, 'all', 'stack-check']), log, build_env)
@@ -514,7 +545,7 @@ def main():
                            'build_overrides': image_flags})
             shutil.rmtree(build)
     if (git('branch', '--show-current') != branch or git('rev-parse', 'HEAD') != commit_full or git('status', '--porcelain') or
-            git('rev-parse', 'origin/main') != upstream_full):
+            git('rev-parse', f'{remote}/main') != upstream_full):
         raise ValueError('source changed during the build; refusing to package')
     write_release_sums(package, images)
     profile = 'p25-calibration' if args.parrot else 'agc'
@@ -524,12 +555,13 @@ def main():
                 'commit': commit_full, 'profile': profile,
                 'build_overrides': profile_flags, 'images': images}
     (package / 'build.json').write_text(json.dumps(metadata, indent=2) + '\n')
-    (package / 'README.txt').write_text(package_readme(version, args.parrot, args.without_aes, ysf=prefix == 'kf8sysf'))
+    (package / 'README.txt').write_text(package_readme(version, args.parrot, args.without_aes,
+                                                       ysf=prefix in ('kf8sysf', 'crucible'), product=product))
     for name in ('LICENSE', 'AUTHORS', 'CONTRIBUTORS'):
         shutil.copy2(ROOT / name, package / name)
     shutil.copytree(ROOT / 'LICENSES', package / 'LICENSES')
     copy_firmware_notices(package, images, build_env)
-    archive = out / f'radiofoundry-{version}.zip'
+    archive = out / f'{"crucible" if product else "radiofoundry"}-{version}.zip'
     digest = write_archive(package, archive, images)
     print(f'ZIP: {archive}\nSHA256: {digest}')
 
