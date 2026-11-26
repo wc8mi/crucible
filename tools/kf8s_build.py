@@ -94,7 +94,7 @@ def next_sequence(path, day):
 
 
 # The C-SKY compiler runs under amd64 emulation on an Arm host, where cc1 now and then dies of a segfault on a file that
-# compiles the next time; make resumes where it stopped, so such a build is run again, a few times at most
+# compiles the next time; make resumes where it stopped, so such a build is run again, ten times at most
 COMPILER_CRASH = re.compile(r'internal compiler error: Segmentation fault|^Segmentation fault', re.M)
 
 
@@ -108,7 +108,9 @@ def run_logged(args, log, env, attempts=1):
         if attempt == attempts or not COMPILER_CRASH.search(log.read_text()):
             raise subprocess.CalledProcessError(result.returncode, args)
         print(f'  the compiler crashed (emulation); building again ({attempt + 1} of {attempts})', flush=True)
-    if re.search(r'\bwarning:', log.read_text(), re.I):
+    # Docker's note that the image is amd64 on an Arm host is not a build warning
+    text = re.sub(r"^WARNING: The requested image's platform .*$", '', log.read_text(), flags=re.M)
+    if re.search(r'\bwarning:', text, re.I):
         raise ValueError('build warnings: ' + str(log))
 
 
@@ -534,7 +536,7 @@ def main():
             print('building ' + name, flush=True)
             log = out / (name + '.log')
             run_logged(build_command(board, ['make', f'-j{args.jobs}', *flags, 'all', 'stack-check']), log, build_env,
-                       attempts=6 if board.platform == 'hrc7000' else 1)
+                       attempts=10 if board.platform == 'hrc7000' else 1)
             image = build / Path(board.build_image(options)).name
             expected = configured_features(board, [*image_flags, *option_flags], build_env) if parrot else baseline
             check_built_profile((build / 'version').read_text(), (build / 'flags').read_text(),
