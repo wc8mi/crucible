@@ -58,6 +58,7 @@ import * as crumbs from "./trail.js";
 import { missingApi, kitPanel, kitLine, supportNotices } from "./manual.js";
 import { showBetaNotice } from "./beta.js";
 import { DROP_OK, START_KEEP, currentBuild, planUpdate } from "./update.js";
+import * as rel from "./releases.js";
 import { readDfuInfo, choiceFor, hwoptAction, pendingHwopt, majorsFor, runsOriginal, BOOTLOADER } from "./origversion.js";
 import { readOriginal, deviceKind, spiSeconds, Guard } from "./origbackup.js";
 import { toSerial, CLICK_WAIT_MS } from "./netmode.js";
@@ -151,7 +152,11 @@ const S = initialState();
 const API = "https://api.radiofoundry.org/v1/";
 // minimal non-invasive reporting for helping the RadioFoundry project track programming failures; opt out with
 // ?reporting=0
-const FLASH_LOG = new URLSearchParams(location.search).get("reporting") !== "0";
+// A page that offers prebuilt releases (<body data-releases="index.json">: releases.js) updates from them, never from the
+// build service; with data-reporting="off" it sends nothing to the project's services either (a fork's own page)
+const RELEASES = document.body.dataset.releases || "";
+const NO_REPORTING = document.body.dataset.reporting === "off";
+const FLASH_LOG = !NO_REPORTING && new URLSearchParams(location.search).get("reporting") !== "0";
 
 // A version link (/flash/?version=<tag, full commit hash or branch name>) builds that version instead of the latest release. The tab keeps
 // it for the session, so a reload or a visit to another page doesn't lose it; ?version= (empty) or the banner drops it.
@@ -393,8 +398,10 @@ async function loadData() {
 	// repository texts in the page's language where the catalog overrides them (feature.<SWITCH>.*, variant.<id>.*)
 	const feats = features.features.map((f) => ({ ...f, title: tOr(`feature.${f.name}.title`, f.title), help: tOr(`feature.${f.name}.help`, f.help) }));
 	const vars = variants.variants.map((v) => ({ ...v, title: tOr(`variant.${v.id}.title`, v.title), summary: tOr(`variant.${v.id}.summary`, v.summary) }));
+	// the prebuilt releases this page offers (releases.js), their paths relative to the index
+	const index = RELEASES ? { ...rel.parseIndex(await (await fetch(new URL(RELEASES, location.href))).json()), base: new URL(RELEASES, location.href) } : null;
 	return { radios: radios.radios, features: feats, groups: features.groups, reported: features.reported || [],
-		variants: vars, fb, releases: releases.releases, site };
+		variants: vars, fb, releases: releases.releases, site, index };
 }
 
 const fb = () => (S.sim ? S.sim.fb : S.data.fb);
@@ -872,6 +879,7 @@ async function reset() {
 	// exactly a fresh load: fields set along the way (buildOptions, keyFromRadio, ...) go, the rest start over
 	for (const k of Object.keys(S)) delete S[k];
 	Object.assign(S, initialState(), keep);
+	if (RELEASES) S.task = "update";	// a page of prebuilt releases has no start view
 	setAdapter(null);	// the next connect names its own
 	render();
 }
@@ -911,7 +919,8 @@ function simLinks() {
 // update: a radio that runs RadioFoundry, reached once, its build kept
 
 // The newest release of the radio (or the version link's): what the update installs
-const updateVersion = () => VERSION_REF ? versionShort()
+const updateVersion = () => RELEASES ? (S.firmware?.manifest.version || S.pick?.release.name || "")
+	: VERSION_REF ? versionShort()
 	: S.data.releases.filter((x) => x.board === S.radio.id).at(-1)?.version || defaultRef(S.data.site.branch);
 
 // One port chooser for every radio: RadioFoundry's USB port or a programming cable. Whatever answers names the radio, and
@@ -954,6 +963,14 @@ async function connectForUpdate(status) {
 		S.now = await rfoundryNow(S.link, p);
 		await keyFromRadio(S.link);
 		await codecFromRadio(S.link, p, status);
+	}
+	// a page of prebuilt releases installs one of them as it is: nothing to match against the build service
+	if (RELEASES) {
+		S.current = { kind: "release" };
+		S.editBuild = false;
+		S.pick = null;
+		diag.note("update: radio", { board: p.board, git: p.git, git_time: p.version?.git_time ?? null, options: S.buildOptions || {} });
+		return;
 	}
 	const record = await buildRecord(p, r);
 	S.current = currentBuild(p, r, S.data.releases.filter((x) => x.board === r.id), S.data.reported, record);
@@ -1002,14 +1019,16 @@ function updateView() {
 					status.replaceChildren(connectError(e), connectHelp(e, "flash.update.not_rfoundry"));
 				}
 			}, { primary: true }));
-			out.replaceChildren(panel(t("flash.update.title"), h("p", {}, t("flash.update.lead")),
+			out.replaceChildren(panel(t(RELEASES ? "flash.release.title" : "flash.update.title"), h("p", {}, t(RELEASES ? "flash.release.lead" : "flash.update.lead")),
 				h("ol", { class: "steps" }, h("li", {}, t("flash.update.step_on")), h("li", {}, t("flash.update.step_cable")),
 					h("li", {}, t("flash.update.step_choose"))),
-				h("p", { class: "small muted" }, t("flash.update.first_install"), " ",
-					h("a", { href: "#", onclick: (e) => { e.preventDefault(); S.task = "install"; S.step = 0; render(); } }, t("flash.update.to_install"))),
+				RELEASES ? h("p", { class: "small muted" }, t("flash.release.first_install"))
+					: h("p", { class: "small muted" }, t("flash.update.first_install"), " ",
+						h("a", { href: "#", onclick: (e) => { e.preventDefault(); S.task = "install"; S.step = 0; render(); } }, t("flash.update.to_install"))),
 				status));
 			return;
 		}
+		if (RELEASES) return releasePick(out, status, draw);
 		const p = S.now.probe, cur = S.current;
 		// the radio's own build, unless the build step has the selection (edits kept when the user comes back)
 		const plan = S.editBuild ? { preset: S.selection.matches(startCode), added: [], needed: [], dropped: [], ask: [], startAsk: [], ready: true }
@@ -1100,6 +1119,94 @@ function updateView() {
 	};
 	draw();
 	return out;
+}
+
+// A page of prebuilt releases (releases.js): the releases with an image for this radio and its options, newest first,
+// the one it runs marked. The picked one is installed as it is; one older than what the radio runs needs the user's
+// word, since newer firmware may have changed what it keeps in settings
+function releasePick(out, status, draw) {
+	const p = S.now.probe, ix = S.data.index, opts = S.buildOptions || {};
+	const list = rel.forRadio(ix, S.board.id, opts, { tests: !!S.showTests });
+	const hidden = S.showTests ? 0 : rel.hiddenTests(ix, S.board.id, opts);
+	if (S.pick && !list.includes(S.pick)) S.pick = list.find((e) => e.release === S.pick.release) || null;
+	S.pick ||= list[0] || null;
+	if (S.firmware && S.firmware.tag !== S.pick?.release.tag) S.firmware = null;
+	const dir = S.pick ? rel.direction(p, S.pick.image) : null;
+	const date = (iso) => (iso ? localTime(iso) : "");
+	const choose = (e) => { S.pick = e; S.downOk = false; S.releaseError = null; draw(); };
+	const rows = list.map((e) => {
+		const d = rel.direction(p, e.image);
+		const tags = [d === "same" && ["installed", "flash.release.installed"], e.release.prerelease && ["test", "flash.release.test"],
+			d === "older" && ["older", "flash.release.older"]].filter(Boolean);
+		return h("label", { class: `release-row${e === S.pick ? " picked" : ""}` },
+			h("input", { type: "radio", name: "release", checked: e === S.pick, onchange: () => choose(e) }),
+			h("span", { class: "release-name" }, h("b", {}, e.release.name),
+				h("span", { class: "release-meta small muted" }, [e.release.tag, date(e.release.published)].filter(Boolean).join(" · "))),
+			h("span", { class: "release-tags" }, tags.map(([k, key]) => h("span", { class: `release-tag release-tag-${k}` }, t(key)))));
+	});
+	const notes = S.pick ? rel.noteBlocks(S.pick.release.notes) : [];
+	const noteNodes = [];
+	for (const b of notes) {
+		if (b.kind === "li") {
+			const last = noteNodes.at(-1);
+			if (last?.tagName === "UL") last.append(h("li", {}, b.text));
+			else noteNodes.push(h("ul", {}, h("li", {}, b.text)));
+		} else noteNodes.push(h("p", {}, b.text));
+	}
+	const notesBox = S.pick && (noteNodes.length || S.pick.release.url) ? h("details", { class: "release-notes", open: true },
+		h("summary", {}, t("flash.release.notes", { name: S.pick.release.name })), ...noteNodes,
+		S.pick.release.url ? h("p", { class: "small" }, h("a", { href: S.pick.release.url, target: "_blank", rel: "noopener" }, t("flash.release.on_github"))) : null) : null;
+	const down = dir === "older" ? h("div", { class: "notice action release-down" },
+		h("p", {}, h("b", {}, t("flash.release.older_title")), " ", t("flash.release.older_text")),
+		h("label", { class: "toggle" }, h("input", { type: "checkbox", checked: !!S.downOk, onchange: (ev) => { S.downOk = ev.target.checked; draw(); } }),
+			h("span", {}, t("flash.release.older_ok")), h("span")))
+		: dir === "unknown" ? notice(t("flash.release.unknown_age"), "info") : null;
+	const optionText = Object.entries(opts).map(([k, v]) => {
+		const o = buildOptions().find((x) => x.name === k);
+		return o?.values.find((x) => x.id === v)?.title || `${k}=${v}`;
+	}).join(", ");
+	const none = !list.length ? notice(t("flash.release.none", { radio: S.radio.name + (optionText ? ` (${optionText})` : "") }), "bad") : null;
+	const tests = hidden || S.showTests ? h("label", { class: "toggle release-tests" },
+		h("input", { type: "checkbox", checked: !!S.showTests, onchange: (ev) => { S.showTests = ev.target.checked; S.pick = null; draw(); } }),
+		h("span", {}, h("b", {}, t("flash.release.show_tests")), h("span", { class: "why" }, t("flash.release.show_tests_text", { n: hidden }))), h("span")) : null;
+	out.replaceChildren(panel(t("flash.release.title"),
+		h("dl", { class: "kv-list" },
+			h("dt", {}, t("flash.update.radio")), h("dd", {}, S.radio.name + (optionText ? ` (${optionText})` : "")),
+			h("dt", {}, t("flash.release.running")), h("dd", {}, firmwareName(p.version))),
+		h("h3", {}, t("flash.release.choose")),
+		none, list.length ? h("div", { class: "release-list", role: "radiogroup" }, rows) : null, tests, notesBox, down,
+		S.releaseError ? notice(S.releaseError, "bad") : null,
+		S.firmware ? notice(t("flash.build.image_ready", { what: S.firmware.source }), "ok") : null, status));
+	const go = async () => {
+		if (!S.firmware) await loadRelease(S.pick, draw);
+		if (S.firmware) next();
+	};
+	const blocked = !S.pick || S.releaseLoading || (dir === "older" && !S.downOk);
+	S.forward(button(S.releaseLoading ? [spinner(), t("flash.release.loading")] : t(dir === "same" ? "flash.release.reinstall" : "flash.release.go", { name: S.pick?.release.name || "" }),
+		go, { primary: true, disabled: blocked }), dir === "older" && !S.downOk ? t("flash.release.older_first") : null);
+}
+
+// The picked release's image and manifest, from this site, checked against the index, the board and the radio's options
+async function loadRelease(entry, redraw) {
+	const base = S.data.index.base;
+	const ok = (r) => { if (!r.ok) throw new Error(t("flash.release.missing", { status: r.status })); return r; };
+	S.releaseLoading = true;
+	S.releaseError = null;
+	redraw();
+	try {
+		const [m, img] = await Promise.all([fetch(new URL(entry.image.manifest, base)).then(ok).then((r) => r.json()),
+			fetch(new URL(entry.image.image, base)).then(ok).then((r) => r.arrayBuffer()).then((x) => new Uint8Array(x))]);
+		rel.checkManifest(entry.image, m);
+		await verify(m, img, fb(), S.board.id);
+		const wrong = rel.optionMismatches(m, S.buildOptions);
+		if (wrong.length) throw new Error(t("flash.build.wrong_options", { name: wrong[0][0], value: wrong[0][1] ?? wrong[0][2] }));
+		S.firmware = { manifest: m, image: img, source: entry.release.name, origin: "release", variant: m.variant || "custom", tag: entry.release.tag };
+		diag.note("update: release", { tag: entry.release.tag, git: m.git, direction: rel.direction(S.now.probe, entry.image) });
+	} catch (e) {
+		S.releaseError = errorText(e);
+	}
+	S.releaseLoading = false;
+	redraw();
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -2354,6 +2461,8 @@ function writeView() {
 		return plan;
 	}, next, what, opts);
 	if (!stubRoute()) {
+		// a page of prebuilt releases promises an update over the cable: say why this one takes the bootloader instead
+		if (RELEASES && !shortRegister()) return h("div", { class: "flasher" }, notice(t("flash.release.bootloader"), "action"), dfu());
 		if (!shortRegister()) return dfu();
 		diag.note("flash size register reads short: update mode", { flashKb: S.now.flashKb });
 		return h("div", { class: "flasher" }, notice(t("flash.f4.register_short", { kb: S.now.flashKb }), "action"), dfu());
@@ -3318,8 +3427,8 @@ async function main() {
 	S.backupParts = [];
 	const m = location.hash.match(/radio=(\w+)/);
 	const r = m && S.data.radios.find((x) => x.id === m[1]);
-	// #update: the Update task (the Codeplug Editor's Update Firmware button)
-	if (/(?:^#|&)update(?:&|$)/.test(location.hash)) {
+	// #update: the Update task (the Codeplug Editor's Update Firmware button); a page of prebuilt releases has no other
+	if (RELEASES || /(?:^#|&)update(?:&|$)/.test(location.hash)) {
 		S.task = "update";
 		S.step = 0;
 	} else if (r && available(r, "install")) {
