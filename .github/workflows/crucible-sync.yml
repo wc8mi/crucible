@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 David Behnke
+# Weekly: merge RadioFoundry's main into a sync branch (tools/crucible_sync.sh) and open a pull request to main, with
+# Crucible CI started on it. A conflict the script can't settle opens an issue instead.
+#
+# Needs the CRUCIBLE_SYNC_TOKEN secret: a fine-grained token for this repository with contents, pull requests, issues,
+# actions and workflows write. GITHUB_TOKEN can't push upstream commits that touch .github/workflows.
+name: Upstream sync
+
+on:
+  schedule:
+    - cron: "23 11 * * 1"   # Mondays 11:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Token
+        env:
+          TOKEN: ${{ secrets.CRUCIBLE_SYNC_TOKEN }}
+        run: |
+          [ -n "$TOKEN" ] || { echo "::error::set the CRUCIBLE_SYNC_TOKEN secret (see this workflow's header)"; exit 1; }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          submodules: false
+          token: ${{ secrets.CRUCIBLE_SYNC_TOKEN }}
+      - name: Merge RadioFoundry
+        id: merge
+        run: |
+          set -u
+          git config user.name "Crucible upstream sync"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/radiofoundry/radiofoundry.git
+          rc=0
+          tools/crucible_sync.sh > "$RUNNER_TEMP/sync.log" 2>&1 || rc=$?
+          cat "$RUNNER_TEMP/sync.log"
+          {
+            echo "branch=$(git branch --show-current)"
+            echo "upstream=$(git rev-parse --short=8 upstream/main)"
+            if grep -q '^sync: up to date' "$RUNNER_TEMP/sync.log"; then echo "result=current"
+            elif [ "$rc" = 0 ]; then echo "result=merged"
+            else echo "result=conflicts"; fi
+          } >> "$GITHUB_OUTPUT"
+      - name: Pull request and CI
+        if: steps.merge.outputs.result == 'merged'
+        env:
+          GH_TOKEN: ${{ secrets.CRUCIBLE_SYNC_TOKEN }}
+          BRANCH: ${{ steps.merge.outputs.branch }}
+          UPSTREAM: ${{ steps.merge.outputs.upstream }}
+        run: |
+          set -eu
+          git push -q origin "$BRANCH"
+          {
+            echo "Merges RadioFoundry \`$UPSTREAM\` into Crucible (tools/crucible_sync.sh)."
+            echo
+            echo '```'; cat "$RUNNER_TEMP/sync.log"; echo '```'
+            echo
+            echo "Before merging: Crucible CI passes, and the checks in CRUCIBLE.md, \"Merging RadioFoundry\", are done."
+          } > "$RUNNER_TEMP/body.md"
+          gh pr create --base main --head "$BRANCH" --title "Sync: RadioFoundry $UPSTREAM" --body-file "$RUNNER_TEMP/body.md"
+          gh workflow run crucible-ci.yml --ref "$BRANCH"
+      - name: Issue for conflicts
+        if: steps.merge.outputs.result == 'conflicts'
+        env:
+          GH_TOKEN: ${{ secrets.CRUCIBLE_SYNC_TOKEN }}
+          UPSTREAM: ${{ steps.merge.outputs.upstream }}
+        run: |
+          set -eu
+          {
+            echo "Merging RadioFoundry \`$UPSTREAM\` needs a person. Run \`tools/crucible_sync.sh\` locally and resolve:"
+            echo
+            echo '```'; cat "$RUNNER_TEMP/sync.log"; echo '```'
+          } > "$RUNNER_TEMP/body.md"
+          gh issue create --title "Sync: RadioFoundry $UPSTREAM conflicts" --body-file "$RUNNER_TEMP/body.md"

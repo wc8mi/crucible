@@ -50,6 +50,8 @@ endif
 -include boards/$(BOARD)/config.mk
 # The platform's defaults, after the board's: ?= keeps the first value, so the board's wins
 -include platform/$(PLATFORM)/config.mk
+# A downstream build's feature defaults (Crucible: config/crucible.mk); after the board's, so the board's still win
+-include config/crucible.mk
 # What the board or platform lists as unsupported or not written is off by default: the list is enough, no
 # CONFIG_X ?= n beside it (docs/build-config.md). A command-line CONFIG_X=y still builds it
 $(foreach f,$(sort $(BOARD_UNSUPPORTED) $(BOARD_NOT_WRITTEN)),$(eval CONFIG_$(f) ?= n))

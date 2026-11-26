@@ -39,15 +39,51 @@ agents alike. Everything in [AGENTS.md](AGENTS.md) still applies. This page adds
 
 ## Merging RadioFoundry
 
+The Upstream sync workflow does this every Monday and opens a pull request, or an issue when it can't. By hand:
+
 ```
-git fetch upstream
-git switch -c sync/upstream-$(date +%y%m%d) main
-git merge upstream/main
+tools/crucible_sync.sh        # fetches upstream, merges into sync/upstream-<date>-<hash>; pushes nothing
 JOBS=8 tools/ci.sh            # ends with "all checks passed"
 ```
 
-Resolve conflicts in favor of upstream's behavior unless the carried change is the point. Our files that upstream
-also has (README.md, the issue templates) keep our side. Merge the sync branch into `main` through a pull request.
+The script keeps files Crucible deleted deleted (RadioFoundry's workflows, the feature and radio request forms) when
+upstream changes them. Any other conflict is for a person: resolve it in favor of upstream's behavior unless the
+carried change is the point. Our files that upstream also has (README.md, the issue and PR templates) keep our side.
+Merge the sync branch into `main` through a pull request.
+
+After the merge, check:
+
+- `python3 tools/boards.py docs` changes nothing, or commit what it writes.
+- A new feature switch upstream added: on or off in [config/crucible.mk](config/crucible.mk), and in crucible.toml
+  `[ci] matrix` if a release might turn it off.
+- A UI change: regenerate the gallery (`make -C tests/host ui-gallery`), and look at the boot and About screens.
+
+## Features and defaults
+
+Nothing is removed from the tree. A feature Crucible doesn't ship is off by default in
+[config/crucible.mk](config/crucible.mk), read after each board's own `config.mk`; the board files stay upstream's.
+
+| Feature | In Crucible |
+|---|---|
+| FM, DMR, P25, NXDN | On |
+| YSF | On; incomplete, so every release is a pre-release until a build is stable |
+| Trunking (DMR Tier III, P25 trunked) | Off (`config/crucible.mk`), and out of the maximal build |
+| IP services, satellite tracking | On, best effort: upstream maintains them; their host tests run, but a failure alone doesn't block a release |
+
+## CI
+
+[Crucible CI](.github/workflows/crucible-ci.yml) runs on every pull request to `main` and every push to it.
+RadioFoundry's workflows are deleted here: their nightly and hardware jobs need runners Crucible doesn't have.
+
+| Part | What |
+|---|---|
+| Boards | Only crucible.toml `[radios]`: `tools/ci.sh` narrows any selection to them |
+| Builds | Each board's default and maximal configuration, plus each switch in crucible.toml `[ci] matrix` built off |
+| Host tests | All of them, including the audio tests (RX AGC, mic gain, beeps, the synthesized voice set) |
+| Checks | Python, docs, translations, licenses, the web flasher tests, the generated mark (`tools/crucible_mark.py --check`) |
+
+Locally, `JOBS=8 tools/ci.sh` runs the same with Crucible's boards. Listening tests on the four radios go in the
+bring-up records (`tools/bringup.py`); recordings are never committed.
 
 ## Build and package
 
@@ -86,7 +122,8 @@ Finish building and verifying the package first, then publish it in
 [wc8mi/crucible releases](https://github.com/wc8mi/crucible/releases). Use the package label as the annotated Git tag,
 pointing to the exact firmware commit in `build.json`. Push the branch and tag without changing an existing release
 tag. Attach the ZIP and its `.zip.sha256` sidecar, keep all license notices, and include the radios, changes,
-validation limits and a link to the [usage guide](docs/kf8sfork/README.md). Mark test firmware as a pre-release. The
+validation limits and a link to the [usage guide](docs/kf8sfork/README.md). Mark every release a pre-release until a build is stable (YSF is still incomplete). The flasher lists
+pre-releases when a radio has no full release. The
 [Crucible flasher](https://tinker.wc8mi.net/crucible/) lists a release once its site is rebuilt.
 
 Documentation for testers: the [usage and testing guide](docs/kf8sfork/README.md) and the

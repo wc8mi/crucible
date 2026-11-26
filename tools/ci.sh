@@ -127,6 +127,14 @@ if [ -n "$PLATFORMS$TOOLCHAINS" ]; then
 	echo "ci: $sel: ${ONLY:-no boards}"
 	[ -n "$ONLY" ] || ONLY=","
 fi
+# Crucible (crucible.toml): only the boards it ships, of those selected; the same message as an empty selection
+if [ -f crucible.toml ] && [ -n "$REG_PY" ]; then
+	if [ -z "$ONLY" ]; then ONLY=$($REG_PY tools/crucible.py boards)
+	else ONLY=$($REG_PY tools/crucible.py boards --within "$ONLY"); fi
+	echo "ci: Crucible's boards: ${ONLY:-none of those selected}"
+	[ -n "$ONLY" ] || ONLY=","
+	CRUCIBLE_MATRIX=" $($REG_PY tools/crucible.py matrix) "
+fi
 for b in $(echo "$ONLY" | tr ',' ' '); do
 	[ -f "boards/$b/board.mk" ] || { echo "ci: unknown board $b (no boards/$b/board.mk)" >&2; exit 2; }
 done
@@ -555,6 +563,7 @@ for bm in boards/*/board.mk boards/*/; do
 		case "$unsupported" in *" $f "*) ;; *) all_on="$all_on CONFIG_$f=y" ;; esac
 		[ "$QUICK" = 1 ] && continue
 		case "$required" in *" $f "*) continue ;; esac
+		[ -n "${CRUCIBLE_MATRIX:-}" ] && case "$CRUCIBLE_MATRIX" in *" $f "*) ;; *) continue ;; esac	# crucible.toml [ci]
 		[ "${kv#*=}" = y ] && build "$b" "no-$f" "CONFIG_$f=n"
 	done
 	if [ "$QUICK" = 0 ]; then

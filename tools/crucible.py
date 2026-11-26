@@ -2,10 +2,14 @@
 # Copyright (c) 2026 David Behnke
 """Crucible's scope, read from crucible.toml at the top of the tree (CRUCIBLE.md).
 
+    tools/crucible.py boards [--within a,b,...]   the boards Crucible ships, comma separated (those of the list given)
+    tools/crucible.py matrix                      the switches CI builds off, space separated
+
 Tools shared with RadioFoundry call these helpers instead of carrying their own Crucible logic, so each upstream file
 changes by a line or two and merges stay clean. Without crucible.toml every helper answers as RadioFoundry would.
 """
 import os
+import sys
 
 try:
     import tomllib
@@ -43,3 +47,26 @@ def shown(boards, root=ROOT):
 
 def active(root=ROOT):
     return config(root) is not None
+
+
+def main(argv):
+    c = config()
+    if c is None:
+        print("crucible: no crucible.toml", file=sys.stderr)
+        return 2
+    if argv[:1] == ["boards"]:
+        ids = sorted(c["radios"]["boards"])
+        if argv[1:2] == ["--within"]:
+            within = set(filter(None, argv[2].split(","))) if len(argv) > 2 else set()
+            ids = [b for b in ids if b in within]
+        print(",".join(ids))
+        return 0
+    if argv[:1] == ["matrix"]:
+        print(" ".join(c.get("ci", {}).get("matrix", [])))
+        return 0
+    print(__doc__, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

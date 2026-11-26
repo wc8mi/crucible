@@ -17,3 +17,12 @@ upstream = "https://github.com/radiofoundry/radiofoundry"
 # untouched, so upstream changes to them merge without conflicts; they are just never built or listed here.
 [radios]
 boards = ["dm1701", "dm32", "md9600", "mduv380"]
+
+# What Crucible's CI (tools/ci.sh, .github/workflows/crucible-*.yml) builds beyond each board's default and maximal
+# configurations: each switch here built off, so a release can drop it cleanly. Every other switch keeps its default and
+# is never built off: upstream's CI covers those. Host tests all run.
+[ci]
+matrix = ["P25", "NXDN", "YSF", "DMR_IP_GATEWAY", "USB_NETWORK", "HOTSPOT", "APRS", "SATELLITE_TLE"]
+# Best effort: features upstream maintains that Crucible ships but doesn't test on its radios. Their host tests run;
+# a failure is a warning in the release notes, not a blocker on its own (CRUCIBLE.md, "Releases")
+best_effort = ["DMR_IP_GATEWAY", "USB_NETWORK", "SATELLITE_TLE"]
