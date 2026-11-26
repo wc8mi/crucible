@@ -16,6 +16,7 @@
 #include "radio/radio.h"
 #include "dmr/ipGateway.h"
 #include "debuglink/dl_fmt.h"
+#include "product.h"		// the name users see (Crucible)
 
 #define LINE_MAX		64
 // The longest answer (dump_state: 134 bytes and up to 48 a band line) is built here. At most half the
@@ -313,7 +314,7 @@ static bool command(int c, char *line)
 		dl_text(&ot, ext ? "get_split_freq:\nTX Frequency: %u\n" : "%u\n", (unsigned)view->ch.tx_hz);
 	} else if (IS("_", "get_info")) {
 		get = true;
-		dl_text(&ot, ext ? "get_info:\nInfo: RadioFoundry %s\n" : "RadioFoundry %s\n", board.name);
+		dl_text(&ot, ext ? "get_info:\nInfo: " RFOUNDRY_PRODUCT " %s\n" : RFOUNDRY_PRODUCT " %s\n", board.name);
 	} else if (strcmp(cmd, "\\chk_vfo") == 0) {
 		get = true;
 		dl_text(&ot, ext ? "chk_vfo:\nCHKVFO: 0\n" : "0\n");

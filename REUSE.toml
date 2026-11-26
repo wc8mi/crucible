@@ -35,3 +35,10 @@ SPDX-License-Identifier = "MIT"
 path = ["site/static/vendor/tom-select/tom-select.complete.min.js", "site/static/vendor/tom-select/tom-select.default.css"]
 SPDX-FileCopyrightText = "2013-2026 Tom Select contributors"
 SPDX-License-Identifier = "Apache-2.0"
+
+# Crucible's marks (CRUCIBLE.md): the logo sources and their renders
+[[annotations]]
+path = ["docs/crucible/brand/**"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 David Behnke"
+SPDX-License-Identifier = "MIT"

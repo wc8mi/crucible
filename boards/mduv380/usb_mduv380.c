@@ -5,13 +5,14 @@
 #if CONFIG_USB	// the whole file
 #include "platform.h"
 #include "usb/usb_port.h"
+#include "product.h"		// the name users see (Crucible)
 
 const usb_ids_t board_usb_ids = {
 	.vid = STM32_USB_VID,
 	.pid_serial = STM32_USB_PID_SERIAL,
 	.pid_network = STM32_USB_PID_NETWORK,
 	.bcd_device = 0x0100,
-	.manufacturer = "RadioFoundry",
+	.manufacturer = RFOUNDRY_PRODUCT,
 	.product = "MD-UV380",
 	.serial_interface = "MD-UV380 serial",
 	.serial_number = stm32_usb_serial_number,

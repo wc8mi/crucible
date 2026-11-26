@@ -45,6 +45,7 @@
 #if CONFIG_SFR
 #include "dmr/sfr.h"
 #endif
+#include "product.h"		// the name users see (Crucible)
 
 // Settings > Connections > Data services: the ARS server and the IP gateway
 #define DATA_IDS	(CONFIG_DMR && (CONFIG_DMR_ARS || CONFIG_DMR_IP_GATEWAY))
@@ -5578,7 +5579,7 @@ static const char *about_text(void)
 	// wider than the display and the release wrapped without its label. A release: its name, then the commit it was
 	// built from; any other build: the commit alone
 	sb_str(&b, TR(ABOUT_BODY_FIRMWARE, "Firmware: "));
-	sb_str(&b, "RadioFoundry\n");
+	sb_str(&b, RFOUNDRY_PRODUCT "\n");
 	if (RFOUNDRY_RELEASE[0] != '\0') {
 		sb_str(&b, TR(ABOUT_BODY_RELEASE, "Release: "));
 		sb_str(&b, RFOUNDRY_RELEASE);

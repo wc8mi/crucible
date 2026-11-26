@@ -188,7 +188,7 @@ def test_rigctl(net):
         assert rx_hz == int(core["ch.rx_hz"]), (rx_hz, core)
         assert _rig(s, "m").split()[0] == "FM"
         assert _rig(s, "t").strip() in ("0", "1")
-        assert _rig(s, "\\get_info").startswith("RadioFoundry")
+        assert _rig(s, "\\get_info").startswith(("RadioFoundry", "Crucible"))
         assert _rig(s, "+f").startswith("get_freq:\nFrequency: ")
         assert _rig(s, "xyz").strip() == "RPRT -4"
         # Set the VFO 12.5 kHz up and read it back, then return

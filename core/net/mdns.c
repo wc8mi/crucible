@@ -15,6 +15,7 @@
 // mdnsTick, so a busy USB endpoint only delays them.
 #include <string.h>
 #include "net/mdns.h"
+#include "product.h"		// the name users see (Crucible)
 
 #define TYPE_A		1
 #define TYPE_PTR	12
@@ -615,7 +616,7 @@ static void make_labels(void)
 		cat(inst_label, sizeof(inst_label), id.callsign);
 		cat(inst_label, sizeof(inst_label), " ");
 	}
-	cat(inst_label, sizeof(inst_label), id.board != NULL ? id.board : "RadioFoundry");
+	cat(inst_label, sizeof(inst_label), id.board != NULL ? id.board : RFOUNDRY_PRODUCT);
 	cat(inst_label, sizeof(inst_label), " (");
 	cat(inst_label, sizeof(inst_label), num);
 	cat(inst_label, sizeof(inst_label), ")");

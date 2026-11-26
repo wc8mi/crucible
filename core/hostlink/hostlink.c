@@ -47,6 +47,7 @@
 #endif
 #include "FreeRTOS.h"
 #include "task.h"
+#include "product.h"		// the name users see (Crucible)
 
 #define HOSTLINK_TASK_PRIORITY	3	// with input and USB; above the UI (core/app/app.c task table)
 #if CONFIG_DEBUGLINK
@@ -199,7 +200,7 @@ static const mmdvm_io_t mmdvm_io = {
 
 static void make_description(void)
 {
-	static const char prefix[] = "RadioFoundry ";
+	static const char prefix[] = RFOUNDRY_PRODUCT " ";
 	const char *parts[3] = { prefix, board.name, " " RFOUNDRY_GIT };
 	size_t n = 0;
 

@@ -6,6 +6,7 @@
 #include <string.h>
 #include "snmp/snmpMib.h"
 #include "dmr/dmrDataService.h"
+#include "product.h"		// the name users see (Crucible)
 
 // The enterprise number as OID contents (base 128, X.690 8.19)
 #if RFOUNDRY_SNMP_PEN >= 2097152u
@@ -236,7 +237,7 @@ static bool get(const snmpMib_t *mib, uint8_t id, snmpValue_t *v)
 		case SYS_DESCR: {
 			char *p = c->text, *end = c->text + sizeof(c->text) - 1;
 
-			p = append(p, end, "RadioFoundry ");
+			p = append(p, end, RFOUNDRY_PRODUCT " ");
 			p = append(p, end, d->board);
 			p = append(p, end, " ");
 			p = append(p, end, d->firmware);

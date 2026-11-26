@@ -12,6 +12,7 @@
 #include "settings/settings.h"
 #include "dmr/ipGateway.h"
 #include "hal_time.h"
+#include "product.h"		// the name users see (Crucible)
 
 #ifndef RFOUNDRY_GIT
 #define RFOUNDRY_GIT "unknown"
@@ -93,7 +94,7 @@ static void drop_conn(uint32_t now)
 static void a_opened(int c)
 {
 	char line[128];
-	size_t n = dl_fmt(line, sizeof(line), "user %s pass %u vers RadioFoundry " RFOUNDRY_GIT, cur_call,
+	size_t n = dl_fmt(line, sizeof(line), "user %s pass %u vers " RFOUNDRY_PRODUCT " " RFOUNDRY_GIT, cur_call,
 			  aprsis_passcode(cur_call));
 
 	if (cur_range != 0) {

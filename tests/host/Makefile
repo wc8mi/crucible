@@ -733,7 +733,7 @@ UIAPP   := $(UI) $(CORE)/ui/ui_app.c $(CORE)/ui/ui_menus.c $(CORE)/ui/ui_find.c 
            $(CORE)/support/support_info.c sim/ui_sim.c sim/ui_png.c
 # The About page's data header, as the firmware build makes it (tools/gen_about.py; the STM32F4 list stands in)
 ABOUT_H := out/gen/rfoundry_about.h
-$(shell python3 $(ROOT)/tools/gen_about.py $(ROOT)/AUTHORS $(ROOT)/platform/stm32f4/THIRD_PARTY $(ABOUT_H) >/dev/null)
+$(shell python3 $(ROOT)/tools/gen_about.py $(firstword $(wildcard $(ROOT)/MAINTAINERS) $(ROOT)/AUTHORS) $(ROOT)/platform/stm32f4/THIRD_PARTY $(ABOUT_H) >/dev/null)
 UIFLAGS := -std=gnu99 -Wall -Wextra -Wno-unused-parameter -Wshadow -g $(COVFLAGS) $(SANFLAGS) -I$(CORE) -I$(ROOT)/hal -I. -Iout/gen \
            '-DGFX_FB_BYTES=(320u*320u*2u)' -DGFX_MAX_ROWS=320 -DCONFIG_FONT_XL=1 -DFONT_BOTH -DGFX_INDEXED=1 -DGFX_FIT_TRACE
 UIDEPS  := $(UIAPP) $(ABOUT_H) $(LANG_H) $(CORE)/dsp/speech_meter.h $(wildcard $(CORE)/ui/*.h $(CORE)/ui/fonts/*.inc sim/ui_sim.h)
@@ -1861,11 +1861,13 @@ run-ws: wsTest
 # The SNMP agent (docs/spec/snmp.md): the BER codec against hand-worked X.690 encodings, SNMPv2c processing, the MIB and
 # the notifications (snmpTest); then the agent on a loopback UDP socket against tools/rfoundry_snmp.py and, when installed,
 # the system's SNMP command line tools (snmp_peer_check.sh)
+# The encodings these tests check byte for byte carry RadioFoundry's name (core/product.h lets a build rename it)
+SNMP_NAME := -DRFOUNDRY_PRODUCT='"RadioFoundry"'
 SNMPLIB := $(CORE)/snmp/snmp.c $(CORE)/snmp/snmpBer.c $(CORE)/snmp/snmpMib.c
 TESTS   += snmpTest snmpPeer
 
 snmpTest: snmpTest.c $(SNMPLIB) $(wildcard $(CORE)/snmp/*.h)
-	$(CC) $(CFLAGS) -Wshadow -o $@ snmpTest.c $(SNMPLIB)
+	$(CC) $(CFLAGS) -Wshadow $(SNMP_NAME) -o $@ snmpTest.c $(SNMPLIB)
 
 snmpPeer: snmpPeer.c $(SNMPLIB) $(wildcard $(CORE)/snmp/*.h)
 	$(CC) $(CFLAGS) -Wshadow -o $@ snmpPeer.c $(SNMPLIB)
@@ -1874,7 +1876,7 @@ snmpPeer: snmpPeer.c $(SNMPLIB) $(wildcard $(CORE)/snmp/*.h)
 # on fakes of the radio, the settings and the gateway
 TESTS   += snmpAgentTest
 snmpAgentTest: snmpAgentTest.c fuzz.h $(CORE)/snmp/snmp_agent.c $(CORE)/hostlink/hostlink_view.c $(SNMPLIB) $(DATA) $(wildcard $(CORE)/snmp/*.h)
-	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -DCONFIG_SNMP=1 -DCONFIG_DMR_IP_GATEWAY=1 -DCONFIG_HOTSPOT=0 -o $@ \
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow $(SNMP_NAME) -DCONFIG_SNMP=1 -DCONFIG_DMR_IP_GATEWAY=1 -DCONFIG_HOTSPOT=0 -o $@ \
 		snmpAgentTest.c $(CORE)/snmp/snmp_agent.c $(CORE)/hostlink/hostlink_view.c $(SNMPLIB) $(DATA)
 
 run: run-snmp

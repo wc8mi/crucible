@@ -29,7 +29,7 @@ def test_hotspot_version_status(radio):
         try:
             kind, f = link.request(GET_VERSION, timeout=2.0)
             assert kind == "reply" and len(f) > 4, f"GET_VERSION: {kind} {f!r}"
-            assert b"RadioFoundry" in f, f
+            assert b"RadioFoundry" in f or b"Crucible" in f, f	# the product name (core/product.h)
             # The first frame takes the modem; once it has, GET_STATUS reports DMR slot 2 space (frame byte 8)
             space = 0
             for _ in range(6):

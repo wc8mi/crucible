@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "product.h"
 #include "netSvcFakes.h"
 #include "fuzz.h"
 #include "net/net.h"
@@ -557,7 +558,7 @@ static void test_rigctl(void)
 	CHECK(strcmp(rig(&a, "V VFOA\n"), "RPRT 0\n") == 0);
 	CHECK(strcmp(rig(&a, "V VFOB\n"), "RPRT -1\n") == 0);
 	CHECK(strcmp(rig(&a, "s\n"), "0\nVFOA\n") == 0);
-	CHECK(strcmp(rig(&a, "\\get_info\n"), "RadioFoundry fake\n") == 0);
+	CHECK(strcmp(rig(&a, "\\get_info\n"), RFOUNDRY_PRODUCT " fake\n") == 0);
 	CHECK(strcmp(rig(&a, "\\chk_vfo\n"), "0\n") == 0);
 	const char *ds = rig(&a, "\\dump_state\n");
 	CHECK(strncmp(ds, "0\n2\n2\n136000000 174000000 0x20 -1 -1", 35) == 0);
@@ -664,7 +665,7 @@ static void test_aprsis(void)
 	run_for(2000);
 	CHECK(srv.syns == 1 && srv.established);
 	srv.rx[srv.rxn] = 0;
-	CHECK(strcmp((char *)srv.rx, "user Q0TEST-7 pass 9667 vers RadioFoundry unknown filter m/50\r\n") == 0);
+	CHECK(strcmp((char *)srv.rx, "user Q0TEST-7 pass 9667 vers " RFOUNDRY_PRODUCT " unknown filter m/50\r\n") == 0);
 	CHECK(!net_tnc_taken());
 	// A poll whose time was read before the login went out (frames handled after it): not a timed-out login
 	aprsis_poll(now_ms - 1);

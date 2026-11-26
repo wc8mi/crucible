@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 David Behnke
+# Crucible's contact, shown under "Maintainers" on every radio's About page in place of RadioFoundry's (FORKING.md:
+# keep the License line, list your own maintainers). tools/gen_about.py reads it like AUTHORS; # lines are comments.
+# AUTHORS stays as it is: it names The RadioFoundry Authors, who hold the copyright in their code.
+David Behnke KF8S
+github.com/wc8mi/crucible

@@ -388,12 +388,14 @@ $(shell echo '$(RFOUNDRY_PRESET) $(RFOUNDRY_OFF)' | cmp -s - $(BUILD)/build_info
 	rm -f $(BUILD)/core/hostlink/build_info.o $(BUILD_INFO_TR); })
 # The About page's authors and third-party list (tools/gen_about.py), and the objects that include it when it changed
 ABOUT_OBJ := $(patsubst %.c,$(BUILD)/%.o,$(shell grep -l rfoundry_about.h $(APP_SRC) 2>/dev/null))
+# The maintainers it lists: a downstream build's own (MAINTAINERS, FORKING.md), else AUTHORS'
+ABOUT_MAINTAINERS := $(firstword $(wildcard MAINTAINERS) AUTHORS)
 # A feature built from third-party code adds its own list
 ABOUT_MORE :=
 ifeq ($(CONFIG_IMBE),y)
 ABOUT_MORE += core/mbe/THIRD_PARTY
 endif
-$(shell python3 tools/gen_about.py AUTHORS platform/$(PLATFORM)/THIRD_PARTY $(BUILD)/gen/rfoundry_about.h $(ABOUT_MORE) | grep -q changed \
+$(shell python3 tools/gen_about.py $(ABOUT_MAINTAINERS) platform/$(PLATFORM)/THIRD_PARTY $(BUILD)/gen/rfoundry_about.h $(ABOUT_MORE) | grep -q changed \
 	&& rm -f $(ABOUT_OBJ))
 # The text keys every file that includes i18n.h needs (tools/i18n.py, tr_keys.h, rewritten only when a key changed:
 # the dependency files rebuild those). A failure stops the build: the old keys would compile without a word. The

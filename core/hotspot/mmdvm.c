@@ -4,6 +4,7 @@
 #include <string.h>
 #include "hotspot/mmdvm.h"
 #include "hotspot/hotspot.h"
+#include "product.h"		// the name users see (Crucible)
 
 #define DESCRIPTION_MAX		96	// any build ID plus an extension suffix fits (docs/spec/gotchas.md 8.11)
 // a modem doesn't acknowledge DMR data frames (it only NAKs a refused one); hosts don't wait for an answer
@@ -208,7 +209,7 @@ static void get_version(void)
 {
 	uint8_t p[1 + DESCRIPTION_MAX];
 	uint8_t n = 0;
-	const char *d = (io->description != NULL) ? io->description : "RadioFoundry";
+	const char *d = (io->description != NULL) ? io->description : RFOUNDRY_PRODUCT;
 
 	p[0] = MMDVM_PROTOCOL_VERSION;
 	while ((d[n] != '\0') && (n < DESCRIPTION_MAX)) {

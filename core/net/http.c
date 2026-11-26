@@ -34,6 +34,7 @@
 #endif
 #include "net/http_assets.h"
 #include "http_assets_gen.h"	// the build's gen directory: core/net/http_assets/* (tools/gen_http_assets.py)
+#include "product.h"		// the name users see (Crucible)
 
 #ifndef RFOUNDRY_GIT
 #define RFOUNDRY_GIT "unknown"
@@ -96,7 +97,7 @@ static uint32_t usb_serial_at;
 // What a browser tab shows for the moment the request takes: a web page on the host opens it, since it can't send
 // UDP and may not fetch plain http, and the tab closes itself
 static const char usb_serial_page[] =
-	"<!doctype html><meta charset=utf-8><title>RadioFoundry</title>"
+	"<!doctype html><meta charset=utf-8><title>" RFOUNDRY_PRODUCT "</title>"
 	"<p>The radio's USB is switching to a serial port. You can close this tab."
 	"<script>setTimeout(function(){window.close()},300)</script>";
 #endif

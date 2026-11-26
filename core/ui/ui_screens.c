@@ -12,6 +12,7 @@
 #include "ui_svc_aprs.h"
 #include "cjk_font.h"	// CJK_FONT_H: the line height a CJK language needs (CONFIG_LANG_ZH)
 #include "config.h"
+#include "product.h"	// the wordmark and the mark (Crucible)
 #include "audio/rx_agc.h"
 #include "ui_signal.h"
 #include "codeplug/codeplug_modes.h"	// channel kinds: the mode word
@@ -919,6 +920,10 @@ void ui_draw_hint(const char *text, bool toast)
 static const color_t ORANGE = RGB565(242, 96, 31), SKY = RGB565(203, 74, 24), CREAM = RGB565(255, 243, 220),
 	BROWN = RGB565(59, 23, 9), AMBER = RGB565(255, 179, 71), PEACH = RGB565(255, 217, 168);
 
+#if RFOUNDRY_PRODUCT_MARK
+#include "product_mark.h"
+#endif
+
 static bool in_rrect(int px, int py, int x, int y, int w, int h, int r)
 {
 	if (px < x || px >= x + w || py < y || py >= y + h)
@@ -932,6 +937,11 @@ static bool in_rrect(int px, int py, int x, int y, int w, int h, int r)
 static int mark_color(int X, int Y, bool mono, bool small)
 {
 	color_t ink = ui_col.fg, paper = ui_col.bg;
+#if RFOUNDRY_PRODUCT_MARK
+	(void)paper;
+	(void)small;
+	return product_mark_color(X, Y, mono, ink);
+#endif
 	int ax = X > 512 ? X - 512 : 512 - X, ay = Y > 512 ? Y - 512 : 512 - Y;
 	if (ay * 1000 + ax * 577 > 482000 || ax > 417)
 		return -1;
@@ -984,13 +994,19 @@ static void draw_mark(int cx, int cy, int r)
 	}
 }
 
-// The wordmark: "Radio" in the accent color, "Foundry" in the text color, centered; returns its height
+// The wordmark (product.h): the accent part in the accent color, the rest in the text color, at x; returns its width
+static int wordmark_at(const font_t *f, int x, int y)
+{
+	int w1 = gfx_text_width(f, RFOUNDRY_WORDMARK_ACCENT) + (RFOUNDRY_WORDMARK_REST[0] != '\0');
+	gfx_text(f, x, y, RFOUNDRY_WORDMARK_ACCENT, gfx_bpp() == 1 ? ui_col.fg : AMBER);
+	gfx_text(f, x + w1, y, RFOUNDRY_WORDMARK_REST, ui_col.fg);
+	return w1 + gfx_text_width(f, RFOUNDRY_WORDMARK_REST);
+}
+
+// The wordmark centered; returns its height
 static int draw_wordmark(const font_t *f, int y)
 {
-	int w1 = gfx_text_width(f, "Radio") + 1, w = w1 + gfx_text_width(f, "Foundry");
-	int x = (gfx_width() - w) / 2;
-	gfx_text(f, x, y, "Radio", gfx_bpp() == 1 ? ui_col.fg : AMBER);
-	gfx_text(f, x + w1, y, "Foundry", ui_col.fg);
+	wordmark_at(f, (gfx_width() - gfx_text_width(f, RFOUNDRY_WORDMARK_ACCENT RFOUNDRY_WORDMARK_REST)) / 2, y);
 	return f->h;
 }
 
@@ -1000,7 +1016,7 @@ void ui_draw_splash(const char *board_name, const char *version, const char *lin
 	const ui_layout_t *L = &ui_layout;
 	gfx_clear(ui_col.bg);
 
-	const char *word = "RadioFoundry";
+	const char *word = RFOUNDRY_WORDMARK_ACCENT RFOUNDRY_WORDMARK_REST;
 	const font_t *wf = gfx_text_width(L->large, word) <= w - 4 ? L->large :
 		gfx_text_width(L->medium, word) <= w - 4 ? L->medium : L->small;
 	// The owner's lines (the CPS boot text): as large as fits, never dropped
@@ -1070,8 +1086,7 @@ void ui_draw_splash(const char *board_name, const char *version, const char *lin
 		int sw = side_w, ww = gfx_text_width(wf, word);
 		int x0 = (w - sw - ww) / 2, row_h = 2 * side_r > wf->h ? 2 * side_r : wf->h;
 		draw_mark(x0 + (sw - 4) / 2, y + row_h / 2, side_r);
-		gfx_text(wf, x0 + sw, y + (row_h - wf->h) / 2, "Radio", gfx_bpp() == 1 ? ui_col.fg : AMBER);
-		gfx_text(wf, x0 + sw + gfx_text_width(wf, "Radio") + 1, y + (row_h - wf->h) / 2, "Foundry", ui_col.fg);
+		wordmark_at(wf, x0 + sw, y + (row_h - wf->h) / 2);
 		y += row_h;
 	} else
 		y += draw_wordmark(wf, y);
