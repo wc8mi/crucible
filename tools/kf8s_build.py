@@ -93,9 +93,21 @@ def next_sequence(path, day):
 
 
 
-def run_logged(args, log, env):
-    with log.open('w') as stream:
-        subprocess.run(args, cwd=ROOT, env=env, stdout=stream, stderr=subprocess.STDOUT, check=True)
+# The C-SKY compiler runs under amd64 emulation on an Arm host, where cc1 now and then dies of a segfault on a file that
+# compiles the next time; make resumes where it stopped, so such a build is run again, a few times at most
+COMPILER_CRASH = re.compile(r'internal compiler error: Segmentation fault|^Segmentation fault', re.M)
+
+
+def run_logged(args, log, env, attempts=1):
+    log.write_text('')
+    for attempt in range(1, attempts + 1):
+        with log.open('a') as stream:
+            result = subprocess.run(args, cwd=ROOT, env=env, stdout=stream, stderr=subprocess.STDOUT)
+        if not result.returncode:
+            break
+        if attempt == attempts or not COMPILER_CRASH.search(log.read_text()):
+            raise subprocess.CalledProcessError(result.returncode, args)
+        print(f'  the compiler crashed (emulation); building again ({attempt + 1} of {attempts})', flush=True)
     if re.search(r'\bwarning:', log.read_text(), re.I):
         raise ValueError('build warnings: ' + str(log))
 
@@ -347,6 +359,9 @@ def test_release_notices():
 
 
 def self_test():
+    assert COMPILER_CRASH.search('csky-elf-gcc: internal compiler error: Segmentation fault signal terminated program cc1')
+    assert COMPILER_CRASH.search('x\nSegmentation fault\nmake: *** [Makefile:467: a.tr] Error 1')
+    assert not COMPILER_CRASH.search("a.c:3:1: error: expected ';'\nmake: *** [Makefile:467: a.o] Error 1")
     assert require_branch('kf8sfork') == 'kf8s' and require_branch('kf8sforkysf') == 'kf8sysf'
     assert require_branch('main') == 'crucible'
     for branch in ('feat/p25-contact-lookup', 'feat/audio-rx-agc', 'HEAD'):
@@ -518,7 +533,8 @@ def main():
                      'BUILD_SOURCE=fork', f'BUILD_SOURCE_REPO={source_repo}', *image_flags, *option_flags]
             print('building ' + name, flush=True)
             log = out / (name + '.log')
-            run_logged(build_command(board, ['make', f'-j{args.jobs}', *flags, 'all', 'stack-check']), log, build_env)
+            run_logged(build_command(board, ['make', f'-j{args.jobs}', *flags, 'all', 'stack-check']), log, build_env,
+                       attempts=6 if board.platform == 'hrc7000' else 1)
             image = build / Path(board.build_image(options)).name
             expected = configured_features(board, [*image_flags, *option_flags], build_env) if parrot else baseline
             check_built_profile((build / 'version').read_text(), (build / 'flags').read_text(),
