@@ -5,7 +5,7 @@
 
 | | |
 |---|---|
-| Status | Proposed |
+| Status | Accepted (KF8S, 2026-11-26) |
 | Date | 2026-11-26 |
 | Decides | What the DMR TX level and YSF TX level settings mean, and where the difference between radios is kept |
 
