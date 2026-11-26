@@ -1,0 +1,192 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 David Behnke */
+/*
+ * Crucible's flasher page (tools/crucible_site.py): loaded after tokens.css and site.css, so the shared flasher keeps
+ * its markup and flow and only the look changes. Cast iron and molten metal: hot-core orange (#FF7738) owns the shell,
+ * flame (#FFC45D) marks the live edge, iron-black (dark) or greensand grey (light) is the ground. Every progress bar is
+ * a pour. Dark is the default; light with the system setting unless the visitor picked dark, always with
+ * data-theme="light".
+ */
+
+@font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 600; font-display: swap;
+	src: url("fonts/barlow-condensed-600-latin.woff2") format("woff2");
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 600; font-display: swap;
+	src: url("fonts/barlow-condensed-600-latin-ext.woff2") format("woff2");
+	unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 700; font-display: swap;
+	src: url("fonts/barlow-condensed-700-latin.woff2") format("woff2");
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 700; font-display: swap;
+	src: url("fonts/barlow-condensed-700-latin-ext.woff2") format("woff2");
+	unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
+/* Dark: the iron. The default, and with data-theme="dark"; as specific as tokens.css's own dark block, so it wins */
+:root, :root:not([data-theme="light"]), :root[data-theme="dark"] {
+	color-scheme: dark;
+	--font-cast: "Barlow Condensed", "Arial Narrow", sans-serif;
+	--radius: 4px;
+	--radius-sm: 3px;
+	--wrap: 980px;
+
+	--hot: #ff7738;			/* hot-core: the shell, the primary action, the pour */
+	--flame: #ffc45d;		/* the live edge only: the pour's leading edge, focus */
+	--iron: #1a120c;		/* type on hot-core: 7:1 */
+	--cooling: #9c3410;		/* the pour behind its edge */
+
+	--bg: #14100d;
+	--surface: #1e1915;
+	--surface-2: #2a231d;
+	--text: #f2ece6;
+	--muted: #b9aca0;
+	--faint: #968a80;
+	--border: #3d332b;
+	--accent: var(--hot);
+	--accent-text: var(--iron);
+	--accent-soft: #3a1f12;
+	--link: #ff9e6a;
+	--focus: var(--flame);
+	--code-bg: #2a231d;
+	--ok: #86d6a0;
+	--ok-soft: #16291c;
+	--warn: #f2bd57;
+	--warn-soft: #33270f;
+	--bad: #ff8f80;
+	--bad-soft: #3a1714;
+	--info-soft: #241e19;
+	--shadow: 0 1px 1px rgb(0 0 0 / 35%), 0 6px 18px rgb(0 0 0 / 28%);
+}
+
+/* Light: greensand, the moulding sand's grey with a green cast, never cream */
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme="dark"]) {
+		color-scheme: light;
+		--bg: #d8dbd4;
+		--surface: #eff1ec;
+		--surface-2: #c8ccc3;
+		--text: #1c1612;
+		--muted: #4c4f47;
+		--faint: #595c54;
+		--border: #aeb2a8;
+		--accent-soft: #f7d9c8;
+		--link: #a33d0b;
+		--focus: #a33d0b;
+		--code-bg: #dfe2db;
+		--ok: #1d6b35;
+		--ok-soft: #dcefe1;
+		--warn: #7c5100;
+		--warn-soft: #f5e7c8;
+		--bad: #a3241a;
+		--bad-soft: #f6dcd8;
+		--info-soft: #e4e7e0;
+		--shadow: 0 1px 1px rgb(40 24 12 / 8%), 0 6px 16px rgb(40 24 12 / 9%);
+	}
+}
+:root[data-theme="light"] {
+	color-scheme: light;
+	--bg: #d8dbd4;
+	--surface: #eff1ec;
+	--surface-2: #c8ccc3;
+	--text: #1c1612;
+	--muted: #4c4f47;
+	--faint: #595c54;
+	--border: #aeb2a8;
+	--accent-soft: #f7d9c8;
+	--link: #a33d0b;
+	--focus: #a33d0b;
+	--code-bg: #dfe2db;
+	--ok: #1d6b35;
+	--ok-soft: #dcefe1;
+	--warn: #7c5100;
+	--warn-soft: #f5e7c8;
+	--bad: #a3241a;
+	--bad-soft: #f6dcd8;
+	--info-soft: #e4e7e0;
+	--shadow: 0 1px 1px rgb(40 24 12 / 8%), 0 6px 16px rgb(40 24 12 / 9%);
+}
+
+/* The parts the browser draws */
+::selection { background: var(--hot); color: var(--iron); }
+html { scrollbar-color: var(--border) var(--bg); accent-color: var(--hot); caret-color: var(--hot); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 2px; }
+a { text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
+.mono, code, .build-stamp { font-variant-numeric: tabular-nums; }
+
+/* Casting marks: headings in the condensed face, uppercase like letters cast into iron */
+h1, h2, .cx-word { font-family: var(--font-cast); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+h1, .page-head.compact h1 { font-size: clamp(2rem, 4.2vw, 2.9rem); line-height: 1; text-wrap: balance; }
+h2 { font-size: clamp(1.35rem, 2.2vw, 1.65rem); line-height: 1.1; }
+h3 { font-weight: 650; }
+
+/* The band: hot-core across the top, the mark and the wordmark in iron */
+.cx-band { background: var(--hot); color: var(--iron); border-bottom: 1px solid rgb(0 0 0 / 22%); }
+.cx-band .wrap { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 60px; }
+.cx-brand { display: inline-flex; align-items: center; gap: 0.6rem; color: var(--iron); text-decoration: none; }
+.cx-brand svg { width: 26px; height: 30px; flex: none; }
+.cx-word { font-size: 1.7rem; text-transform: uppercase; letter-spacing: 0.06em; line-height: 1; }
+.cx-band .theme-toggle { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: var(--radius);
+	background: transparent; border: 1px solid rgb(26 18 12 / 35%); color: var(--iron); cursor: pointer; }
+.cx-band .theme-toggle:hover { background: rgb(26 18 12 / 10%); }
+.cx-band .theme-toggle svg { width: 20px; height: 20px; }
+.cx-band :focus-visible { outline-color: var(--iron); }
+
+/* The page head: what this page does, in one line */
+.page-head { padding-top: var(--space-6); padding-bottom: var(--space-3); }
+.page-head h1 { margin-bottom: var(--space-3); }
+.page-head .lead, .page-head.compact .lead { display: block; max-width: 72ch; font-size: 1.05rem; color: var(--muted); margin: 0; }
+
+/* Plates: square shoulders, full borders */
+.panel { border-radius: var(--radius); padding: var(--space-5); }
+.panel .panel { border-radius: var(--radius-sm); }
+.panel h2 { margin-bottom: var(--space-4); }
+.btn { border-radius: var(--radius-sm); font-weight: 600; }
+.btn-primary { background: var(--hot); border-color: var(--hot); color: var(--iron); }
+.btn-primary:hover { background: #ff8a52; border-color: #ff8a52; filter: none; }
+.btn-primary:active { background: #f0682b; }
+.btn-quiet:hover { color: var(--text); background: var(--surface-2); }
+
+/* Notices: a tinted plate with a full border, never a side bar */
+.notice, .notice.info, .notice.ok, .notice.bad, .notice.calm { border-left: 0; border: 1px solid var(--warn); border-radius: var(--radius-sm); }
+.notice.info { border-color: var(--border); }
+.notice.ok, .notice.calm { border-color: color-mix(in srgb, var(--ok) 55%, transparent); }
+.notice.bad { border-color: color-mix(in srgb, var(--bad) 60%, transparent); }
+.notice { border-color: color-mix(in srgb, var(--warn) 55%, transparent); }
+/* The flasher's standing "stay on this page" line is a caution, not an error: an error that follows must stand out */
+#flasher > p.notice.bad:has(> strong:only-child) { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 55%, transparent); }
+
+/* The stepper: plates in a row; done steps carry a drawn check, the current one is hot with a flame edge */
+.stepper li { border-radius: var(--radius-sm); }
+.stepper li::before { border-radius: 2px; font-variant-numeric: tabular-nums; }
+.stepper li[aria-current] { border-color: var(--hot); box-shadow: inset 0 -2px 0 var(--flame); }
+.stepper li[aria-current]::before { background: var(--hot); color: var(--iron); }
+.stepper li.done::before { content: ""; background-color: var(--ok);
+	-webkit-mask: url("check.svg") center / 0.85rem no-repeat; mask: url("check.svg") center / 0.85rem no-repeat; }
+
+/* The release list: plates with square shoulders; the picked one carries the flame edge like the current step */
+.release-row, .release-tag { border-radius: var(--radius-sm); }
+.release-row.picked { box-shadow: inset 0 -2px 0 var(--flame); }
+.release-name b { font-family: var(--font-mono); font-size: 0.95em; font-variant-numeric: tabular-nums; }
+
+/* The pour: the mould is an iron channel in both themes, so the flame edge shows on it; the metal cools behind that
+   edge, and once the pour stops (done, or stopped by an error) the casting sets: no flame */
+.progress { height: 14px; border-radius: 2px; background: #2a231d; box-shadow: inset 0 1px 2px rgb(0 0 0 / 45%); }
+.progress > span { position: relative; border-radius: 2px;
+	background: linear-gradient(90deg, var(--cooling) 0%, #c84a13 40%, var(--hot) 82%, var(--flame) 100%);
+	transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.progress.active > span { background-image: linear-gradient(90deg, var(--cooling) 0%, #c84a13 40%, var(--hot) 82%, var(--flame) 100%);
+	background-size: 100% 100%; animation: none; }
+.progress.active > span::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 10px;
+	background: var(--flame); animation: cx-melt 1.1s ease-in-out infinite alternate; }
+.progress:not(.active) > span { background: linear-gradient(90deg, var(--cooling), var(--hot)); }
+@keyframes cx-melt { from { opacity: 1; } to { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) {
+	.progress > span { transition: none; }
+	.progress.active > span::after { animation: none; opacity: 1; }
+}
+
+/* The foot: who made it, where help is, what it's based on */
+.cx-foot { margin-top: var(--space-7); border-top: 1px solid var(--border); background: var(--surface); }
+.cx-foot .wrap { display: grid; gap: var(--space-2); padding-top: var(--space-5); padding-bottom: var(--space-5); font-size: var(--text-sm); color: var(--muted); }
+.cx-foot p { margin: 0; max-width: 72ch; }
+.cx-foot strong { color: var(--text); }
+.cx-foot .build-stamp { justify-self: start; text-align: left; margin: 0; color: var(--faint); font-family: var(--font-mono); font-size: var(--text-xs); }
