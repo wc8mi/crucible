@@ -43,6 +43,13 @@ precedence = "override"
 SPDX-FileCopyrightText = "2026 David Behnke"
 SPDX-License-Identifier = "MIT"
 
+# Crucible's decision records: the screens of each record's prototype
+[[annotations]]
+path = ["docs/crucible/adr/**/*.png"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 David Behnke"
+SPDX-License-Identifier = "MIT"
+
 # Crucible's design records (Impeccable): generated JSON and Markdown that carry no header
 [[annotations]]
 path = [".impeccable/**"]
