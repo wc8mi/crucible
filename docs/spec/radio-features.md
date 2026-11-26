@@ -340,8 +340,8 @@ It retains each board's measured correction without applying that offset to othe
 hardware page records its measurement. The AMBE path combines this offset and any software manual gain into one
 requested multiplier (`ambeVoiceSetMicGainQ8`); neither is applied as a separate PCM scaling stage. The codec's
 existing internal AGC options remain unchanged. A codec with internal AGC uses the middle manual step, while the
-fixed board calibration still applies. No external AMBE RMS target is introduced until its actual codec baseline
-is measured. The shared AMBE microphone path also serves NXDN.
+fixed board calibration still applies. The TX level settings below add an optional software RMS target in its
+place. The shared AMBE microphone path also serves NXDN.
 
 `CONFIG_TX_MIC_LIMITER` defaults to DMR and protects the digital microphone PCM before AMBE or P25 encoding.
 One shared block controller (`core/dsp/tx_level.h`) applies the requested manual software gain once, with a
@@ -366,6 +366,47 @@ peak ceiling reduced the requested gain, rather than ordinary recovery or RMS at
 The board stores the user offset and applies it on its normal transmit entry. Its codec ADC may also feed VOX;
 software PCM calibration does not change the VOX measurement. Without `CONFIG_DMR` and without a hardware gain
 hook the Mic gain row is dimmed.
+
+**TX level (`CONFIG_TX_MIC_LIMITER`).** Settings > Talk & listen > DMR TX level and YSF TX level choose the AMBE
+leveling target of each profile: Off, or an RMS target of -30 to -12 dBFS in 2 dB steps
+(`tx_level_choice_rms()`, `core/dsp/tx_level.h`). Off keeps the manual gain with the peak limiter, as above. A
+target runs the same controller as P25 AGC (`tx_level_process`) and clears the codec's internal AGC option
+(`VOCODER_OPT_AGC`) for that transmission, so the two don't fight. The YSF engine selects its profile before it
+keys (`ambeVoiceTxProfile`); every other AMBE transmission (DMR, NXDN) uses the DMR profile. The profile is latched
+when the transmission starts.
+
+**Mic input.** Settings > Talk & listen > Mic input is a step of the board's analog microphone input gain,
+`HAL_MIC_INPUT_MIN` to `HAL_MIC_INPUT_MAX` (-7 to +8) around its default. It sets the level the codec ADC sees
+before any software gain, so it is the control for clipping at the ADC: a target can't undo a clipped input. The
+board applies it through `hal_radio_t.mic_input` in the radio task, at once when in digital mode and again on each
+digital mode entry. Boards without the hook dim the row; [feature-matrix.md](../feature-matrix.md) lists them.
+
+**Mic check (`CONFIG_MIC_CHECK`, needs `CONFIG_TX_MIC_LIMITER`).** Settings > Advanced > Mic check meters the AMBE
+microphone path without transmitting, on a DMR, NXDN or YSF channel (`RREQ_MIC`, `radio_req_mic_check`; NXDN
+uses the DMR profile). The radio
+core keeps the AMBE stream running while the screen is open and selects the channel's profile. Each 200 ms window
+(`AMBE_MIC_CHECK_BLOCKS`) shows:
+
+| Row | Meaning |
+|---|---|
+| TX level | the profile's target. OK steps it up, a long press down; saved and in force at once |
+| Mic input | the board's analog step, as the setting |
+| Mic dBFS | the board's samples: RMS / peak |
+| Mic rail samples | samples at or past 32000 (`AMBE_MIC_CLIP`): the ADC is clipping; lower Mic input |
+| Encoder dBFS | what the encoder would get after the gain and limiter: RMS / peak |
+| Gain dB | the gain in force at the window's end |
+| Limited blocks | blocks the peak ceiling cut |
+| Decoded dBFS | the last playback: RMS over blocks louder than -50 dBFS, and peak |
+
+Record speech keeps up to 2 s of encoded frames (`AMBE_MIC_CHECK_FRAMES`, 7 bytes each). Stop and play, or the 2 s
+limit, decodes them to the speaker and meters the decoded audio: the level the far end hears, to set the target
+by. Receive audio is muted while recording or playing. The vocoder keeps one state for encode and decode, so the
+check records first and decodes after, never both at once. A transmission, a channel change away from DMR or YSF,
+or leaving the screen ends it. The debug link's `dmr_tx_audio` view shows `voice.tx_profile`,
+`voice.tx_target_rms`, `voice.tx_target_dmr`, `voice.tx_target_ysf` and the `mic_check.*` meters (dBFS x 10).
+
+Without a mic check, a second radio's receive audio levels row ([rx-agc.md](rx-agc.md)) gives the decoded level
+of a real transmission.
 
 ### 3.7 DTMF transmit (CONFIG_DTMF)
 

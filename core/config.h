@@ -358,6 +358,9 @@
 #ifndef CONFIG_TX_MIC_LIMITER
 #define CONFIG_TX_MIC_LIMITER 0
 #endif
+#ifndef CONFIG_MIC_CHECK
+#define CONFIG_MIC_CHECK 0
+#endif
 #ifndef CONFIG_TX_DC_BLOCK
 #define CONFIG_TX_DC_BLOCK 0
 #endif
@@ -374,8 +377,12 @@
 #ifndef CONFIG_NXDN_SCRAMBLER
 #define CONFIG_NXDN_SCRAMBLER		0
 #endif
+// YSF (C4FM) DN voice (core/ysf, docs/spec/ysf.md)
+#ifndef CONFIG_YSF
+#define CONFIG_YSF			0
+#endif
 #ifndef CONFIG_AIR
-#define CONFIG_AIR			(CONFIG_P25 || CONFIG_NXDN)
+#define CONFIG_AIR			(CONFIG_P25 || CONFIG_NXDN || CONFIG_YSF)
 #endif
 // P25 trunked: the codec of its systems and channels (docs/spec/p25-codeplug.md 3), the control channel decoded, voice
 // channel grants followed and, where the system allows it, registration and transmit on a grant (core/p25/p25_follow.c)
@@ -394,6 +401,10 @@
 #ifndef CONFIG_AIR_RAW
 #define CONFIG_AIR_RAW			0
 #endif
+// AIR_RX_ADAPT: the soft modem's adaptive receive options a mode's profile may ask for (docs/spec/air-interface.md 6.1)
+#ifndef CONFIG_AIR_RX_ADAPT
+#define CONFIG_AIR_RX_ADAPT		0
+#endif
 #ifndef CONFIG_IMBE
 #define CONFIG_IMBE			CONFIG_P25
 #endif
@@ -403,7 +414,7 @@
 // Derived: zone sharing carries channels of a kind and their systems (docs/spec/zone-share.md 4.2) in a build with a
 // mode's codec. Without it a share leaves channels of a kind out and refuses a record that has them
 #ifndef CONFIG_ZONE_SHARE_MODES
-#define CONFIG_ZONE_SHARE_MODES		(CONFIG_ZONE_SHARE && (CONFIG_P25 || CONFIG_NXDN || CONFIG_DMR_TRUNK))
+#define CONFIG_ZONE_SHARE_MODES		(CONFIG_ZONE_SHARE && (CONFIG_P25 || CONFIG_NXDN || CONFIG_YSF || CONFIG_DMR_TRUNK))
 #endif
 // The GPS status screen: the satellites (NMEA GSV / GSA) on a sky plot and signal bars, the fix's quality, the grid
 // locator (core/position/nmea_sky.c, core/ui/ui_gps.c). Needs GPS
@@ -436,6 +447,14 @@
 #define RFOUNDRY_CPU_DATA		__attribute__((section(RFOUNDRY_CPU_DATA_SECTION)))
 #else
 #define RFOUNDRY_CPU_DATA
+#endif
+// Hot code: in RAM where the platform runs code from RAM faster than from its flash and gives a section for it
+// (RFOUNDRY_HOT_CODE_SECTION), else where all code goes. Only for small functions on a per-sample or per-symbol path:
+// each costs RAM as well as flash, and is never inlined into a caller left in flash
+#ifdef RFOUNDRY_HOT_CODE_SECTION
+#define RFOUNDRY_HOT_CODE		__attribute__((section(RFOUNDRY_HOT_CODE_SECTION), noinline))
+#else
+#define RFOUNDRY_HOT_CODE
 #endif
 // Large, cold state can go in RAM the board sets apart that is slower or shared with another bus master, so it costs
 // no main RAM: zeroed at start-up like .bss. Only for buffers task code uses now and then (a flash sector, a request
@@ -538,10 +557,16 @@
 #error "CONFIG_NET_PPP needs CONFIG_HOSTLINK and CONFIG_DMR_IP_GATEWAY"
 #endif
 #if CONFIG_AIR_RAW && !CONFIG_AIR
-#error "CONFIG_AIR_RAW needs CONFIG_P25 or CONFIG_NXDN (an air-framed mode)"
+#error "CONFIG_AIR_RAW needs CONFIG_P25, CONFIG_NXDN or CONFIG_YSF (an air-framed mode)"
 #endif
 #if CONFIG_AIR_RAW && !CONFIG_DEBUGLINK
 #error "CONFIG_AIR_RAW needs CONFIG_DEBUGLINK"
+#endif
+#if CONFIG_AIR_RX_ADAPT && !CONFIG_AIR
+#error "CONFIG_AIR_RX_ADAPT needs CONFIG_P25, CONFIG_NXDN or CONFIG_YSF (an air-framed mode)"
+#endif
+#if CONFIG_AIR_RX_ADAPT && !CONFIG_SUBTONE
+#error "CONFIG_AIR_RX_ADAPT needs CONFIG_SUBTONE (the standard tone and code lists, core/radio/tones.c)"
 #endif
 #if CONFIG_NET_TCP && !CONFIG_DMR_IP_GATEWAY
 #error "CONFIG_NET_TCP needs CONFIG_DMR_IP_GATEWAY"
@@ -612,6 +637,9 @@
 #if CONFIG_TX_MIC_LIMITER && !CONFIG_DMR
 #error "CONFIG_TX_MIC_LIMITER needs CONFIG_DMR"
 #endif
+#if CONFIG_MIC_CHECK && !CONFIG_TX_MIC_LIMITER
+#error "CONFIG_MIC_CHECK needs CONFIG_TX_MIC_LIMITER"
+#endif
 #if (CONFIG_TX_DC_BLOCK || CONFIG_P25_TX_AGC || CONFIG_P25_PARROT) && !CONFIG_P25
 #error "P25 input leveling and parrot need CONFIG_P25"
 #endif
@@ -620,6 +648,9 @@
 #endif
 #if CONFIG_NXDN && !CONFIG_DMR
 #error "CONFIG_NXDN needs CONFIG_DMR (its voice is the DMR vocoder's)"
+#endif
+#if CONFIG_YSF && !CONFIG_DMR
+#error "CONFIG_YSF needs CONFIG_DMR (its voice is the DMR vocoder's)"
 #endif
 #if (CONFIG_APRS_RX && !CONFIG_APRS_AFSK) || (CONFIG_APRS_IGATE && !(CONFIG_APRS_RX && CONFIG_HOSTLINK))
 #error "an APRS sub-feature is on without its parent (APRS_RX needs APRS_AFSK; APRS_IGATE needs APRS_RX and HOSTLINK)"

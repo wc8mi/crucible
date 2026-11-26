@@ -151,6 +151,7 @@ Ids are only appended and never reused. A kind and a system type that belong tog
 | 3 | P25 trunked | P25T | `CONFIG_P25_TRUNK` and a board whose air interface receives P25; receive, and transmit where the system allows it ([p25-trunking.md](p25-trunking.md) 5, 7) | [p25-codeplug.md](p25-codeplug.md) |
 | 4 | NXDN conventional | NXDN | `CONFIG_NXDN` and a board whose air interface carries NXDN (`radio_nxdn_fits`) | [nxdn-codeplug.md](nxdn-codeplug.md) |
 | 5 | Conventional DMR AES-256 | AES | `CONFIG_DMR_AES` | See below |
+| 103 | YSF (C4FM), DN voice | YSF | `CONFIG_YSF` and a board whose air interface carries YSF (`radio_ysf_fits`) | [ysf-codeplug.md](ysf-codeplug.md) |
 
 | System type | Name | Short | Built when | Spec |
 |---|---|---|---|---|
@@ -282,6 +283,11 @@ Key 0x0100 + n, n = 0-254 (0xFF is "none" in a tag).
 
 Listen only is a per-system choice of the user. It is not a sharing rule: a share carries the flag as set (8), and a
 receiver never forces it. A channel's own TX flag (2.1) still applies on a system that allows the transmit side.
+
+A type's mode module may name network IDs the radio refuses to transmit on (`noTx(fields)`). For such a system the
+editor shows listen only, locks the Transmit choice, hides the fields only a transmitter reads (the module marks them
+`txOnly`) and writes the flag clear on save and export. The firmware enforces the rule whatever is stored. The P25
+trunked type's IDs are in [p25-codeplug.md](p25-codeplug.md) 3.
 
 ### 7.2 System entries
 

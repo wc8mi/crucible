@@ -77,10 +77,13 @@ Text is shortened with a middle ellipsis only as a last resort (P5 allows it for
 - Home's talk target line (DMR target or FM frequency) drops to the small font as a whole, then takes the target's
   short form; a frequency is never shortened. An FM channel's line is its RX frequency and a repeater's offset
   ("147.060 MHz +600k", no arrow), which drops " MHz", then the offset. While PTT is held (transmitting or refused),
-  and in the VFO, the line is the arrow and the TX frequency. Large-text Home picks the largest font each line fits
-  in, and takes the short form before it would go below the medium font. The short form of a talkgroup is its number
-  ("TG 91 World" becomes "TG 91"); of a private contact, its name ("Joe Smith 9991234" becomes "Joe Smith"). A
-  contact's ID alone says nothing at a glance, so it is what goes. An ID without a contact is shown as the ID.
+  and in the VFO, the line is the arrow and the TX frequency. A trunked P25 channel's line is the follower's state
+  ([p25-trunking.md](p25-trunking.md) 7); idle on the control channel of a system that can't transmit (listen only,
+  or blocked) it is `WORD_RX_ONLY` in the warning color, as an RX-only channel's is. Large-text Home picks the
+  largest font each line fits in, and takes the short form before it would go below the medium font. The short form
+  of a talkgroup is its number ("TG 91 World" becomes "TG 91"); of a private contact, its name ("Joe Smith 9991234"
+  becomes "Joe Smith"). A contact's ID alone says nothing at a glance, so it is what goes. An ID without a contact is
+  shown as the ID.
 - While a VFO frequency is being typed in dual watch, its selected pane shows the digits and blanks for the remaining
   places in place of the old frequency, including on Large text Home. The other pane keeps its frequency. Back removes
   a digit; OK or # tunes the selected pane.
@@ -92,6 +95,10 @@ Text is shortened with a middle ellipsis only as a last resort (P5 allows it for
   "Priv" in blue, and a private call is not encrypted.
 - NXDN Home shows an ENC marker with the caller and destination when a scrambled call plays. It shows "Encrypted: not played" when
   the radio receives an encrypted call and holds its audio.
+- YSF Home names the caller by callsign: "N1ABC > DG-ID 12", the DG-ID dropped first when the line is short (the callsign is kept longest). A call of
+  another DG-ID shows "Other DG-ID: not played", one that isn't DN voice "Not DN voice: not played". The talk line
+  shows the DG-ID PTT sends ("DG-ID 00"), or "No callsign" in the warning color while PTT is refused for want of one;
+  the chips show the power and the DG-ID heard ("RX DG-ID 00"). The radio ID is not on Home ([ysf.md](ysf.md) 6.5).
 
 `uiSim --ellipsis` (section 7) lists what is still shortened; `uiSim --layout` fails the build on a middle ellipsis
 with ordinary content.
@@ -208,14 +215,14 @@ instead of OK pressed once per step. The rows shown follow the copy's mode, so a
 - New from current (the first row in Channels: New channel from current settings) fills a copy from what the radio uses now: the channel in use
   with its temporary changes, or the VFO. It opens as an unsaved channel at the lowest free number, named after the
   source with a number appended (or the frequency, from the VFO).
-- OK on Mode steps FM, DMR, P25, NXDN, then the channel's own kind, and round to FM. A step is offered where it can
-  run: DMR with `CONFIG_DMR`; P25 and NXDN where the radio runs them (`UI_FEAT_P25`, `UI_FEAT_NXDN`, as the VFO's
+- OK on Mode steps FM, DMR, P25, NXDN, YSF, then the channel's own kind, and round to FM. A step is offered where it can
+  run: DMR with `CONFIG_DMR`; P25, NXDN and YSF where the radio runs them (`UI_FEAT_P25`, `UI_FEAT_NXDN`, `UI_FEAT_YSF`, as the VFO's
   mode tile), and not in a copy made by Copy here, which takes its source's tag and has no block of its own; a kind
   of its own (a trunked channel, [channel-modes.md](channel-modes.md)) only on the channel opened as one, since its
   system can't be picked here. In a listen band only FM. The step back to the mode the channel was opened with
   restores it as it was, with its system and its NAC or RAN: a slip on the row is taken back by pressing on. A
-  channel made P25 starts with NAC 293 both ways and squelch normal, one made NXDN with RAN 1 both ways at 9600 bit/s;
-  either keeps its talk target and own ID, and Save writes it as a stored channel of the kind with that block. The
+  channel made P25 starts with NAC 293 both ways and squelch normal, one made NXDN with RAN 1 both ways at 9600 bit/s,
+  one made YSF with DG-ID 0 both ways; each keeps its talk target and own ID, and Save writes it as a stored channel of the kind with that block. The
   row's changed mark counts the kind. Saving a stored channel of a kind as a plain one or one of another kind
   replaces its tag, so Save asks first on the `discard` screen, titled "Save as FM?" (or "Save as DMR?"; "Unsaved
   Changes" when it becomes another kind): the kind's name and "settings will be removed", "No, keep editing" first (the default; BACK is the same), then "Yes,
@@ -227,6 +234,19 @@ instead of OK pressed once per step. The rows shown follow the copy's mode, so a
   P25 writes a stored P25 channel from the radio's P25 settings ([p25-codeplug.md](p25-codeplug.md) 2.3).
 - An NXDN channel the same way: Mode "NXDN", then RAN and Rate in place of NAC, no Talkaround. Own ID over 65519 is
   refused ("NXDN IDs go up to 65519").
+- A YSF channel: Mode "YSF", then DG-ID in place of NAC; no TX contact, Own ID or Talkaround (YSF names the
+  radio by callsign and radio ID). DG-ID shows the sent DG-ID, then the heard one where they differ ("12/00"); OK opens
+  it, digits type 0-99, Up and Down step through 0-99, and OK sets both to the value (00 hears every DG-ID).
+- On a YSF channel quick settings tile 3 opens Rooms (no tones) and tile 8 is the DG-ID (no width): Up/Down step
+  0-99, digits type two, OK sets it both ways (`ui_svc_ysf_dgid`). In the VFO it stays; on a stored channel it lasts
+  until another channel is taken (`radio_ysf_settings_t.temp_chan`). # on Home opens Rooms (a YSF call has no
+  caller's actions). Recent lists a YSF call by callsign and DG-ID (`ui_recent_t.ysf`); Hub > last caller, call back
+  and # skip it, its actions toast "No actions here".
+- Settings > My radio adds, with `CONFIG_YSF`, two rows. YSF callsign: OK opens text entry (up to 10 characters); OK
+  there writes the YSF record ([ysf-codeplug.md](ysf-codeplug.md) 1), refusing anything but letters, digits, `-` and
+  `/` with a toast; saved empty, the radio name's callsign is used again. YSF RID: read only, OK says it is made from
+  the MCU's unique ID and can't be edited ([ysf.md](ysf.md) 6); a radio ID from the fallback ends in "?". About shows
+  it too ("YSF RID: ").
 - NAC shows the received NAC in hex, then the sent one where they differ ("F7E/293"); RAN the same in decimal. OK opens
   it. NAC: digits type hex digits (up to 3; a fourth starts over), Up and Down step the last one through 0-F (so A-F
   are reached), with none typed they step the whole NAC; BACK takes a digit back. RAN: a spinner 0-63 that also takes

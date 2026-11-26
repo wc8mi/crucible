@@ -365,6 +365,9 @@ int main(void)
 	rx_agc_configure(RX_AGC_NXDN, 5);
 	rx_agc_begin(&s, RX_AGC_NXDN, 1, 0);
 	assert(!s.cached && s.gain_q8 == 0); // IDs never collide across modes
+	rx_agc_configure(RX_AGC_YSF, 5);
+	rx_agc_begin(&s, RX_AGC_YSF, 1, 0);
+	assert(!s.cached && s.gain_q8 == 0); // YSF has its own memory and fallback
 	rx_agc_begin(&s, RX_AGC_DMR, 1, 123);
 	assert(!s.cached); // or known network scopes
 

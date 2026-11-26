@@ -900,6 +900,7 @@ const hal_radio_t md9600_radio = {
 	.rx_sleep = rx_sleep,
 #if CONFIG_REF_TRIM
 	.ref_trim = ref_trim,
+	.mic_input = md9600_c6000_mic_input,
 #endif
 #if CONFIG_MD9600_TX
 	.tx_drive_level = tx_drive_level,

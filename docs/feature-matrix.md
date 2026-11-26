@@ -55,12 +55,14 @@ is `tools/bringup.py list --radio <id>`.
 | `caller_details` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `p25_id_lookup` | not recorded | not recorded | not recorded | not recorded | off | not recorded | not recorded | not recorded |
 | `tx_mic_limiter` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
+| `mic_check` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `tx_dc_block` | not recorded | not recorded | not recorded | not recorded | off | not recorded | not recorded | not recorded |
 | `p25_tx_agc` | not recorded | not recorded | not recorded | not recorded | off | not recorded | not recorded | not recorded |
 | `p25_parrot` | off | off | off | off | off | off | off | off |
-| `p25_trunk` | not recorded | not recorded | not recorded | not recorded | not written | not recorded | not recorded | not recorded |
+| `p25_trunk` | off | off | not recorded | not recorded | not written | off | off | not recorded |
 | `nxdn` | not recorded | not recorded | not recorded | not recorded | not written | not recorded | not recorded | partial, needs re-run |
 | `nxdn_scrambler` | not recorded | not recorded | not recorded | not recorded | not written | not recorded | not recorded | not recorded |
+| `ysf` | not recorded | not recorded | not recorded | not recorded | not written | not recorded | not recorded | not recorded |
 | `dmr_voice` | pass (seed) | pass (seed) | pass (seed) | pass (seed) | pass (seed) | not recorded | partial, needs re-run | partial, needs re-run |
 | `dmr_privacy` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | partial, needs re-run |
 | `dmr_aes` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
@@ -69,10 +71,10 @@ is `tools/bringup.py list --radio <id>`.
 | `dmr_gps` | not recorded | pass (seed) | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | off |
 | `dmr_emergency` | not recorded | pass (seed) | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | pass, needs re-run |
 | `dmr_roaming` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | pass, needs re-run |
-| `dmr_trunk` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
-| `dmr_trunk_tx` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
-| `dmr_trunk_supl` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
-| `dmr_trunk_gw` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
+| `dmr_trunk` | off | off | not recorded | not recorded | not recorded | off | off | not recorded |
+| `dmr_trunk_tx` | off | off | not recorded | not recorded | not recorded | off | off | not recorded |
+| `dmr_trunk_supl` | off | off | not recorded | not recorded | not recorded | off | off | not recorded |
+| `dmr_trunk_gw` | off | off | not recorded | not recorded | not recorded | off | off | not recorded |
 | `voice_capture` | off | off | off | off | off | off | off | off |
 | `dmr_signaling` | not recorded | pass (seed) | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | pass, needs re-run |
 | `vfo` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | ✕ |
@@ -101,7 +103,7 @@ is `tools/bringup.py list --radio <id>`.
 | `dmr_lrrp` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | off |
 | `dmr_udp_compress` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | partial, needs re-run |
 | `dmr_confirmed` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass | partial |
-| `sfr` | not recorded | pass (seed) | pass (seed) | not recorded | ✕ | not recorded | ✕ | partial |
+| `sfr` | not recorded | pass (seed) | pass (seed) | not recorded | ✕ | not recorded | ✕ | partial, needs re-run |
 | `sfr_dualpath_rx` | not recorded | not recorded | not recorded | not recorded | ✕ | not recorded | not recorded | not recorded |
 | `sfr_cwid` | not recorded | not recorded | not recorded | not recorded | ✕ | not recorded | pass, needs re-run | pass, needs re-run |
 | `aprs` | pass (seed) | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | partial, needs re-run |
@@ -116,14 +118,14 @@ is `tools/bringup.py list --radio <id>`.
 | `hotspot` | pass (seed) | pass (seed) | pass (seed) | pass (seed) | not recorded | not recorded | pass, needs re-run | off |
 | `split_duplex` | pass (seed) | pass (seed) | pass (seed) | not written | not written | not recorded | partial, needs re-run | not written |
 | `debuglink` | pass (seed) | pass (seed) | pass (seed) | pass (seed) | pass (seed) | not recorded | pass, needs re-run | partial, needs re-run |
-| `task_stacks` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass | pass |
+| `task_stacks` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | pass, needs re-run |
 | `cps_openfw` | not recorded | pass (seed) | not recorded | pass (seed) | pass (seed) | not recorded | pass, needs re-run | pass, needs re-run |
 | `cps_fast` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `stub_entry` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `crash_log` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | pass, needs re-run |
 | `crash_screen` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | ✕ |
 | `crash_report` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | ✕ |
-| `watchdog` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass | pass |
+| `watchdog` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | pass, needs re-run |
 | `support_info` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `fault_trace` | not recorded | ✕ | not recorded | not recorded | ✕ | ✕ | ✕ | not recorded |
 | `usb_network` | ✕ | pass (seed) | ✕ | ✕ | not recorded | not recorded | pass, needs re-run | ✕ |
@@ -144,13 +146,13 @@ is `tools/bringup.py list --radio <id>`.
 | `mdns` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | off |
 | `tftp` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | off |
 | `tftp_iddb` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | off |
-| `dmr_iddb` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass | ✕ |
+| `dmr_iddb` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | ✕ |
 | `iddb_compact` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | pass, needs re-run |
 | `snmp` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | off |
 | `net_ppp` | not recorded | off | pass (seed) | pass (seed) | off | off | off | off |
 | `ui_navigation` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | pass, needs re-run |
 | `key_lock` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | ✕ |
-| `channel_knob` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass | pass |
+| `channel_knob` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | pass, needs re-run |
 | `tx_power_menu` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `ui_settings` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | partial, needs re-run | ✕ |
 | `diag` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | ✕ |
@@ -174,6 +176,7 @@ is `tools/bringup.py list --radio <id>`.
 | `nand_storage` | ✕ | ✕ | ✕ | not recorded | ✕ | ✕ | ✕ | ✕ |
 | `codec_check` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | pass, needs re-run |
 | `air_raw` | off | off | off | off | off | off | off | off |
+| `air_rx_adapt` | not recorded | not recorded | not recorded | not recorded | off | not recorded | not recorded | not recorded |
 | `debuglink_dmrip` | off | off | off | off | off | off | off | off |
 | `audio_probe` | not written | off | not written | not written | not written | off | off | not written |
 | `rx_agc` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
@@ -223,10 +226,10 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | `DMR_SIGNALING` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `DMR_EMERGENCY` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `DMR_ROAMING` | ● | ● | ● | ● | ● | ● | ● | ● |
-| `DMR_TRUNK` | ● | ● | ● | ● | ● | ● | ● | ● |
-| `DMR_TRUNK_TX` | ● | ● | ● | ● | ● | ● | ● | ● |
-| `DMR_TRUNK_SUPL` | ● | ● | ● | ● | ● | ● | ● | ● |
-| `DMR_TRUNK_GW` | ● | ● | ● | ● | ● | ● | ● | ● |
+| `DMR_TRUNK` | ○ | ○ | ● | ● | ● | ○ | ○ | ● |
+| `DMR_TRUNK_TX` | ○ | ○ | ● | ● | ● | ○ | ○ | ● |
+| `DMR_TRUNK_SUPL` | ○ | ○ | ● | ● | ● | ○ | ○ | ● |
+| `DMR_TRUNK_GW` | ○ | ○ | ● | ● | ● | ○ | ○ | ● |
 | `VOICE_CAPTURE` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | `DMR_IP_GATEWAY` | ● | ● | ● | ● | ● | ● | ● | ○ |
 | `ZONE_SHARE` | ● | ● | ● | ● | ● | ● | ● | ✕ |
@@ -317,6 +320,7 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | `CONTACT_EDIT` | ● | ● | ● | ● | ● | ● | ● | ✕ |
 | `VOLUME_BAR` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `TX_MIC_LIMITER` | ● | ● | ● | ● | ● | ● | ● | ● |
+| `MIC_CHECK` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `P25` | ● | ● | ● | ● | … | ● | ● | ● |
 | `P25_ID_LOOKUP` | ● | ● | ● | ● | ○ | ● | ● | ● |
 | `CALLER_DETAILS` | ● | ● | ● | ● | ● | ● | ● | ● |
@@ -324,10 +328,12 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | `TX_DC_BLOCK` | ● | ● | ● | ● | ○ | ● | ● | ● |
 | `P25_TX_AGC` | ● | ● | ● | ● | ○ | ● | ● | ● |
 | `P25_PARROT` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
-| `P25_TRUNK` | ● | ● | ● | ● | … | ● | ● | ● |
+| `P25_TRUNK` | ○ | ○ | ● | ● | … | ○ | ○ | ● |
 | `NXDN` | ● | ● | ● | ● | … | ● | ● | ● |
 | `NXDN_SCRAMBLER` | ● | ● | ● | ● | … | ● | ● | ● |
 | `AIR_RAW` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
+| `AIR_RX_ADAPT` | ● | ● | ● | ● | ○ | ● | ● | ● |
+| `YSF` | ● | ● | ● | ● | … | ● | ● | ● |
 | Voltage reading (board, no switch) | Battery | Battery | Battery | None | Battery | Battery | Supply | Battery |
 | Clock kept through power-off (board, no switch) | Yes | ? | Yes | ? | ? | ? | ? | No (only while on) |
 <!-- end generated -->
@@ -347,14 +353,18 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | Broadcast FM receiver | `BCAST_FM` | ~0* | — | Needs a second receiver chip (DM-32's RDA5807M); glue not written yet |
 | Receive past the rated bands, Settings > Advanced | `RX_EXT` | 560 | — | Receive only, FM, off by default; ranges from each receiver chip's documents. MD-380: no receiver range in its chip documents |
 | DMR Tier II voice (modem, call stack, AMBE FEC, vocoder) | `DMR` | 377,332 | 275,716 | Includes every DMR feature and everything on IP over DMR |
-| Digital microphone peak limiter | `TX_MIC_LIMITER` | — | — | Protects microphone PCM before AMBE encoding, including NXDN, and during manual P25 gain. See [Mic gain](spec/radio-features.md#36-mic-gain). |
+| Digital microphone peak limiter and TX levels | `TX_MIC_LIMITER` | — | — | Protects microphone PCM before AMBE encoding, including NXDN, and during manual P25 gain; the DMR and YSF TX level targets. The Mic input setting (`hal_radio_t.mic_input`) is on the DM-1701, MD-UV380 and MD-9600; elsewhere it is dimmed. See [Mic gain](spec/radio-features.md#36-mic-gain). |
+| Mic check, Settings > Advanced | `MIC_CHECK` | — | — | Meters the AMBE mic path without transmitting and plays back 2 s of encoded speech with its decoded level. About 700 bytes of RAM. Needs `TX_MIC_LIMITER`. See [Mic gain](spec/radio-features.md#36-mic-gain). |
 | P25 Phase 1 conventional: the air interface (framer, soft modem, shared FEC), the engine, the P25 channel mode and the full-rate voice decoder on the MBE core | `P25` | 40,588 | 24,640* | Needs a board with an air interface provider (`board.air`); without one nothing runs ([air-interface.md](spec/air-interface.md)). Off on the MD-380 until receive is written ([hardware-md380.md](spec/hardware-md380.md) 4.11). Receive and transmit checked on air against the SDR bench on the DM-32UV and the DM-1701, receive, zone scan and dual watch on the MD-9600; the VFO's mode tile, the debug link or a stored P25 channel sets it ([p25.md](spec/p25.md)). RAM: 6,640 B on the DM-1701, 424 B on the MD-380 |
 | Computed microphone DC removal before P25 gain | `TX_DC_BLOCK` | — | — | Shared streaming blocker, reset per transmission; enabled before the temporary P25 calibration capture. Live AMBE/FM/RX unchanged. See [Microphone input leveling](spec/p25.md#52-microphone-input-leveling). |
 | P25 transmit microphone AGC | `P25_TX_AGC` | — | — | The Mic AGC setting enables automatic PCM gain and peak protection before IMBE encoding. The setting defaults to off. See [Microphone input leveling](spec/p25.md#52-microphone-input-leveling). |
 | Rich DMR and P25 caller identity in single and dual Home | `CALLER_DETAILS` | — | — | Needs `DMR`; preserves the numeric ID with database callsign and name. P25 labels require its opt-in lookup setting. Shares the deferred cache with `P25_ID_LOOKUP` ([p25.md](spec/p25.md) 7.3.1) |
 | Optional P25 caller names from private contacts and the DMR ID database | `P25_ID_LOOKUP` | — | — | Needs `P25`; shares the deferred label cache with `CALLER_DETAILS`. The Talk & listen option is off by default. Host tested; radio listening check pending ([p25.md](spec/p25.md) 7.3.1) |
+| Home signal meter in S units and dBm, Advanced RSSI correction | `SIGNAL_METER` | — | — | 13 S/over cells and numeric dBm on Home, power metadata in dual panes, and a display-only VHF/UHF RSSI offset under Settings > Advanced. Off keeps the earlier layouts; stored offsets stay ([ui.md](spec/ui.md)) |
 | NXDN conventional voice, 4800 and 9600 bit/s: the frame codec, receive, the call layer, the engine and the NXDN mode in the radio core | `NXDN` | 10,512 | — | Needs `DMR` (its voice goes through the DMR vocoder path) and a board with an air interface provider (`board.air`); where the provider only receives a rate, PTT is refused at that rate. The VFO's mode tile, the debug link or a stored NXDN channel sets it ([nxdn.md](spec/nxdn.md) 6, [nxdn-codeplug.md](spec/nxdn-codeplug.md)). On the DM-1701 and the DM-32UV transmit is checked off air at both rates and receive with a bench transmitter, speech frames through the vocoder included (DM-1701); on the HR_C6000 radios the speaker plays NXDN speech through the chip's prompt tone FIFO, checked by ear on the DM-1701 and the MD-9600 ([modem-hrc6000.md](spec/modem-hrc6000.md) 10.6). RAM: 2,184 B on the DM-1701; with `P25` also on it shares P25's engine memory (9,464 B flash, 256 B RAM on top of P25) |
 | NXDN Scrambler (15-bit) | `NXDN_SCRAMBLER` | 448 | — | Needs `NXDN`; supports conventional voice calls. The NXDN air interface must support the requested direction. Checked on air against another radio running RadioFoundry and a commercial portable ([bring-up record](testing/dm32-bringup.md#nxdn-scrambler-interoperability)). |
+| Soft modem receive options: an equalizer, a CTCSS notch and a DCS remover, for a mode that asks for them | `AIR_RX_ADAPT` | — | — | HR_C7000 only so far (not written on these two radios). On the DM-32UV: 4,104 B flash, of which about 1.1 KB is copied to RAM (`RFOUNDRY_HOT_CODE`), and 20 B of static RAM; the options' state (about 1.6 KB) is lent by the mode's engine. Needs `SUBTONE` ([air-interface.md](spec/air-interface.md) 6.1). Measured 2026-11-25 |
+| YSF (C4FM) DN voice: the frame codec, receive, the call layer, the engine, the YSF mode in the radio core, the radio ID and rooms | `YSF` | — | — | Needs `DMR` (its voice goes through the DMR vocoder path, as NXDN's) and a board with an air interface provider (`board.air`). The VFO's mode tile, the debug link or a stored YSF channel sets it ([ysf.md](spec/ysf.md) 5, [ysf-codeplug.md](spec/ysf-codeplug.md)). The radio ID comes from the MCU's unique ID ([ysf.md](spec/ysf.md) 6). Checked on air on a DM-32UV: direct, through a repeater and a hotspot ([bring-up](testing/dm32-bringup.md#ysf-c4fm)). DM-32UV: 19,556 B flash, 3,392 B RAM with the room commands ([ysf.md](spec/ysf.md) 9) and the soft modem's equalizer and tone notch ([air-interface.md](spec/air-interface.md) 6.1, 3.1 KB and 1.2 KB of it); the engine shares NXDN's block; ARM sizes not measured yet |
 | Digital receive audio AGC with per-mode targets and recent-caller memory | `RX_AGC` | 3,892 | — | Off until a target is selected. DM-1701 figure with LTO, GCC 13.3 (2026-11-22); hardware listening and timing untested ([receive AGC](spec/rx-agc.md)) |
 | Basic privacy, 8-bit and 16-bit keys | `DMR_PRIVACY` | 6,260 | 7,340 |  |
 | AES-256 DMR voice, PI header and late-entry signaling | `DMR_AES` | 3,484 | 4,692 | Requires `DMR_PRIVACY`. DM-1701: 480 B RAM. TX to a receiver of another make needs the modem driver's burst F field (`set_burst_f`, [dmr-voice.md](spec/dmr-voice.md) 5.1): only the HR_C7000 driver has it (DM-32UV); on the HR_C6000 and other radios our AES overs reach radios running RadioFoundry only (#864). |

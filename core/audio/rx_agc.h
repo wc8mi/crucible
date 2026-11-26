@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include "config.h"
 
-typedef enum { RX_AGC_DMR, RX_AGC_P25, RX_AGC_NXDN, RX_AGC_MODES } rx_agc_mode_t;
+typedef enum { RX_AGC_DMR, RX_AGC_P25, RX_AGC_NXDN, RX_AGC_YSF, RX_AGC_MODES } rx_agc_mode_t;
 #define RX_AGC_TARGETS 11u
 #define RX_AGC_CALLERS 10u
 #define RX_AGC_SILENT (-96)

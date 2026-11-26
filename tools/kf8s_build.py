@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
 # Copyright (c) 2026 David Behnke
-"""Build and package all registry images with the private kf8sfork label. Other branches refuse this wrapper."""
+"""Build and package all registry images with a private label (kf8sfork, or the kf8sforkysf YSF experiment). Other branches refuse this wrapper."""
 import argparse
 from datetime import datetime
 import fcntl
@@ -48,9 +48,14 @@ def git(*args):
     return subprocess.check_output(['git', '-C', str(ROOT), *args], text=True).strip()
 
 
+# The branches allowed a private label, and the label's prefix: the YSF experiment is kept apart from KF8S builds
+BRANCH_PREFIX = {'kf8sfork': 'kf8s', 'kf8sforkysf': 'kf8sysf'}
+
+
 def require_branch(branch):
-    if branch != 'kf8sfork':
-        raise ValueError('private version labels require branch kf8sfork')
+    if branch not in BRANCH_PREFIX:
+        raise ValueError('private version labels require branch ' + ' or '.join(BRANCH_PREFIX))
+    return BRANCH_PREFIX[branch]
 
 
 def next_sequence(path, day):
@@ -244,7 +249,7 @@ def write_archive(package, archive, images):
     return digest
 
 
-def package_readme(version, parrot, without_aes):
+def package_readme(version, parrot, without_aes, ysf=False):
     aes = ('DMR AES is disabled in this package. AES channels are unavailable and PTT is rejected.\n'
            if without_aes else "DMR AES follows each board's default. See the image manifest.\n")
     diagnostic = ('P25 calibration diagnostic enabled wherever P25 is built. See build.json for overrides.\n'
@@ -263,6 +268,9 @@ def package_readme(version, parrot, without_aes):
         f'{version}\nPrivate KF8S test build based on RadioFoundry. Contact: dbehnke (KF8S).\n'
         'Includes transmit and receive audio AGC, dual caller display, and optional P25 caller lookup.\n'
         f'{aes}{diagnostic}'
+        + ('YSF TEST: experimental YSF (C4FM DN) receive and transmit, untested on the radio. Made room for by\n'
+           'leaving DMR and P25 trunking out of this build. Report any YSF behavior with the version above.\n'
+           if ysf else '') +
         'An upgrade from older settings resets receive AGC to Off and hides the audio levels display.\n'
         'An ambiguous legacy counter blocks AES transmission until recovery. On AES-enabled images, open\n'
         'Settings > Advanced > AES recovery. Choose Keep AES counter, when available, only if you can verify\n'
@@ -321,7 +329,7 @@ def test_release_notices():
 
 
 def self_test():
-    require_branch('kf8sfork')
+    assert require_branch('kf8sfork') == 'kf8s' and require_branch('kf8sforkysf') == 'kf8sysf'
     for branch in ('main', 'feat/p25-contact-lookup', 'feat/audio-rx-agc', 'HEAD'):
         try:
             require_branch(branch)
@@ -413,6 +421,7 @@ def self_test():
     assert "DMR AES follows each board's default" in default_readme and 'diagnostic is off' in default_readme
     assert 'DMR AES is disabled' in diagnostic_readme and 'disables DMR IP gateway' in diagnostic_readme
     assert all('Settings > Advanced > AES recovery' in readme for readme in (default_readme, diagnostic_readme))
+    assert 'YSF TEST' in package_readme('test-version', False, False, ysf=True) and 'YSF' not in default_readme
     assert 'Settings > Advanced > P25 calibration' in diagnostic_readme and 'Limited blocks' in diagnostic_readme
     test_release_notices()
     print('kf8s build: branch guards, daily sequence, provenance, archive, notice and README checks passed')
@@ -432,7 +441,8 @@ def main():
     if args.self_test:
         self_test()
         return
-    require_branch(git('branch', '--show-current'))
+    branch = git('branch', '--show-current')
+    prefix = require_branch(branch)
     if git('status', '--porcelain', '--untracked-files=normal'):
         raise ValueError('commit or preserve pending changes before building')
     # Start from board defaults. Docker receives explicit make arguments and release.py needs the same overrides.
@@ -457,7 +467,7 @@ def main():
     if not common.is_absolute():
         common = ROOT / common
     sequence = next_sequence(common / 'kf8s-build-sequence.json', day)
-    version = f'kf8s-{upstream}-{commit}-{day}-{sequence}'
+    version = f'{prefix}-{upstream}-{commit}-{day}-{sequence}'
     out = ROOT / 'build' / 'kf8s' / version
     package = out / 'package'
     package.mkdir(parents=True)
@@ -503,8 +513,7 @@ def main():
                            'manifest': manifest_path.name,
                            'build_overrides': image_flags})
             shutil.rmtree(build)
-    require_branch(git('branch', '--show-current'))
-    if (git('rev-parse', 'HEAD') != commit_full or git('status', '--porcelain') or
+    if (git('branch', '--show-current') != branch or git('rev-parse', 'HEAD') != commit_full or git('status', '--porcelain') or
             git('rev-parse', 'origin/main') != upstream_full):
         raise ValueError('source changed during the build; refusing to package')
     write_release_sums(package, images)
@@ -515,7 +524,7 @@ def main():
                 'commit': commit_full, 'profile': profile,
                 'build_overrides': profile_flags, 'images': images}
     (package / 'build.json').write_text(json.dumps(metadata, indent=2) + '\n')
-    (package / 'README.txt').write_text(package_readme(version, args.parrot, args.without_aes))
+    (package / 'README.txt').write_text(package_readme(version, args.parrot, args.without_aes, ysf=prefix == 'kf8sysf'))
     for name in ('LICENSE', 'AUTHORS', 'CONTRIBUTORS'):
         shutil.copy2(ROOT / name, package / name)
     shutil.copytree(ROOT / 'LICENSES', package / 'LICENSES')

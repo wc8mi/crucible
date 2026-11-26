@@ -19,6 +19,7 @@ static const ambe_voice_stats_t voice = {
 	.tx_limited_blocks = CONFIG_TX_MIC_LIMITER ? 300 : 0,
 	.tx_mic_low_q8 = CONFIG_TX_MIC_LIMITER ? 218 : 0,
 	.tx_mic_level_db = 51, .tx_mic_spread_db = 21, .tx_mic_zc = 84, .tx_mic_blocks = 300, .tx_mic_muted = 4,
+	.tx_profile = AMBE_TX_YSF, .tx_target_rms = 2068,
 };
 
 static void health(dmr_modem_health_t *h)
@@ -36,6 +37,18 @@ bool ambeVoiceTestSignal(void) { return true; }
 uint32_t ambeVoiceEncodeOptions(void) { return 7; }
 uint32_t ambeVoiceEncodeOptionsSupported(void) { return 7; }
 void ambeVoiceResetStats(void) {}
+#if CONFIG_TX_MIC_LIMITER
+uint16_t ambeVoiceTxTarget(ambe_tx_profile_t profile) { return profile == AMBE_TX_YSF ? 2068 : 3277; }
+#endif
+#if CONFIG_MIC_CHECK
+// The widest a Mic check reading prints: every field at its longest
+void ambeVoiceMicCheckView(ambe_mic_check_t *out)
+{
+	*out = (ambe_mic_check_t){ .windows = 4294967295u, .in_peak_db10 = -960, .in_rms_db10 = -960, .out_peak_db10 = -960,
+		.out_rms_db10 = -960, .gain_db10 = -240, .clips = 65535, .limited = 65535, .profile = AMBE_TX_YSF, .on = 1,
+		.phase = AMBE_CHECK_PLAY, .frames = 100, .played = 65535, .dec_rms_db10 = -960, .dec_peak_db10 = -960 };
+}
+#endif
 
 const dmr_call_view_t *dmr_call_view(void)
 {
@@ -97,6 +110,14 @@ int main(void)
 	CHECK(strstr(text, CONFIG_TX_MIC_LIMITER ? "voice.tx_limited_blocks=300\nvoice.mic_limiter=1\n" :
 						   "voice.tx_limited_blocks=0\nvoice.mic_limiter=0\n") != NULL);
 	CHECK(strstr(text, "voice.tx_mic_muted=4\n") != NULL);
+	CHECK(strstr(text, "voice.tx_profile=ysf\nvoice.tx_target_rms=2068\n") != NULL);
+#if CONFIG_TX_MIC_LIMITER
+	CHECK(strstr(text, "voice.tx_target_dmr=3277\nvoice.tx_target_ysf=2068\n") != NULL);
+#endif
+#if CONFIG_MIC_CHECK
+	CHECK(strstr(text, "mic_check.on=1\nmic_check.phase=2\nmic_check.profile=ysf\n") != NULL);
+	CHECK(strstr(text, "mic_check.dec_rms_db10=-960\nmic_check.dec_peak_db10=-960\n") != NULL);
+#endif
 	printf("dmrViewTest: dmr %zu bytes, dmr_tx_audio %zu bytes, %d failures\n", dmr_size, t.len, failures);
 	return failures != 0;
 }

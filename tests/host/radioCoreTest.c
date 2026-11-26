@@ -165,10 +165,12 @@ static bool r_ref_trim(int16_t ppb) { ref_trim_ppb = ppb; return true; }
 static bool (*direct_q)(void);	// hal_radio_t.dmr_direct_query: what the board asks as it keys a burst
 static void r_dmr_direct_query(bool (*q)(void)) { direct_q = q; }
 static int direct_now(void) { return direct_q != NULL ? direct_q() : -1; }	// the board's answer at a burst now
+static int8_t mic_input_steps = 99;	// mic_input: the last steps (99: never called)
+static void r_mic_input(int8_t steps) { mic_input_steps = steps; }
 static hal_radio_t fake_radio = { .init = r_init, .set_mode = r_set_mode, .rx = r_rx, .tx = r_tx, .tx_off = r_tx_off,
 					.status = r_status, .audio = r_audio, .tx_tone = r_tx_tone,
 					.tx_tone_key = r_tx_tone_key, .tx_dtmf = r_tx_dtmf, .ref_trim = r_ref_trim,
-					.dmr_direct_query = r_dmr_direct_query };
+					.dmr_direct_query = r_dmr_direct_query, .mic_input = r_mic_input };
 
 // (fake_radio.volume is set by test_soft_volume only)
 static void p_led(uint8_t which, bool on) { hw.led[which] = on; }
@@ -446,10 +448,14 @@ static void air_step1(uint8_t i)
 // 4800 symbols/s (P25, NXDN at 9600 bit/s): everything. 2400 symbols/s (NXDN at 4800 bit/s): what air_fit2400 says
 // for each provider (a provider that transmits a profile only, or receives it only)
 static uint32_t air_fit2400[2] = { AIR_FIT_RX | AIR_FIT_TX | AIR_FIT_SOFT, AIR_FIT_RX | AIR_FIT_TX | AIR_FIT_SOFT };
+static bool air_rx_only4800;		// the provider receives 4800 symbols/s only (P25, NXDN 9600, YSF)
 static uint32_t air_fit(uint8_t i, const air_profile_t *pr)
 {
 	if (air_nofit) {
 		return 0;
+	}
+	if (air_rx_only4800 && pr->sym_rate == 4800) {
+		return AIR_FIT_RX | AIR_FIT_SOFT;
 	}
 	return pr->sym_rate == 4800 ? AIR_FIT_RX | AIR_FIT_TX | AIR_FIT_SOFT : pr->sym_rate == 2400 ? air_fit2400[i] : 0;
 }
@@ -2355,7 +2361,10 @@ static void test_vfo_dmr(void)
 	CHECK(debuglink_radio_feature_op(DL_OP_DMR_FIELDS, (const uint8_t[]){ 1, 0xFF, 0 }, 3) == DL_ST_OK);
 	CHECK(sm.view.ch.mode == RADIO_MODE_DMR && sim.started && !radio_nxdn_running());
 #endif
-	CHECK(debuglink_radio_feature_op(DL_OP_DMR_FIELDS, (const uint8_t[]){ 4, 0xFF, 0 }, 3) == DL_ST_BAD_ARG);
+#if !CONFIG_YSF
+	CHECK(debuglink_radio_feature_op(DL_OP_DMR_FIELDS, (const uint8_t[]){ RADIO_MODE_YSF, 0xFF, 0 }, 3) == DL_ST_UNAVAILABLE);
+#endif
+	CHECK(debuglink_radio_feature_op(DL_OP_DMR_FIELDS, (const uint8_t[]){ RADIO_MODE_YSF + 1, 0xFF, 0 }, 3) == DL_ST_BAD_ARG);
 	CHECK(debuglink_radio_feature_op(DL_OP_DMR_FIELDS, (const uint8_t[]){ 0xFF, 16, 0 }, 3) == DL_ST_BAD_ARG);
 	CHECK(debuglink_radio_feature_op(DL_OP_DMR_FIELDS, (const uint8_t[]){ 0xFF, 0xFF, 3 }, 3) == DL_ST_BAD_ARG);
 	CHECK(debuglink_radio_feature_op(DL_OP_DMR_FIELDS, (const uint8_t[]){ 0xFF, 0xFF }, 2) == DL_ST_BAD_ARG);
@@ -4300,6 +4309,18 @@ void radio_req_nxdn_settings(const radio_nxdn_settings_t *s)
 	req(RREQ_NXDN_SET, 0);
 }
 #endif
+#if CONFIG_YSF
+void radio_req_ysf_settings(const radio_ysf_settings_t *s)
+{
+	radio_ysf_set_settings(s);
+	req(RREQ_YSF_SET, 0);
+}
+void radio_req_ysf_wx(uint8_t cmd, uint32_t arg, const char *text)
+{
+	if (radio_ysf_wx_arm(cmd, arg, text))
+		req(RREQ_YSF_WX, 0);
+}
+#endif
 // Not under test here: debuglink_view_radio.c, linked for the volume operation, refers to them
 void radio_req_scan_dual(uint16_t pos) { (void)pos; }
 void radio_req_zone_pos(uint16_t pos) { req(RREQ_ZONE_POS, pos); }
@@ -4352,6 +4373,16 @@ void radio_req_dmr_timeslot(uint8_t ts) { req(RREQ_DMR_TS, ts); }
 void radio_req_dmr_color_code(uint8_t cc) { req(RREQ_DMR_CC, cc); }
 void radio_req_vfo_sfr(uint8_t a) { req(RREQ_VFO_SFR, a); }
 void radio_req_mode(uint8_t mode) { req(RREQ_MODE, mode); }
+void radio_req_mic_input(int8_t steps)
+{
+	radio_req_t r = { RREQ_MIC, RADIO_MIC_INPUT, (uint32_t)(int32_t)steps };
+	radio_sm_request(&sm, &r, now);
+}
+void radio_req_mic_check(bool on)
+{
+	radio_req_t r = { RREQ_MIC, RADIO_MIC_CHECK, on };
+	radio_sm_request(&sm, &r, now);
+}
 #if CONFIG_P25
 // As radio_task.c: the settings copied in, then the request
 void radio_req_p25_settings(const radio_p25_settings_t *s) { radio_p25_set_settings(s); req(RREQ_P25_SET, 0); }
@@ -9332,7 +9363,7 @@ static void test_nxdn_rx(void)
 	}
 	CHECK(sm.view.state == RS_IDLE && !(v->flags & RADIO_NXDN_RX) && v->src == 2001);	// the last call stays
 	radio_nxdn_stats(&st);
-	CHECK(st.rx_calls == 1 && st.voice >= 40 && st.sacch_fail == 0 && st.facch_fail == 0 && st.voice_held == 0);
+	CHECK(st.air.rx_calls == 1 && st.voice >= 40 && st.sacch_fail == 0 && st.facch_fail == 0 && st.voice_held == 0);
 	run(500);
 	CHECK(sm.view.state == RS_IDLE && !(v->flags & RADIO_NXDN_RX));
 	v_decode_hook = NULL;
@@ -9346,7 +9377,7 @@ static void test_nxdn_rx(void)
 	nfar_call(600);
 	CHECK(sm.view.state == RS_IDLE);
 	radio_nxdn_stats(&st);
-	CHECK(st.rx_calls == 1 && st.ran_rejects > 0);
+	CHECK(st.air.rx_calls == 1 && st.ran_rejects > 0);
 
 	// Group squelch: a call to another group shows (RS_RX), its voice does not play
 	s.rx_ran = 1;
@@ -9402,7 +9433,7 @@ static void test_nxdn_tx(void)
 	CHECK(v->tx == AIR_TX_IDLE && nfar_heard.ends == 1 && nfar_heard.voice >= 40 && nfar_heard.enc >= 30);
 	CHECK(fair[0].keyed_violations == 0 && fair[0].underruns == 0);
 	radio_nxdn_stats(&st);
-	CHECK(st.tx_calls == 1 && st.tx_underruns == 0 && st.tx_syms > 0);
+	CHECK(st.air.tx_calls == 1 && st.air.tx_underruns == 0 && st.air.tx_syms > 0);
 
 	// Settings sent while transmitting: in force for the next transmission
 	req(RREQ_PTT, 1);
@@ -9852,7 +9883,7 @@ static void test_nxdn_stored(void)
 	nfar_call(600);
 	CHECK(sm.view.state == RS_IDLE);
 	radio_nxdn_stats(&st);
-	CHECK(st.rx_calls == 0 && st.ran_rejects > 0);
+	CHECK(st.air.rx_calls == 0 && st.ran_rejects > 0);
 	// Selective on RAN 7: the channel's group plays, another group shows and does not, all and a unit call to us play
 	nfar_begin(true, 7, 2001, false, 20);
 	CHECK(nxdn_engine_tx_prepare(&nfar) && nxdn_engine_tx_go(&nfar));
@@ -10098,6 +10129,305 @@ static void test_nxdn(void)
 		radio_nxdn_end();
 	}
 }
+
+#endif
+
+#if CONFIG_YSF
+// ---- YSF in the radio core (docs/spec/ysf.md 5): the far radio is a YSF engine on the other fake
+// provider. Dual watch between YSF and every other mode the build runs: each look starts its own engine (or the DMR
+// stack), never two at once, and a YSF call holds the watch ----
+#include "ysf/ysf_engine.h"
+#include "ysf/ysf_codeplug.h"
+#include "dmr/ambe/ambeFec.h"
+
+static ysf_engine_t yfar;
+static bool yfar_running, yfar_tx;
+static uint8_t yfar_next;
+
+static bool yf_tx(uint8_t v[YSF_VOICE_BYTES], void *ctx)
+{
+	uint8_t bits[VOCODER_BITS];
+
+	(void)ctx;
+	for (uint8_t i = 0; i < VOCODER_BITS; i++)
+		bits[i] = (uint8_t)((((uint32_t)yfar_next * 2654435761u) >> (i % 29)) & 1u);
+	yfar_next++;
+	ambeFecEncode(bits, v);
+	return true;
+}
+static const ysf_engine_hooks_t yfar_hooks = { .tx_voice = yf_tx };
+
+static void yfar_step(void)
+{
+	if (yfar_tx && ysf_engine_tx_state(&yfar) == AIR_TX_DONE) {
+		ysf_engine_tx_clear(&yfar);
+		yfar_tx = false;
+	}
+}
+
+static void yfar_begin(uint8_t dgid)
+{
+	ysf_engine_cfg_t c = { .rx_dgid = YSF_DGID_ALL, .silence = dmr_ambe_silence };
+
+	strcpy(c.tx.callsign, "N1ABC");
+	strcpy(c.tx.radio_id, "AB123");
+	c.tx.dgid = dgid;
+	if (yfar_running)
+		ysf_engine_end(&yfar);
+	yfar_tx = false;
+	yfar_running = ysf_engine_begin(&yfar, &fake_air1, &c, &yfar_hooks, NULL);
+	CHECK(yfar_running);
+}
+
+static void yfar_stop(void)
+{
+	if (yfar_running) {
+		ysf_engine_end(&yfar);
+		yfar_running = yfar_tx = false;
+	}
+}
+
+// The codec's side (core/ysf/ysf_codeplug.c, tested in ysfCodeplugTest): a stored channel's DG-IDs, by number
+static ysf_chan_t stored_ysf[NCH + 1];
+bool ysf_chan_load(uint16_t number, const channel_t *ch, ysf_chan_t *out)
+{
+	if (ch->kind != CODEPLUG_KIND_YSF || number < 1 || number > NCH)
+		return false;
+	*out = stored_ysf[number];
+	return true;
+}
+bool ysf_chan_save(uint16_t number, const channel_t *ch, const ysf_chan_t *c)
+{
+	stored_ysf[number] = *c;
+	return codeplug_set_channel(number, ch);
+}
+void ysf_radio_load(ysf_radio_t *out) { strcpy(out->callsign, "N0CALL"); }
+void ysf_radio_encode(const ysf_radio_t *r, uint8_t out[YSF_CP_CALL_LEN]) { memcpy(out, r->callsign, YSF_CP_CALL_LEN); }
+void ysf_callsign_from_name(const char *name, char out[YSF_CP_CALL_LEN + 1]) { (void)name; out[0] = '\0'; }
+
+// Rooms (ysf.md 9): a command keys the radio for a short data transmission the far radio hears as one, and the
+// radio unkeys by itself; refused as PTT is (RX only), without the refusal state PTT's release would clear
+static void test_ysf_wx(void)
+{
+	radio_ysf_wx_t w;
+	int keyed0 = hw.tx_calls;
+	uint32_t data0;
+
+	setup_codeplug();
+	add(3, "YSF rptr", 446100000, RADIO_MODE_DMR, false, 2);
+	chans[3].kind = CODEPLUG_KIND_YSF;
+	chans[3].system = 0xFF;
+	stored_ysf[3] = (ysf_chan_t){ .tx_dgid = 0, .rx_dgid = 0 };
+	air_nofit = false;
+	memset(fair, 0, sizeof(fair));
+	start();
+	req(RREQ_ZONE_POS, 2);
+	run(200);
+	CHECK(sm.view.ch.mode == RADIO_MODE_YSF && radio_ysf_running());
+	yfar_begin(0);
+	data0 = yfar.rx.stats.data_frames;
+	radio_req_ysf_wx(YSF_WX_CONNECT, 27299, NULL);
+	CHECK(sm.view.state == RS_TX && hw.keyed && hw.tx_calls == keyed0 + 1);
+	radio_ysf_wx(&w);
+	CHECK(w.asked == 1 && w.asked_cmd == YSF_WX_CONNECT);
+	for (int i = 0; i < 200 && sm.view.state == RS_TX; i++)
+		run(10);
+	CHECK(sm.view.state != RS_TX && !hw.keyed);
+	CHECK(yfar.rx.stats.data_frames >= data0 + 4);		// header, FN 0, FN 1, terminator
+	// heard as a data transmission: a call without voice, from our callsign
+	CHECK(yfar.rx.stats.calls == 1 && yfar.rx.call.dt == YSF_DT_DATA && !strcmp(yfar.rx.call.src, "N0CALL"));
+
+	// RX only: refused, a reason given, nothing left to release
+	chans[3].rx_only = true;
+	start();
+	req(RREQ_ZONE_POS, 2);
+	run(200);
+	keyed0 = hw.tx_calls;
+	radio_req_ysf_wx(YSF_WX_DX, 0, NULL);
+	CHECK(hw.tx_calls == keyed0 && sm.view.tx_deny == TXDENY_RX_ONLY && sm.view.state != RS_TX_DENIED);
+	radio_ysf_wx(&w);
+	CHECK(w.asked == 1);
+	// Refused before the engine took it (an engine that receives only): the command isn't left for the next PTT,
+	// which sends voice once the engine can transmit
+	chans[3].rx_only = false;
+	air_rx_only4800 = true;
+	start();
+	req(RREQ_ZONE_POS, 2);
+	run(200);
+	CHECK(radio_ysf_running());
+	radio_req_ysf_wx(YSF_WX_DX, 0, NULL);
+	CHECK(sm.view.tx_deny == TXDENY_AIR_NO_TX && sm.view.state != RS_TX_DENIED);
+	run(50);
+	air_rx_only4800 = false;
+	start();
+	req(RREQ_ZONE_POS, 2);
+	run(200);
+	CHECK(radio_ysf_running());
+	yfar_begin(0);
+	data0 = yfar.rx.stats.data_frames;
+	req(RREQ_PTT, 1);
+	run(400);
+	req(RREQ_PTT, 0);
+	for (int i = 0; i < 200 && sm.view.state == RS_TX; i++)
+		run(10);
+	CHECK(yfar.rx.stats.data_frames == data0 && yfar.rx.call.dt == YSF_DT_VD2 && yfar.rx.stats.voice > 0);
+	// Not on a YSF channel: nothing
+	req(RREQ_ZONE_POS, 0);
+	run(200);
+	keyed0 = hw.tx_calls;
+	radio_req_ysf_wx(YSF_WX_DX, 0, NULL);
+	CHECK(hw.tx_calls == keyed0);
+	yfar_stop();
+	setup_codeplug();
+	req(RREQ_RELOAD, 0);
+	run(50);
+}
+
+#if CONFIG_SCAN && CONFIG_DUAL_WATCH
+// A watch of channels 3 (YSF) and other, nothing on the air, for ms: how many looks each got and that no two
+// engines (or an engine and the DMR stack) ever ran together
+static void dual_pair(uint16_t other_pos, bool (*other_running)(void), const char *what)
+{
+	const ui_dual_ref_t a = { false, 0, other_pos }, b = { false, 0, 2 }, pair[2] = { a, b };
+	radio_ysf_stats_t y0, y1;
+	bool other_seen = false, ysf_seen = false, overlap = false;
+
+	radio_ysf_stats(&y0);
+	CHECK(ui_svc_dual(pair, 0) && sm.view.scan == SCAN_DUAL);
+	for (int i = 0; i < 4000 / RADIO_POLL_MS; i++) {
+		run(RADIO_POLL_MS);
+		bool y = radio_ysf_running(), o = other_running ? other_running() : false;
+
+		overlap |= y && o;
+		ysf_seen |= sm.view.channel_number == 3 && y;
+		other_seen |= sm.view.channel_number != 3 && (other_running ? o : true);
+	}
+	radio_ysf_stats(&y1);
+	CHECK(!overlap && ysf_seen && other_seen && y1.begins >= y0.begins + 2);
+	CHECK(ui_svc_dual(NULL, 0) && sm.view.scan == SCAN_OFF);
+}
+
+#if CONFIG_DMR
+static bool dmr_stack_running(void) { return sim.started; }
+#endif
+
+static void test_ysf_dual(void)
+{
+	const radio_ysf_view_t *v = &sm.view.ysf;
+	uint16_t visits;
+
+	(void)v;
+
+	setup_codeplug();
+	add(3, "YSF rptr", 446100000, RADIO_MODE_DMR, false, 2);	// zone Local, position 2
+	chans[3].kind = CODEPLUG_KIND_YSF;
+	chans[3].system = 0xFF;
+	stored_ysf[3] = (ysf_chan_t){ .tx_dgid = 12, .rx_dgid = 12 };
+	air_nofit = false;
+	memset(fair, 0, sizeof(fair));
+	start();
+	far_hz = 446100000;
+
+	// YSF + FM (A, Simplex): it goes back and forth; a call of our DG-ID holds the watch on B, another one doesn't
+	const ui_dual_ref_t a = { false, 0, 0 }, b = { false, 0, 2 }, pair[2] = { a, b };
+	CHECK(ui_svc_dual(pair, 0) && sm.view.scan == SCAN_DUAL);
+	CHECK(!scan_holds_on(3, 3000, &visits) && visits >= 2 && sm.view.scan == SCAN_DUAL);
+	yfar_begin(12);
+	CHECK(ysf_engine_tx_prepare(&yfar) && ysf_engine_tx_go(&yfar));
+	yfar_tx = true;
+	CHECK(scan_holds_on(3, 4000, &visits));
+	CHECK(radio_ysf_running() && (v->flags & RADIO_YSF_PLAYED) && v->dgid == 12);
+	run(1500);
+	// Entered late (the watch looked in mid-call): the callsign came from the DCH meanwhile
+	CHECK(sm.view.channel_number == 3 && sm.view.scan_phase == SCAN_PH_HOLD && !strcmp(v->src, "N1ABC") &&
+	      (v->flags & RADIO_YSF_LATE));
+	ysf_engine_tx_stop(&yfar);
+	run(600 + RADIO_DUAL_DELAY_MS + 600);
+	CHECK(sm.view.scan == SCAN_DUAL && sm.view.channel_number == 1);
+	yfar_begin(44);
+	CHECK(ysf_engine_tx_prepare(&yfar) && ysf_engine_tx_go(&yfar));
+	yfar_tx = true;
+	CHECK(!scan_holds_on(3, 4000, &visits) && visits >= 1 && sm.view.scan == SCAN_DUAL);
+	ysf_engine_tx_stop(&yfar);
+	run(600);
+	CHECK(ui_svc_dual(NULL, 0) && sm.view.scan == SCAN_OFF);
+	yfar_stop();
+	far_hz = 0;
+
+#if CONFIG_DMR
+	// YSF + DMR (position 3 of the zone: DMR rptr): the DMR stack and the YSF engine take turns
+	dual_pair(3, dmr_stack_running, "DMR");
+#endif
+#if CONFIG_NXDN
+	// YSF + NXDN on A
+	add(1, "NXDN simp", 446200000, RADIO_MODE_DMR, false, 2);
+	chans[1].kind = CODEPLUG_KIND_NXDN;
+	chans[1].system = 0xFF;
+	stored_nxdn[1] = (nxdn_conv_cfg_t){ .conv = { .rate9600 = true, .rx_ran = 1, .tx_ran = 1 }, .unit_id = 1, .target = 1 };
+	start();
+	dual_pair(0, radio_nxdn_running, "NXDN");
+#endif
+#if CONFIG_P25
+	// YSF + P25 on A
+	add(1, "P25 simp", 446200000, RADIO_MODE_P25, false, 2);
+	chans[1].kind = CODEPLUG_KIND_NONE;
+	start();
+	dual_pair(0, radio_p25_running, "P25");
+#endif
+	setup_codeplug();
+	req(RREQ_RELOAD, 0);
+	run(50);
+}
+#endif
+#endif	// CONFIG_YSF
+
+#if CONFIG_SCAN && CONFIG_DUAL_WATCH && CONFIG_DMR && (CONFIG_P25 || CONFIG_NXDN)
+// The air modes with DMR in a watch, without YSF in it: P25 + DMR and NXDN + DMR take turns the same way
+static void test_air_dmr_dual(void)
+{
+	const ui_dual_ref_t a = { false, 0, 3 }, b = { false, 0, 2 }, pair[2] = { a, b };
+	bool overlap = false, dmr_seen = false, air_seen = false;
+
+	for (int mode = 0; mode < 2; mode++) {
+		setup_codeplug();
+		if (mode == 0) {
+			if (!CONFIG_P25)
+				continue;
+			add(3, "P25 simp", 446100000, RADIO_MODE_P25, false, 2);
+		} else {
+#if CONFIG_NXDN
+			add(3, "NXDN simp", 446100000, RADIO_MODE_DMR, false, 2);
+			chans[3].kind = CODEPLUG_KIND_NXDN;
+			chans[3].system = 0xFF;
+			stored_nxdn[3] = (nxdn_conv_cfg_t){ .conv = { .rate9600 = true, .rx_ran = 1, .tx_ran = 1 }, .unit_id = 1, .target = 1 };
+#else
+			continue;
+#endif
+		}
+		air_nofit = false;
+		start();
+		overlap = dmr_seen = air_seen = false;
+		CHECK(ui_svc_dual(pair, 0) && sm.view.scan == SCAN_DUAL);
+		for (int i = 0; i < 4000 / RADIO_POLL_MS; i++) {
+			run(RADIO_POLL_MS);
+			bool air = false;
+#if CONFIG_P25
+			air |= radio_p25_running();
+#endif
+#if CONFIG_NXDN
+			air |= radio_nxdn_running();
+#endif
+			overlap |= air && sim.started;
+			dmr_seen |= sm.view.channel_number == 4 && sim.started;
+			air_seen |= sm.view.channel_number == 3 && air;
+		}
+		CHECK(!overlap && dmr_seen && air_seen);
+		CHECK(ui_svc_dual(NULL, 0) && sm.view.scan == SCAN_OFF);
+	}
+	setup_codeplug();
+	req(RREQ_RELOAD, 0);
+	run(50);
+}
 #endif
 
 #if CONFIG_AIR
@@ -10110,6 +10440,9 @@ static void air_step(void)
 #endif
 #if CONFIG_NXDN
 	nfar_step();
+#endif
+#if CONFIG_YSF
+	yfar_step();
 #endif
 }
 #endif
@@ -12313,6 +12646,30 @@ static void detour_req(uint8_t op, uint32_t backstop_ms)
 
 // A detour (docs/spec/debuglink.md 7.4): every setting the debug link can change while one runs is back after the
 // deadline, and nothing of it was stored, not by the save timer, not by a power-off's flush
+// The Mic input setting reaches the board's hook, a negative step intact; the Mic check follows the channel
+static void test_mic(void)
+{
+	dmr_start(true);
+	radio_req_mic_input(-3);
+	CHECK(mic_input_steps == -3);
+	radio_req_mic_input(5);
+	CHECK(mic_input_steps == 5);
+	radio_req_mic_check(true);
+	CHECK(sm.mic_check);
+	run(50);
+#if CONFIG_MIC_CHECK
+	ambe_mic_check_t v;
+	ambeVoiceMicCheckView(&v);
+	CHECK(v.on && v.profile == AMBE_TX_DMR);	// a DMR channel, the board in DMR
+#endif
+	radio_req_mic_check(false);
+	CHECK(!sm.mic_check);
+#if CONFIG_MIC_CHECK
+	ambeVoiceMicCheckView(&v);
+	CHECK(!v.on);
+#endif
+}
+
 static void test_detour(void)
 {
 	sim_flash_create(0x40000u, &reset_map);
@@ -12632,6 +12989,15 @@ int main(void)
 #if CONFIG_NXDN
 	test_nxdn();
 #endif
+#if CONFIG_YSF
+	test_ysf_wx();
+#if CONFIG_SCAN && CONFIG_DUAL_WATCH
+	test_ysf_dual();
+#endif
+#endif
+#if CONFIG_SCAN && CONFIG_DUAL_WATCH && CONFIG_DMR && (CONFIG_P25 || CONFIG_NXDN)
+	test_air_dmr_dual();
+#endif
 	test_dmr_data_glue();	// (last: the data service's state carries over)
 	test_factory_reset();
 #if CONFIG_UI_SETTINGS && CONFIG_DMR_AES
@@ -12639,6 +13005,7 @@ int main(void)
 #endif
 #if CONFIG_RADIO_DETOUR
 	test_detour();
+	test_mic();
 #endif
 	test_volume_step_of();
 	CHECK(rekeys == 0);	// every keying in every test above was ended before the next

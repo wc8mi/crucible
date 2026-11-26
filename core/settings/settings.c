@@ -160,6 +160,7 @@ static void aes_migration_check(settings_t *s, size_t bytes)
 	// Prior layout-1 writers could put four audio preferences where others put AES reservation state.
 	// Preserve every reservation byte and block AES if the data may have been used or is incomplete.
 	memset(s->rx_agc, 0, sizeof s->rx_agc);
+	s->rx_agc_ysf = 0;
 	s->rx_audio_levels = 0;
 	if (bytes > reservation && bytes < reservation + sizeof s->aes_mi_res) {
 		s->aes_migration = SETTINGS_AES_REKEY;

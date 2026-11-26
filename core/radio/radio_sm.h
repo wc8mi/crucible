@@ -201,9 +201,12 @@ typedef enum {
 	RREQ_NXDN_SET,		// radio_task.c: the pending NXDN settings were copied (radio_nxdn_set_settings); applied here
 	RREQ_P25_PARROT,		// local codec diagnostic; never keys the transmitter
 	RREQ_VFO_SWAP,		// select the other standalone VFO memory; never starts dual watch
+	RREQ_YSF_SET,		// radio_task.c: the same for YSF (radio_ysf_set_settings)
+	RREQ_YSF_WX,		// radio_task.c: a room command was armed (radio_ysf_wx_arm): send it as a short transmission
 #if CONFIG_RADIO_DETOUR
 	RREQ_DETOUR,		// a detour: arg RADIO_DETOUR_MARK (arg2: backstop ms) or _RETURN
 #endif
+	RREQ_MIC,		// arg RADIO_MIC_INPUT (arg2: hal mic_input steps) or RADIO_MIC_CHECK (arg2: on)
 	// New request types go above
 
 	RREQ_COUNT		// KEEP LAST: sizes req_flags[] (radio_sm.c)
@@ -467,6 +470,7 @@ typedef struct {
 	uint32_t zone_shifts;		// zone_edit_shifts() when the zone indexes below were last followed (zone_edit.h)
 #endif
 	bool reload_pending;		// RREQ_RELOAD came while busy
+	bool mic_check;			// RREQ_MIC: the Mic check screen is open (ambeVoiceMicCheck, radio_sm_tick)
 #if CONFIG_RADIO_DETOUR
 	radio_detour_home_t detour;	// the home state a detour returns to (RREQ_DETOUR)
 	uint32_t detour_ms;		// when it was marked, and the backstop

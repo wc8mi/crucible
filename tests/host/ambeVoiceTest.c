@@ -688,6 +688,148 @@ static void testMicGain(void)
 	ambeVoiceInit(&audio, &vocoder);
 }
 
+#if CONFIG_TX_MIC_LIMITER
+// Per-profile leveling: a target levels the mic and turns the codec's AGC off; the YSF profile is one-shot
+static void testTxProfiles(void)
+{
+	ambeVoiceInit(&audio, &cap_vocoder);
+	const dmr_voice_source_t *src = ambeVoiceSource();
+	ambe_voice_stats_t st;
+	ambeVoiceSetMicGain(5);
+	ambeVoiceSetEncodeOptions(VOCODER_OPT_DEFAULT | VOCODER_OPT_AGC);
+	for (unsigned i = 0; i < 160; i++) mic[i] = i & 1 ? -1000 : 1000;	// RMS 1000, about -30 dBFS
+
+	// No target: the manual gain as before, and the codec's AGC as set
+	ncap = 0;
+	src->begin(src->ctx); block();
+	ambeVoiceGetStats(&st);
+	CHECK(cap_pcm[0][0] == 1000 && st.tx_profile == AMBE_TX_DMR && st.tx_target_rms == 0 &&
+	      cap_opts[0] == (VOCODER_OPT_DEFAULT | VOCODER_OPT_AGC), "no target: manual gain, codec AGC kept");
+	src->end(src->ctx); block();
+
+	// A YSF target: only the transmission begun as YSF levels to it, the codec's AGC off for it
+	ambeVoiceSetTxTarget(AMBE_TX_YSF, 3277);	// -20 dBFS
+	CHECK(ambeVoiceTxTarget(AMBE_TX_YSF) == 3277 && ambeVoiceTxTarget(AMBE_TX_DMR) == 0, "targets kept per profile");
+	ambeVoiceTxProfile(AMBE_TX_YSF);
+	ncap = 0;
+	src->begin(src->ctx);
+	for (int b = 0; b < 40; b++) block();	// the gain rises at most 0.5 dB a block
+	ambeVoiceGetStats(&st);
+	CHECK(st.tx_profile == AMBE_TX_YSF && st.tx_target_rms == 3277, "YSF transmission takes its target");
+	CHECK((cap_opts[0] & VOCODER_OPT_AGC) == 0, "codec AGC off while the leveler sets the level");
+	int last = cap_pcm[ncap - 1][0];
+	CHECK(last > 3000 && last < 3600, "quiet mic leveled up to the target");
+	src->end(src->ctx); block();
+
+	// The next transmission, its profile never set, is DMR again: no target, manual gain
+	ncap = 0;
+	src->begin(src->ctx); block();
+	ambeVoiceGetStats(&st);
+	CHECK(st.tx_profile == AMBE_TX_DMR && cap_pcm[0][0] == 1000, "profile is one-shot: DMR after YSF");
+	src->end(src->ctx); block();
+
+	// A loud mic with a DMR target comes down to it, peaks still under the ceiling
+	ambeVoiceSetTxTarget(AMBE_TX_DMR, 3277);
+	for (unsigned i = 0; i < 160; i++) mic[i] = i & 1 ? -20000 : 20000;
+	ncap = 0;
+	src->begin(src->ctx); block(); block();
+	ambeVoiceGetStats(&st);
+	CHECK(cap_pcm[ncap - 1][0] > 3000 && cap_pcm[ncap - 1][0] < 3600 && st.tx_gain_q16 < TX_LEVEL_UNITY,
+	      "loud mic leveled down to the target");
+	src->end(src->ctx); block();
+	ambeVoiceSetTxTarget(AMBE_TX_DMR, 0);
+	ambeVoiceSetTxTarget(AMBE_TX_YSF, 0);
+	ambeVoiceSetEncodeOptions(VOCODER_OPT_DEFAULT);
+	ambeVoiceInit(&audio, &vocoder);
+}
+#endif
+
+#if CONFIG_MIC_CHECK
+// The mic check meters the transmit chain while nothing is transmitted, and never encodes
+static void testMicCheck(void)
+{
+	ambeVoiceInit(&audio, &cap_vocoder);
+	ambeVoiceStart();
+	ambe_mic_check_t v;
+	ambeVoiceSetMicGain(5);
+	for (unsigned i = 0; i < 160; i++) mic[i] = i & 1 ? -1000 : 1000;
+	ncap = 0;
+	for (unsigned b = 0; b < AMBE_MIC_CHECK_BLOCKS; b++) block();
+	ambeVoiceMicCheckView(&v);
+	CHECK(v.windows == 0 && !v.on, "off: nothing published");
+
+	ambeVoiceSetTxTarget(AMBE_TX_YSF, 3277);
+	ambeVoiceMicCheck(true, AMBE_TX_YSF);
+	for (unsigned b = 0; b < AMBE_MIC_CHECK_BLOCKS; b++) block();
+	ambeVoiceMicCheckView(&v);
+	CHECK(v.on && v.windows == 1 && v.profile == AMBE_TX_YSF && v.target_rms == 3277, "a window published");
+	CHECK(v.in_rms_db10 > -310 && v.in_rms_db10 < -290 && v.in_peak_db10 == v.in_rms_db10 && v.clips == 0,
+	      "input level: -30 dBFS, no clips");
+	CHECK(v.gain_db10 > 0 && v.out_rms_db10 > v.in_rms_db10, "the leveler raises a quiet mic toward the target");
+	CHECK(ncap == 0, "the check never encodes");
+	for (unsigned b = 0; b < 4 * AMBE_MIC_CHECK_BLOCKS; b++) block();
+	ambeVoiceMicCheckView(&v);
+	CHECK(v.out_rms_db10 > -210 && v.out_rms_db10 < -190, "settles at the target");
+
+	for (unsigned i = 0; i < 160; i++) mic[i] = i & 1 ? -32768 : 32767;
+	for (unsigned b = 0; b < AMBE_MIC_CHECK_BLOCKS; b++) block();
+	ambeVoiceMicCheckView(&v);
+	CHECK(v.clips == 160 * AMBE_MIC_CHECK_BLOCKS && v.in_peak_db10 >= -1 && v.out_peak_db10 <= -10,
+	      "clipped input counted, output held under the ceiling");
+
+	// Record, then play back: frames encoded with the codec's AGC off (a target), decoded to the speaker and metered
+	for (unsigned i = 0; i < 160; i++) mic[i] = i & 1 ? -1000 : 1000;
+	ambeVoiceSetEncodeOptions(VOCODER_OPT_DEFAULT | VOCODER_OPT_AGC);
+	ncap = 0;
+	ambeVoiceMicCheckRecord();
+	for (unsigned b = 0; b < 30; b++) block();
+	ambeVoiceMicCheckView(&v);
+	CHECK(v.phase == AMBE_CHECK_RECORD && v.frames == 30 && ncap == 30, "recording encodes every block");
+	CHECK((cap_opts[0] & VOCODER_OPT_AGC) == 0, "recorded with the codec AGC off, as a leveled transmission");
+	ambeVoiceMicCheckPlay();
+	agc_wave = true;
+	decodes = 0;
+	block();
+	ambeVoiceMicCheckView(&v);
+	CHECK(v.phase == AMBE_CHECK_PLAY && v.frames == 30 && decodes == 1 && spk[1] == 464, "playback decodes to the speaker");
+	for (unsigned b = 0; b < 30; b++) block();	// that block recorded one more before it played: 31
+	ambeVoiceMicCheckView(&v);
+	CHECK(v.phase == AMBE_CHECK_LIVE && v.played == 1 && decodes == 31, "playback ends after the recording");
+	CHECK(v.dec_rms_db10 > -380 && v.dec_rms_db10 < -360 && v.dec_peak_db10 == v.dec_rms_db10, "decoded level metered");
+	agc_wave = false;
+	// A full recording plays by itself
+	ambeVoiceMicCheckRecord();
+	for (unsigned b = 0; b < AMBE_MIC_CHECK_FRAMES + 1; b++) block();
+	ambeVoiceMicCheckView(&v);
+	CHECK(v.phase == AMBE_CHECK_PLAY, "full recording plays");
+	ambeVoiceSetEncodeOptions(VOCODER_OPT_DEFAULT);
+
+	ambeVoiceMicCheck(false, AMBE_TX_DMR);
+	block();
+	ambeVoiceMicCheckView(&v);
+	CHECK(!v.on && v.phase == AMBE_CHECK_LIVE, "off again, playback ended");
+	// Off while recording with no block in between (the stream stopped under it), then on: it starts over, live
+	ambeVoiceMicCheck(true, AMBE_TX_YSF);
+	block();
+	ambeVoiceMicCheckRecord();
+	for (unsigned b = 0; b < 5; b++) block();
+	ambeVoiceMicCheckView(&v);
+	CHECK(v.phase == AMBE_CHECK_RECORD, "recording");
+	ambeVoiceMicCheck(false, AMBE_TX_YSF);
+	ambeVoiceMicCheckView(&v);
+	CHECK(!v.on && v.phase == AMBE_CHECK_LIVE, "off: the view is live at once");
+	ambeVoiceMicCheck(true, AMBE_TX_YSF);
+	block();
+	ambeVoiceMicCheckView(&v);
+	CHECK(v.on && v.phase == AMBE_CHECK_LIVE && v.windows == 0, "on again: a fresh check, not the old recording");
+	ambeVoiceMicCheck(false, AMBE_TX_DMR);
+	block();
+	ambeVoiceSetTxTarget(AMBE_TX_YSF, 0);
+	ambeVoiceStop();
+	ambeVoiceInit(&audio, &vocoder);
+}
+#endif
+
 static int zeroCrossings(const int16_t *p, int n)
 {
 	int c = 0;
@@ -965,6 +1107,12 @@ int main(void)
 	testFlagsMap();
 	testEncodeOptions();
 	testMicGain();
+#if CONFIG_TX_MIC_LIMITER
+	testTxProfiles();
+#endif
+#if CONFIG_MIC_CHECK
+	testMicCheck();
+#endif
 	testTxTone();
 	testRepeats();
 	testMicGate();

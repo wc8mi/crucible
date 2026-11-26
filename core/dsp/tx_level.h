@@ -110,4 +110,14 @@ static inline uint16_t tx_level_process(tx_level_t *s, const int16_t *in, int16_
 	}
 	return peak;
 }
+// The TX level settings' choices (Settings > Talk & listen, DMR and YSF TX level): 0 Off, the manual gain with the
+// peak limiter; 1..10 an RMS target of -30..-12 dBFS in 2 dB steps, relative to 32768
+#define TX_LEVEL_CHOICES	11u
+#define TX_LEVEL_CHOICE_DBFS(c)	(-32 + 2 * (int)(c))	// c 1..10
+static inline uint16_t tx_level_choice_rms(uint8_t choice)
+{
+	static const uint16_t rms[TX_LEVEL_CHOICES] = { 0, 1036, 1305, 1642, 2068, 2603, 3277, 4125, 5193, 6538, 8231 };
+	return choice < TX_LEVEL_CHOICES ? rms[choice] : 0u;
+}
+
 #endif

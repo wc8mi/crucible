@@ -58,10 +58,21 @@ BOARD_REQUIRED := FM
 # Supported, but the maximal configuration leaves PPP off: it stands in for the USB network adapter on UART-only radios
 # (docs/spec/ppp.md), and this one has the adapter. The all-feature image exceeds app FLASH with satellite tracking
 # enabled, so only the maximal build turns it off; the default build keeps it on.
-MAXIMAL_SKIP := NET_PPP LANG_ES LANG_IT LANG_FR LANG_ZH
+# kf8sforkysf: trunking stays out of maximal as of the default build, the room YSF takes
+MAXIMAL_SKIP := NET_PPP LANG_ES LANG_IT LANG_FR LANG_ZH DMR_TRUNK P25_TRUNK
 MAXIMAL_VARS := CONFIG_SATELLITE_TLE=n
 # English only (the owner's choice, 2026-11-03)
 CONFIG_LANG_ES ?= n
 # The maximal configuration leaves the other languages and their fonts (about 110 KB) out of its flash check.
 CONFIG_RX_EXT ?= n
 BOARD_NOT_WRITTEN += RX_EXT	# no receive range in its chip documents (a PLL and an IF chain, no single receiver chip)
+
+# kf8sforkysf experiment: YSF (C4FM DN) on this radio, made room for by leaving trunking out. P25, NXDN and
+# conventional DMR stay. YSF receives through the soft modem on the FM copy (the HR_C6000's correlator can't sync on
+# YSF frames); untested on this radio
+CONFIG_DMR_TRUNK ?= n
+CONFIG_P25_TRUNK ?= n
+CONFIG_YSF ?= $(CONFIG_DMR)
+# The soft modem's tone and code removal for YSF through repeaters (docs/spec/air-interface.md 6.1), on with YSF and
+# the standard tone lists
+CONFIG_AIR_RX_ADAPT ?= $(if $(filter y,$(CONFIG_SUBTONE)),$(CONFIG_YSF),n)

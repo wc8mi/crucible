@@ -1236,13 +1236,13 @@ static void draw_talk(const radio_view_t *v, bool label_first)
 		   v->p25.trunk != RADIO_P25_TRUNK_OFF) {
 		// What the follower does, and with the transmit side on, how far it is from talking: registering, the
 		// talk group once PTT can ask for it, a request's state
-		bool txs = (v->p25.flags & RADIO_P25_TRUNK_TX) != 0;
+		// A blocked system is listen only whatever the flag says: it reads as one, never as "Registering". Idle on
+		// the control channel, a system that can't transmit (blocked, or set to listen only) says "RX only", as a
+		// conventional RX-only channel does; a call still reads "Following TG n"
+		bool txs = (v->p25.flags & RADIO_P25_TRUNK_TX) != 0 && v->p25.treg != P25_REG_BLOCKED;
 		if (v->p25.trunk == RADIO_P25_TRUNK_HUNT) {
 			sb_str(&b, TR(HOME_STATE_P25T_HUNT, "Finding system"));
 			c = ui_col.dim;
-		} else if (v->p25.trunk == RADIO_P25_TRUNK_CONTROL && v->p25.treg == P25_REG_BLOCKED) {
-			sb_str(&b, TR(HOME_STATE_P25T_BLOCKED, "Blocked system"));
-			c = ui_col.warn;
 		} else if (v->p25.trunk == RADIO_P25_TRUNK_CONTROL && txs && v->p25.treq == P25_REQ_WAIT) {
 			sb_str(&b, TR(HOME_STATE_P25T_WAIT, "Wait"));
 		} else if (v->p25.trunk == RADIO_P25_TRUNK_CONTROL && txs && v->p25.treq == P25_REQ_QUEUED) {
@@ -1260,7 +1260,11 @@ static void draw_talk(const radio_view_t *v, bool label_first)
 		} else if (v->p25.trunk == RADIO_P25_TRUNK_CONTROL && txs && v->p25.treg != P25_REG_NO_TX) {
 			sb_str(&b, "TG ");
 			sb_u32(&b, v->p25.talk, 1);
+		} else if (v->p25.trunk == RADIO_P25_TRUNK_CONTROL && !txs) {
+			sb_str(&b, TR(WORD_RX_ONLY, "RX only"));
+			c = ui_col.warn;
 		} else if (v->p25.trunk == RADIO_P25_TRUNK_CONTROL) {
+			// the transmit side is on but this control channel has no inbound frequency
 			sb_str(&b, TR(HOME_STATE_P25T_CONTROL, "Control channel"));
 		} else if (v->p25.treq == P25_REQ_TALK) {
 			sb_str(&b, "TG ");
@@ -1290,6 +1294,15 @@ static void draw_talk(const radio_view_t *v, bool label_first)
 		if ((v->nxdn.flags & RADIO_NXDN_TALK_UNIT) == 0)
 			sb_str(&b, "TG ");
 		sb_u32(&b, v->nxdn.talk, 1);
+#endif
+#if CONFIG_YSF
+	} else if (v->ch.mode == RADIO_MODE_YSF && (v->ysf.flags & RADIO_YSF_NO_CALL) != 0) {
+		sb_str(&b, TR(HOME_STATE_NO_CALLSIGN, "No callsign"));	// PTT refused until the codeplug has one
+		c = ui_col.warn;
+	} else if (v->ch.mode == RADIO_MODE_YSF) {
+		// What PTT sends to: the DG-ID (YSF has no talk groups)
+		sb_str(&b, "DG-ID ");
+		sb_u32(&b, v->ysf.tx_dgid, 2);
 #endif
 	} else {
 		// A channel shows the frequency it listens on, as dual watch does, and a repeater's offset after it: no
@@ -1369,6 +1382,20 @@ static void draw_chips(const radio_view_t *v, const ui_state_t *s)
 		sb_init(&b, buf, sizeof buf);
 		sb_str(&b, "NAC ");
 		sb_hex(&b, v->p25.rx_nac, 3);
+		if (x + gfx_text_width(f, buf) <= w)
+			gfx_text(f, x, y, buf, ui_col.fg);
+#endif
+		return;
+	}
+	if (v->ch.mode == RADIO_MODE_YSF) {
+		// The same for YSF: the power and the DG-ID heard (00: every one)
+		if (pw_temp)
+			x = gfx_text(f, x, y, GLYPH_DOT, ui_col.warn);
+		x = gfx_text(f, x, y, ui_power_name(v->power, v->ch.tx_hz), pw_temp ? ui_col.warn : ui_col.fg) + f->w;
+#if CONFIG_YSF
+		sb_init(&b, buf, sizeof buf);
+		sb_str(&b, "RX DG-ID ");
+		sb_u32(&b, v->ysf.rx_dgid, 2);
 		if (x + gfx_text_width(f, buf) <= w)
 			gfx_text(f, x, y, buf, ui_col.fg);
 #endif
@@ -1533,7 +1560,7 @@ const char *ui_deny_text(const radio_view_t *v, uint8_t why, char *buf, size_t l
 		case RADIO_TRUNK_WHY_DENIED: sb_str(&b, TR(DENY_WHY_P25T_DENIED, "System denied the call")); break;
 		case RADIO_TRUNK_WHY_NO_ANSWER: sb_str(&b, TR(DENY_WHY_P25T_NO_ANSWER, "No answer from system")); break;
 		case RADIO_TRUNK_WHY_NO_CHAN: sb_str(&b, TR(DENY_WHY_P25T_NO_CHAN, "Voice channel unusable")); break;
-		case RADIO_TRUNK_WHY_BLOCKED: sb_str(&b, TR(DENY_WHY_P25T_WACN_BLOCKED, "Blocked system: no TX")); break;
+		case RADIO_TRUNK_WHY_BLOCKED: sb_str(&b, TR(DENY_WHY_P25T_WACN_BLOCKED, "RX-only system: no TX")); break;
 		case RADIO_TRUNK_WHY_OTHER_SYS: sb_str(&b, TR(DENY_WHY_TRUNK_OTHER_SYS, "Another system heard")); break;
 		case RADIO_TRUNK_WHY_OTHER_KIND: sb_str(&b, TR(DENY_WHY_TRUNK_OTHER_KIND, "Incompatible system")); break;
 		case RADIO_TRUNK_WHY_REG_REFUSED: sb_str(&b, TR(DENY_WHY_TRUNK_REG_REFUSED, "Registration refused")); break;
@@ -1583,8 +1610,8 @@ static const char *deny_action(const radio_view_t *v)
 			return TR(DENY_FIX_CHECK_SYSTEM, "Check system settings");
 		if (trunk_why(v) == RADIO_TRUNK_WHY_REG_REFUSED)
 			return TR(DENY_FIX_ASK_TO_ADD_ID, "Ask to add your ID");	// the system doesn't know it
-		if (trunk_why(v) == RADIO_TRUNK_WHY_OTHER_KIND)
-			return TR(DENY_FIX_PICK_ANOTHER_CHANNEL, "Pick another channel");	// no setting helps
+		if (trunk_why(v) == RADIO_TRUNK_WHY_OTHER_KIND || trunk_why(v) == RADIO_TRUNK_WHY_BLOCKED)
+			return TR(DENY_FIX_PICK_ANOTHER_CHANNEL, "Pick another channel");	// no setting helps, nor a retry
 		return TR(DENY_FIX_RELEASE_AND_RETRY, "Release PTT, try again");
 #endif
 	default: return TR(DENY_FIX_PICK_ANOTHER_CHANNEL, "Pick another channel");
@@ -2091,6 +2118,42 @@ static void draw_last_heard(const radio_view_t *v, const ui_state_t *s, int y)
 	gfx_text(sm, 0, y, fit, ui_col.fg);
 }
 
+#if CONFIG_YSF
+// Activity on Home, YSF idle: the last YSF call heard (ui_state_t.ysf_last), as DMR's: "N1ABC" / "DG-ID 12 11s ago"
+static void draw_last_heard_ysf(const ui_state_t *s, int y)
+{
+	const font_t *sm = ui_layout.small;
+	int w = gfx_width();
+	char where[32], fit[48];
+	sbuf_t b;
+
+	if (s->ysf_last_ms == 0) {
+		gfx_text(sm, 0, y + (ui_layout.activity_h - sm->h) / 2, TR(EMPTY_NO_CALLS_HEARD, "No calls heard yet"),
+			ui_col.dim);
+		return;
+	}
+	sb_init(&b, where, sizeof where);
+	sb_str(&b, "DG-ID ");
+	sb_u32(&b, s->ysf_last_dgid, 2);
+	sb_chr(&b, ' ');
+	sb_age(&b, s->now_ms - s->ysf_last_ms);
+	if (ui_layout.activity_h >= 2 * sm->h) {
+		gfx_text_fit(sm, s->ysf_last, w, fit, sizeof fit);
+		gfx_text(sm, 0, y, fit, ui_col.fg);
+		gfx_text_fit(sm, where, w, fit, sizeof fit);
+		gfx_text(sm, 0, y + sm->h, fit, ui_col.dim);
+		return;
+	}
+	// One line: the callsign whole (10 at most), where and when in what is left
+	y += (ui_layout.activity_h - sm->h) / 2;
+	gfx_text_fit(sm, s->ysf_last, w, fit, sizeof fit);
+	int cw = gfx_text_width(sm, fit);
+	gfx_text(sm, 0, y, fit, ui_col.fg);
+	gfx_text_fit(sm, where, w - cw - sm->w, fit, sizeof fit);
+	gfx_text(sm, w - gfx_text_width(sm, fit), y, fit, ui_col.dim);
+}
+#endif
+
 // One text line of the call screens, if it still fits above the hint row; returns the next y
 static int call_line(const font_t *f, int y, const char *text, color_t c)
 {
@@ -2136,6 +2199,7 @@ bool ui_svc_rx_audio_text(uint8_t mode, char *out, size_t len)
 	case RADIO_MODE_DMR: agc = RX_AGC_DMR; break;
 	case RADIO_MODE_P25: agc = RX_AGC_P25; break;
 	case RADIO_MODE_NXDN: agc = RX_AGC_NXDN; break;
+	case RADIO_MODE_YSF: agc = RX_AGC_YSF; break;
 	default: if (len) out[0] = 0; return false;
 	}
 	if (!rx_audio_levels() || ui_svc_setting_get((uint8_t)(UI_SET_RX_AGC_DMR + agc)) == 0) {
@@ -2400,15 +2464,33 @@ static void draw_dmr_call(const radio_view_t *v, const ui_state_t *s)
 #endif
 
 #if CONFIG_AIR
-// A P25 or NXDN call coming in (air_call): whether one is heard now, and its fields
+// A P25, NXDN or YSF call coming in (air_call): whether one is heard now, and its fields. YSF names its caller by
+// callsign (call, "" until heard) and its target by DG-ID: dgid >= 0
 typedef struct {
 	bool played, enc, unit;
 	uint32_t src, dst;
 	const char *name;
+#if CONFIG_YSF
+	bool not_dn, data;
+	const char *call;
+	int16_t dgid;
+#endif
 } air_call_t;
 
 static bool air_call(const radio_view_t *v, air_call_t *c)
 {
+	memset(c, 0, sizeof *c);
+#if CONFIG_YSF
+	c->dgid = -1;
+	if (v->ch.mode == RADIO_MODE_YSF && (v->ysf.flags & RADIO_YSF_RX) != 0) {
+		c->played = (v->ysf.flags & RADIO_YSF_PLAYED) != 0;
+		c->not_dn = (v->ysf.flags & RADIO_YSF_NOT_DN) != 0;
+		c->data = (v->ysf.flags & RADIO_YSF_DATA) != 0;
+		c->call = v->ysf.src;
+		c->dgid = v->ysf.dgid;
+		return true;
+	}
+#endif
 #if CONFIG_P25
 	if (v->ch.mode == RADIO_MODE_P25 && (v->p25.flags & RADIO_P25_RX) != 0) {
 		const radio_p25_view_t *p = &v->p25;
@@ -2445,12 +2527,44 @@ static void air_call_line(const air_call_t *c, const font_t *f, int y)
 	char buf[64], fit[48];
 	sbuf_t b;
 
+#if CONFIG_YSF
+	if (!c->played && !c->data) {
+		gfx_text_fit(f, c->enc ? TR(CALL_WHY_ENCRYPTED, "Encrypted: not played") :
+			c->not_dn ? TR(CALL_WHY_NOT_DN, "Not DN voice: not played") :
+			c->dgid >= 0 ? TR(CALL_WHY_OTHER_DGID, "Other DG-ID: not played") :
+			TR(CALL_WHY_OTHER_TG, "Other TG: not played"), gfx_width(), fit, sizeof fit);
+		gfx_text(f, 0, y, fit, ui_col.warn);
+		return;
+	}
+#else
 	if (!c->played) {
 		gfx_text_fit(f, c->enc ? TR(CALL_WHY_ENCRYPTED, "Encrypted: not played") :
 			TR(CALL_WHY_OTHER_TG, "Other TG: not played"), gfx_width(), fit, sizeof fit);
 		gfx_text(f, 0, y, fit, ui_col.warn);
 		return;
 	}
+#endif
+#if CONFIG_YSF
+	if (c->call != NULL) {
+		// YSF: "N0CALL > DG-ID 12", or "N0RPT > Data" for a data transmission (room data); the callsign kept longest
+		for (int with_dgid = 1; with_dgid >= 0; with_dgid--) {
+			sb_init(&b, buf, sizeof buf);
+			sb_str(&b, c->call[0] ? c->call : "?");
+			if (with_dgid && c->data) {
+				sb_str(&b, " " GLYPH_ARROW " ");
+				sb_str(&b, TR(CALL_VALUE_DATA, "Data"));
+			} else if (with_dgid) {
+				sb_str(&b, " " GLYPH_ARROW " DG-ID ");
+				sb_u32(&b, (uint32_t)c->dgid, 2);
+			}
+			if (gfx_text_width(f, buf) <= gfx_width())
+				break;
+		}
+		gfx_text_fit(f, buf, gfx_width(), fit, sizeof fit);
+		gfx_text(f, 0, y, fit, ui_col.rx);
+		return;
+	}
+#endif
 	// Fit the caller to the space left by the destination; a long database name must not disappear entirely.
 	char destination[48], caller[32];
 	sb_init(&b, destination, sizeof destination);
@@ -2508,7 +2622,8 @@ static bool draw_air_audio(const radio_view_t *v, const ui_state_t *s)
 		sb_str(&b, " dBm");
 		y = call_line(L->small, y, buf, ui_col.fg);
 	}
-	rx_audio_text(v->ch.mode == RADIO_MODE_P25 ? RX_AGC_P25 : RX_AGC_NXDN, buf, sizeof buf);
+	rx_audio_text(v->ch.mode == RADIO_MODE_P25 ? RX_AGC_P25 : v->ch.mode == RADIO_MODE_YSF ? RX_AGC_YSF : RX_AGC_NXDN,
+		      buf, sizeof buf);
 	call_line(L->small, y, buf, ui_col.dim);
 	ui_draw_hint(TR(HINT_PTT_REPLIES, "PTT replies"), false);
 	return true;
@@ -2633,6 +2748,12 @@ static void draw_activity(const radio_view_t *v, const ui_state_t *s)
 #if CONFIG_DMR
 		if (v->ch.mode == RADIO_MODE_DMR && v->dmr.active) {
 			draw_last_heard(v, s, y);	// hear all shows as "All" in the chips and in the hint
+			break;
+		}
+#endif
+#if CONFIG_YSF
+		if (v->ch.mode == RADIO_MODE_YSF) {
+			draw_last_heard_ysf(s, y);
 			break;
 		}
 #endif
@@ -4164,6 +4285,10 @@ uint8_t ui_quick_kind(int pos, const radio_view_t *v)
 	if (!v->vfo && pos == 3)
 		return QT_TO_VFO;	// a channel's tile 4 copies it to the VFO; the VFO's stays Mode
 	uint8_t kind = v->ch.mode == RADIO_MODE_DMR ? dmr[pos] : fm[pos];
+	if (CONFIG_YSF && v->ch.mode == RADIO_MODE_YSF && kind == QT_TONE)
+		kind = QT_YSF_ROOMS;	// no tones on YSF: tile 3 opens Rooms
+	if (CONFIG_YSF && v->ch.mode == RADIO_MODE_YSF && kind == QT_BANDWIDTH)
+		kind = QT_DGID;		// nor a width: tile 8 is the DG-ID
 	if (v->vfo && (kind == QT_MONITOR || kind == QT_PRIVACY))
 		return QT_SPLIT;	// the VFO's TX frequency; Monitor stays on its key, privacy on channels
 	return kind;
@@ -4201,6 +4326,8 @@ bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *l
 		[QT_TO_VFO] = TRN(QUICK_LABEL_COPY_TO_VFO, TEXT_ALT_OPEN "Copy to VFO"
 			TEXT_ALT_NEXT "To VFO" TEXT_ALT_CLOSE),
 		[QT_SPLIT] = TRN(QUICK_LABEL_TX_FREQ, TEXT_ALT_OPEN "TX freq" TEXT_ALT_NEXT "TXFreq" TEXT_ALT_CLOSE),
+		[QT_YSF_ROOMS] = TRN(QUICK_LABEL_ROOMS, "Rooms"),
+		[QT_DGID] = TRX(QUICK_LABEL_DGID, "DG-ID"),
 	};
 	uint8_t kind = ui_quick_kind(tile, v);
 	bool editing = s->quick_edit && s->quick_focus == tile;
@@ -4286,6 +4413,14 @@ bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *l
 		sb_u32(&b, s->brightness, 1);
 		sb_chr(&b, '%');
 		return true;
+	case QT_YSF_ROOMS:
+		sb_str(&b, TR(QUICK_VALUE_OPEN, "Open"));
+		return CONFIG_YSF;
+#if CONFIG_YSF
+	case QT_DGID:
+		sb_u32(&b, editing ? s->dgid_edit : v->ysf.tx_dgid, 2);
+		return true;
+#endif
 #if CONFIG_DMR
 	case QT_TIMESLOT:
 		sb_str(&b, "TS");

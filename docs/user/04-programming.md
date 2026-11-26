@@ -226,6 +226,27 @@ supported levels, with labels for the channel's transmit band. **Radio default**
 Without that metadata, the editor keeps the portable Min/Low/Mid/High/Max and numbered scale; the numbers
 are relative steps, not watts. Several portable steps may map to the same level on a radio with fewer levels.
 
+### YSF
+
+Pick **YSF** in the channel form's **Mode** for YSF (C4FM DN voice). Using it on the radio:
+[Channels, zones and the VFO](07-channels-zones-vfo.md#ysf-channels). A YSF channel has no contact or Own ID.
+
+**YSF channel:**
+
+| Field | Meaning |
+|---|---|
+| TX DG-ID | DG-ID sent, 0-99 |
+| RX DG-ID | DG-ID heard, 0-99. 0 hears every DG-ID |
+
+**Radio tab:**
+
+| Field | Meaning |
+|---|---|
+| YSF callsign | The callsign YSF sends, up to 10 letters, digits, - and /. Blank: the radio name's first word |
+
+There is no radio ID field, on purpose: every radio makes its own from its chip, so a codeplug copied to many radios
+never gives two of them the same one ([Your radio ID](07-channels-zones-vfo.md#your-radio-id)).
+
 ### Files
 
 **Open File** takes:

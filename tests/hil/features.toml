@@ -97,6 +97,11 @@ switch = "TX_MIC_LIMITER"
 spec = "docs/spec/radio-features.md"
 source = ["core/dsp/tx_level.h", "core/dmr/ambe/ambeVoice.c", "core/p25/p25Voice.c"]
 
+[feature.mic_check]
+switch = "MIC_CHECK"
+spec = "docs/spec/radio-features.md"
+source = ["core/dmr/ambe/ambeVoice.c", "core/ui/ui_menus.c", "core/radio/radio_sm.c"]
+
 [feature.tx_dc_block]
 switch = "TX_DC_BLOCK"
 spec = "docs/spec/p25.md"
@@ -127,6 +132,13 @@ source = ["core/nxdn", "core/air", "core/fec", "core/radio/radio_nxdn.c", "core/
 switch = "NXDN_SCRAMBLER"
 spec = "docs/spec/nxdn.md"
 source = ["core/nxdn/nxdn_scramble.c", "core/nxdn/nxdn_call.c", "core/nxdn/nxdn_engine.c"]
+
+[feature.ysf]
+switch = "YSF"
+spec = "docs/spec/ysf.md"
+source = ["core/ysf", "core/air", "core/fec", "core/radio/radio_ysf.c", "core/radio/radio_ysf.h",
+          "core/radio/radio_air.h", "core/radio/radio_air_mem.c", "core/radio/radio_air_voice.c",
+          "core/debuglink/debuglink_view_ysf.c"]
 
 [feature.dmr_voice]
 switch = "DMR"
@@ -633,6 +645,11 @@ source = ["tools/rfoundry/rfoundry"]
 switch = "AIR_RAW"
 spec = "docs/spec/debuglink.md"
 source = ["core/debuglink/debuglink_air.c", "core/debuglink/debuglink_air.h"]
+
+[feature.air_rx_adapt]
+switch = "AIR_RX_ADAPT"
+spec = "docs/spec/air-interface.md"
+source = ["core/air/air_softmodem.c"]
 
 [feature.debuglink_dmrip]
 switch = "DEBUGLINK_DMRIP"

@@ -8,10 +8,14 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// RADIO_MODE_P25 and RADIO_MODE_NXDN are a channel's modes only (the radio core runs them with the board in
-// RADIO_MODE_DMR, its modem chip's digital mode, docs/spec/p25.md 7, docs/spec/nxdn.md 6): set_mode never gets them
-typedef enum { RADIO_MODE_FM, RADIO_MODE_DMR, RADIO_MODE_P25, RADIO_MODE_NXDN } radio_mode_t;
+// RADIO_MODE_P25, RADIO_MODE_NXDN and RADIO_MODE_YSF are a channel's modes only (the radio core runs them with the
+// board in RADIO_MODE_DMR, its modem chip's digital mode, docs/spec/p25.md 7, docs/spec/nxdn.md 6, docs/spec/ysf.md
+// 5): set_mode never gets them
+typedef enum { RADIO_MODE_FM, RADIO_MODE_DMR, RADIO_MODE_P25, RADIO_MODE_NXDN, RADIO_MODE_YSF } radio_mode_t;
 typedef enum { RADIO_BW_12K5, RADIO_BW_25K } radio_bw_t;
+// hal_radio_t.mic_input's range, chip steps either side of the board's level
+#define HAL_MIC_INPUT_MIN	(-7)
+#define HAL_MIC_INPUT_MAX	8
 
 typedef enum { TONE_NONE, TONE_CTCSS, TONE_DCS, TONE_DCS_INV } tone_type_t;
 // hal_radio_t.dmr_keying
@@ -53,7 +57,7 @@ typedef struct {
 	// reaching a decoder. A board whose decoder reads that audio through the path audio() gates (an I2S tap behind the
 	// FM feed-through) needs it; without it the core mutes with audio(false)
 	void (*speaker_mute)(bool mute);
-	// Optional: receive audio from a signal is open: FM squelch open or monitor, or a DMR, P25 or NXDN call playing
+	// Optional: receive audio from a signal is open: FM squelch open or monitor, or a DMR, P25, NXDN or YSF call playing
 	// (the green LED's state). Local beeps don't set it. For a board whose own noise reaches the audio only with a
 	// carrier present, such as backlight PWM through the synthesizer
 	void (*rx_open)(bool on);
@@ -110,6 +114,11 @@ typedef struct {
 	void (*pcm_mic_gain)(int8_t db);
 	// Optional: route the transmit microphone to the PCM ADC without arming RF. Restore receive routing on false.
 	void (*pcm_mic_route)(bool on);
+	// Optional: the microphone ADC's analog gain for digital voice (DMR, and the voice the air interface frames),
+	// in the chip's own steps relative to the board's level (the Mic input setting, HAL_MIC_INPUT_MIN..MAX). It sets
+	// how hot the samples reach the shared chain (mic_pcm_db, gain, leveler), so a mic that clips before it can be
+	// turned down. Applied now in DMR mode and at every entry to it. Radio task only. NULL = no such gain
+	void (*mic_input)(int8_t steps);
 	// Optional: fixed AMBE microphone PCM calibration in dB, combined with the manual software gain before
 	// the shared peak limiter. Zero keeps the board's delivered level. P25 ignores this codec-specific offset.
 	int8_t mic_pcm_db;

@@ -825,6 +825,27 @@
     "UI_SETTINGS"
    ]
   },
+  "mic_check": {
+   "group": "settings",
+   "needs": [
+    "UI_SETTINGS",
+    "MIC_CHECK"
+   ]
+  },
+  "mic_check_meters": {
+   "group": "settings",
+   "needs": [
+    "UI_SETTINGS",
+    "MIC_CHECK"
+   ]
+  },
+  "settings_rssi_correction": {
+   "group": "settings",
+   "needs": [
+    "UI_SETTINGS",
+    "SIGNAL_METER"
+   ]
+  },
   "settings_editor": {
    "group": "settings",
    "needs": [

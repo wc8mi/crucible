@@ -46,6 +46,7 @@
 
 #define C6000_PWD_WAIT_MS	12	// at least 10 ms after PWD low before the first access (as the other HR_C6000 radios)
 #define DMR_MIC_GAIN		7	// the other HR_C6000 radios' value (unverified here)
+static int8_t mic_input_steps;	// md9600_c6000_mic_input: the radio task's
 #define RX_GAIN_DB		2	// 4:0x37 = 0xC2 (unverified)
 #define SAFE_GAIN		0x80u	// modulation gain without a calibration value
 #define VOICE_SPI_PINS		(GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5)	// PB3 SCK, PB4 MISO, PB5 MOSI (AF5)
@@ -470,7 +471,8 @@ void md9600_c6000_mode(bool dmr, uint32_t hz)
 #if CONFIG_DMR
 		count(hrc6000_rx_iq_swap(&modem, iq_swap(hz), false));
 		count(hrc6000_dmr_enter(&modem, cal_gain(CAL_DMR_I_UHF, CAL_DMR_I_VHF, hz),
-					cal_gain(CAL_DMR_Q_UHF, CAL_DMR_Q_VHF, hz), DMR_MIC_GAIN));
+					cal_gain(CAL_DMR_Q_UHF, CAL_DMR_Q_VHF, hz),
+					hrc_mic_gain_steps(DMR_MIC_GAIN, mic_input_steps)));
 #endif
 		ref_offset(hz);
 		tuned_hz = hz;
@@ -483,6 +485,16 @@ void md9600_c6000_mode(bool dmr, uint32_t hz)
 	}
 	speaker_apply();
 	fm_tap_update();
+}
+
+void md9600_c6000_mic_input(int8_t steps)
+{
+	mic_input_steps = steps;
+#if CONFIG_DMR
+	if (diag.dmr) {
+		count(hrc_set_mic_gain(&modem, hrc_mic_gain_steps(DMR_MIC_GAIN, steps)));
+	}
+#endif
 }
 
 void md9600_c6000_retune(uint32_t hz)

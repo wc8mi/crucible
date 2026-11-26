@@ -111,6 +111,12 @@ bool hrc_set_dmr_id(hrc_t *dev, uint32_t id);
 bool hrc_set_mod_gain(hrc_t *dev, uint8_t mod2, uint8_t mod1);
 // The DMR microphone gain, through the chip's own register
 bool hrc_set_mic_gain(hrc_t *dev, uint8_t gain);
+// That gain (0..31) for a board's level moved by steps (hal_radio_t.mic_input), held in range
+static inline uint8_t hrc_mic_gain_steps(uint8_t level, int8_t steps)
+{
+	int v = (int)level + steps;
+	return (uint8_t)(v < 0 ? 0 : v > 31 ? 31 : v);
+}
 // The vocoder buffer flush (modem-hrc6000.md 3, step 5): 128 bytes of 0x7F to page 3
 bool hrc_flush_vocoder(hrc_t *dev);
 // The prompt tone FIFO (modem-hrc6000.md 8.1): 16-bit samples at 8 kHz to the codec's DAC, 64 deep, drained by the

@@ -27,9 +27,13 @@
 #endif
 #if CONFIG_DMR
 #include "dmr/ambe/ambeVoice.h"
+#include "dsp/tx_level.h"
 #endif
 #if CONFIG_NXDN
 #include "radio/radio_nxdn.h"
+#endif
+#if CONFIG_YSF
+#include "radio/radio_ysf.h"
 #endif
 #if CONFIG_P25
 #include "radio/radio_p25.h"
@@ -155,11 +159,63 @@ bool ui_svc_vfo_sfr(uint8_t a)
 #endif
 }
 
+#if CONFIG_YSF
+void ui_svc_ysf_rid(char out[RADIO_YSF_RID_LEN + 1], bool *weak)
+{
+	radio_ysf_rid(out, weak);
+}
+
+bool ui_svc_ysf_wx(uint8_t cmd, uint32_t arg, const char *text)
+{
+	radio_get_view(&ui_svc_view);
+	if (ui_svc_view.ch.mode != RADIO_MODE_YSF)
+		return false;
+	radio_req_ysf_wx(cmd, arg, text);
+	return true;
+}
+
+void ui_svc_ysf_wx_state(radio_ysf_wx_t *out)
+{
+	radio_ysf_wx(out);
+}
+
+bool ui_svc_ysf_wx_room(uint8_t i, ysf_wx_room_t *out)
+{
+	return radio_ysf_wx_room(i, out);
+}
+
+bool ui_svc_ysf_dgid(uint8_t dgid, uint16_t chan)
+{
+	radio_ysf_settings_t s;
+
+	if (dgid > RADIO_YSF_DGID_MAX)
+		return false;
+	radio_ysf_settings(&s);
+	if (chan == 0) {
+		s.tx_dgid = dgid;
+		s.rx_dgid = dgid;
+	} else {
+		s.temp_chan = chan;
+		s.temp_dgid = dgid;
+	}
+	radio_req_ysf_settings(&s);
+	return true;
+}
+
+void ui_svc_ysf_callsign(char out[RADIO_YSF_CALL_LEN + 1])
+{
+	char name[CODEPLUG_NAME_LEN + 1];
+
+	ui_svc_name_get(UI_NAME_RADIO, name);
+	radio_ysf_callsign(name, out);
+}
+#endif
+
 #if CONFIG_FM
 bool ui_svc_mode(uint8_t mode)
 {
 	if (mode != RADIO_MODE_FM && mode != RADIO_MODE_DMR && !(mode == RADIO_MODE_P25 && CONFIG_P25) &&
-	    !(mode == RADIO_MODE_NXDN && CONFIG_NXDN)) {
+	    !(mode == RADIO_MODE_NXDN && CONFIG_NXDN) && !(mode == RADIO_MODE_YSF && CONFIG_YSF)) {
 		return false;
 	}
 	radio_req_mode(mode);
@@ -225,6 +281,9 @@ uint32_t ui_svc_feat_radio(void)
 #endif
 #if CONFIG_NXDN
 	       (radio_nxdn_fits() ? UI_FEAT_NXDN : 0) |
+#endif
+#if CONFIG_YSF
+	       (radio_ysf_fits() ? UI_FEAT_YSF : 0) |
 #endif
 	       0;
 }
@@ -469,6 +528,17 @@ void ui_svc_apply(uint8_t id, int32_t value)
 	case UI_SET_MIC_GAIN:		// the board's gain (FM and DMR) or DMR's sample scaling (radio/mic_gain.h)
 		apply_mic_gain(value, ui_svc_setting_get(UI_SET_MIC_AGC) != 0);
 		return;
+#if CONFIG_TX_MIC_LIMITER
+	case UI_SET_TX_LEVEL_DMR:	// the leveling target of a profile (ambeVoice.h); 0 = the manual gain
+	case UI_SET_TX_LEVEL_YSF:
+		ambeVoiceSetTxTarget(id == UI_SET_TX_LEVEL_DMR ? AMBE_TX_DMR : AMBE_TX_YSF,
+				     tx_level_choice_rms((uint8_t)(value < 0 ? 0 : value)));
+		return;
+	case UI_SET_MIC_INPUT:		// the board's analog input gain (hal_radio_t.mic_input), in the radio task
+		if (board.radio->mic_input != NULL)
+			radio_req_mic_input((int8_t)value);
+		return;
+#endif
 	case UI_SET_REF_TRIM:		// the board's reference, receive and transmit (radio/ref_trim.h)
 		if (radio_set_ref_trim(value))
 			radio_req_retune();	// a board that applies it when it tunes
@@ -566,6 +636,13 @@ void ui_svc_apply(uint8_t id, int32_t value)
 	rs_send(&was);
 }
 
+#if CONFIG_MIC_CHECK
+void ui_svc_mic_check(bool on) { radio_req_mic_check(on); }
+void ui_svc_mic_check_record(void) { ambeVoiceMicCheckRecord(); }
+void ui_svc_mic_check_play(void) { ambeVoiceMicCheckPlay(); }
+void ui_svc_mic_check_view(ambe_mic_check_t *out) { ambeVoiceMicCheckView(out); }
+bool ui_svc_mic_input_available(void) { return board.radio->mic_input != NULL; }
+#endif
 #if CONFIG_P25_PARROT
 bool ui_svc_p25_parrot(uint8_t command, bool agc, int8_t target)
 {

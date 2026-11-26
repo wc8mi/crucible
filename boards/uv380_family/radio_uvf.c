@@ -42,6 +42,7 @@
 #define UHF_MIN_HZ		300000000u
 #define FM_MIC_GAIN		7	// 0..31, as the init value 0xE4 = 0x27
 #define DMR_MIC_GAIN		7
+static int8_t mic_input_steps;	// hal mic_input: the radio task's
 #define I2C_TRIES		3
 #define I2C_TIMEOUT_MS		5
 #define C6000_PWD_WAIT_MS	12	// at least 10 ms after PWD low before the first SPI access
@@ -686,7 +687,7 @@ static void dmr_enter(void)
 	uvf_cal_point_t cal;
 	uvf_cal_at(r.rx_valid ? r.rx_hz : board.bands[0].lo_hz, &cal);	// on false it fills safe defaults
 #if CONFIG_DMR
-	count(hrc6000_dmr_enter(&r.modem, cal.dmr_i, cal.dmr_q, DMR_MIC_GAIN));
+	count(hrc6000_dmr_enter(&r.modem, cal.dmr_i, cal.dmr_q, hrc_mic_gain_steps(DMR_MIC_GAIN, mic_input_steps)));
 #endif
 	stm32_hrc_dmr_enter();
 }
@@ -926,6 +927,18 @@ static volatile int16_t trim_ppb;
 
 #if CONFIG_REF_TRIM
 // Taken at the next tune, so the RF chips' bus stays the radio task's: true asks the core for one
+// The mic ADC gain for DMR and the air interface's voice (4:0xE4): now in DMR mode, else at dmr_enter. FM TX keeps
+// its own FM_MIC_GAIN and leaving it always passes through dmr_enter
+static void mic_input(int8_t steps)
+{
+	mic_input_steps = steps;
+#if CONFIG_DMR
+	if (r.mode == RADIO_MODE_DMR) {
+		count(hrc_set_mic_gain(&r.modem, hrc_mic_gain_steps(DMR_MIC_GAIN, steps)));
+	}
+#endif
+}
+
 static bool ref_trim(int16_t ppb)
 {
 	trim_ppb = ppb;
@@ -1373,6 +1386,7 @@ const hal_radio_t uvf_radio = {
 	.rx_sleep = rx_sleep,
 #if CONFIG_REF_TRIM
 	.ref_trim = ref_trim,
+	.mic_input = mic_input,
 #endif
 	.dmr_direct_query = dmr_direct_query,
 	.dmr_keying = dmr_keying,

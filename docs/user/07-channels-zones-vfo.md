@@ -360,19 +360,19 @@ The configured system identity still has to match; receive-only operation never 
 | Home says | What the radio is doing |
 |---|---|
 | Finding system | Trying the system's control channels in turn |
-| Control channel | On the control channel, waiting for a call to the channel's talkgroup |
+| RX only | On the control channel of a system the radio can't transmit on (set to listen only, or a blocked network ID), waiting for a call to the channel's talkgroup |
 | Following TG 201 | On the voice channel of a call. It goes back to the control channel when the call ends |
+| Control channel | Transmit is on, but this control channel has no inbound frequency: the radio waits for a call |
 | Registering | Transmit is on: registering with the system and joining the talkgroup |
 | TG 201 | Registered. PTT asks the system for a voice channel |
 | Wait, Queued | PTT is held and the request is with the system. Talk when home shows the transmission |
 | Denied, Reg. denied | The system refused the request or the registration |
-| Blocked system | The system's network ID is blocked: the radio never transmits on it |
 
 - A system set to listen only, a channel set to RX only, or one without a unit ID or talkgroup never transmits: PTT
   says "RX only".
 - A system whose network ID (WACN) is BEE00 through BEEFF, or whose system ID is 00A, never gets a transmission: PTT
-  says "Blocked system: no TX" until the radio is switched off. A P25 conventional channel that announces one of them
-  says "This mode: receive only".
+  says "RX-only system: no TX" until the radio is switched off. The radio still receives the system and follows its
+  calls; home says "RX only" between them. A P25 conventional channel that announces one of them says "This mode: receive only".
 - Calls to other talkgroups are followed only when the channel is set to follow every group of the system.
 - A system whose control messages fail their checksum is heard with the channel's **Accept Invalid CRC** on
   ([Accept invalid CRC](09-dmr.md#accept-invalid-crc)).
@@ -381,6 +381,11 @@ The configured system identity still has to match; receive-only operation never 
   can't send or receive Phase 2's modulation (H-CPM, H-DQPSK).
 - Scan skips these channels and dual watch doesn't take them: a trunked channel follows its system instead.
 - Explicit network/site status acquisition has also been checked on a live system in receive-only mode.
+- The editor treats a system with a blocked network ID as listen only as soon as its WACN or system ID is typed. A
+  notice under the identity fields names the WACN or system ID that matched, and **Transmit** locks to "Never (listen
+  only)". The radio ID, the control channels' TX column and the plan's TX offset column are hidden, and saving writes
+  the system's transmit flag off. The radio ID, TX frequencies and TX offsets you entered stay in the file and come
+  back if you change the ID. **Transmit** stays off until you set it again.
 
 For a ham P25 trunked system, RadioFoundry recommends one identity: WACN 0x32350, any system ID, and NAC 0x293 on the
 control channel. **Add Recommended Ham System** on the editor's **Systems** tab fills a P25 trunked system in with
@@ -417,6 +422,78 @@ squelch and the group (when a contact has that group; else group 1).
   your unit ID (**Own ID**, up to 65519). RAN 0 receives every RAN. The squelch can be changed only from a computer.
 - Scan stops on NXDN channels and holds on a call you would hear there, at a rate the radio can receive. Dual watch
   takes one as A or B.
+
+### YSF in the VFO
+
+On a radio that runs YSF, YSF is one of the VFO's modes, after NXDN ("VFO: YSF"). It is YSF
+digital voice in DN mode (C4FM, 12.5 kHz), through the radio's DMR voice codec. Other YSF radios, repeaters
+and room nodes hear it as they hear a commercial portable.
+
+- It hears DN voice calls with every DG-ID. A call in VW (full rate) or data mode shows on Home but stays silent
+  ("Not DN voice: not played").
+- PTT sends with DG-ID 0, your callsign and your radio ID. The callsign is the codeplug's YSF callsign, else the first
+  word of the radio name when it reads as a callsign. Set it in **Settings > My radio > YSF callsign**. Without one,
+  Home says "No callsign" and PTT is refused.
+- Home shows "YSF", the DG-ID PTT sends ("DG-ID 00") and the DG-ID heard ("RX DG-ID 00"). During a
+  call it shows the caller's callsign and the call's DG-ID, or why the call isn't played. Calls heard go into
+  **Recent** with the callsign and DG-ID, and while idle Home shows the last one ("N1ABC", "DG-ID 12 11s ago"). Your
+  own callsign coming back from a hotspot is left out.
+- **Squelch**: YSF doesn't need it. The radio decodes a YSF signal whatever the squelch level and never plays noise;
+  the DG-ID decides what plays. The squelch level only tells scan and dual watch when to stop on the channel. A
+  room data transmission from a repeater shows its callsign and "Data" and goes into Recent.
+- **DG-ID**: quick settings tile **8**, or the first row of the Rooms page (# on Home). Type two digits or step with
+  Up/Down, **OK** sets it for receive and transmit (00 hears every DG-ID). In the VFO it stays until the radio is
+  switched off; on a stored channel it lasts until you change channel. To keep a channel's DG-ID, set it in the
+  channel editor.
+
+Not in this first version: VW (full-rate voice, which the radio's voice chip doesn't run), Group Monitor, sending
+your position, and a repeater's news (voice messages, pictures). They are planned for later.
+
+### YSF channels
+
+A YSF channel comes from a codeplug written on a computer ([YSF in the editor](04-programming.md#ysf)), a zone shared
+by another radio, the VFO (in YSF, open **Channels**, **New channel from current settings** and save it), or any
+channel: press **OK** on its Mode until it says YSF, set the DG-ID, and save. A channel made YSF starts with DG-ID 00.
+
+- **DG-ID** (0-99) is in the channel's settings: the radio sends it and hears only calls with it. 00 sends 0 and hears
+  every DG-ID. (The codeplug can hold different DG-IDs for sending and hearing; the Codeplug Editor sets them apart.)
+- A YSF channel has no TX contact and no Own ID: YSF names you by your callsign and radio ID.
+- **OK** on Mode steps on to FM, then back round to YSF with its settings as they were. Saving the channel as another
+  mode removes its YSF settings: the radio asks first.
+- Scan stops on YSF channels and holds on a call you would hear there. Dual watch takes one as A or B, with a channel
+  of any other mode as the other one (FM, DMR, P25, NXDN or another YSF channel): the radio listens to each in turn
+  and stays on the one where a call you would hear comes in.
+
+### Rooms
+
+On a YSF channel, the radio talks to the room node it hears (a repeater or a gateway linked to a room
+network): it asks the node where it is, connects it to a room, disconnects it, and lists the rooms. Open it from
+**Tools > Rooms** (key **0** in Tools), with **#** on Home or quick settings tile **3** on a YSF channel, or from a key set to **Rooms**
+(Settings > Keys).
+
+| Row | What it does |
+|---|---|
+| Node | The node's name. **OK** asks the node; until it answers the row says "Waiting...", and "No answer" after 8 s |
+| Room | The room the node is in, or None. **OK** asks again |
+| Room ID | Type a room's 5-digit number with the digit keys (anywhere on the page); **Back** takes a digit back |
+| Connect | Connects the node to the room ID typed |
+| Disconnect | Takes the node out of its room |
+| Rooms | The node's list of rooms, 20 a page: **OK** on a room connects to it, **Next page** asks for the next 20 |
+| Search | Type a name or its start: the rooms that match, as a list |
+
+Each command is a short transmission (about half a second) with your callsign and radio ID, refused where PTT would be
+(receive only, no callsign, outside the bands). The node answers on its own; the page shows the answer as it comes.
+
+### Your radio ID
+
+Every YSF radio sends a radio ID: five letters and digits. Repeaters, room nodes and other radios use it
+to tell radios apart, so no two radios may share one. RadioFoundry makes yours from the radio's own chip, which is
+different in every radio: it is the same every time the radio starts, after every update and every codeplug write,
+and nothing can change it. It is never in the codeplug, so copying a codeplug to another radio never copies it.
+
+See it in **Settings > My radio > YSF RID** and in **Settings > About**. If it shows a **?** after it, this radio
+has no chip ID to make it from and the radio ID comes from your DMR ID and radio name instead: two radios with the same
+codeplug would then share it. Details: [YSF, the radio ID](../spec/ysf.md#6-the-radio-id-rid).
 
 ### Leaving the VFO
 

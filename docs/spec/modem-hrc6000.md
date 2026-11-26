@@ -178,7 +178,7 @@ explained by the manual; keep them.
 | 11 | 0x41=0x40, 0x56=0x00, 0x5C=0x09, 0x5F=0xF0 | receive in the next slot; detect all syncs |
 | 12 | page 1 burst from 0x04: D5 D7 F7 7F D7 57 | MS data sync |
 | 13 | 0x11=0x80, 0x81=0x19, 0x85=0x00 | direct simplex channel mode, interrupt mask, TX-start sub-status mask |
-| 14 | 0xE4 = 0x20 + DMR mic gain; DTMF tone table (section 8) | |
+| 14 | 0xE4 = 0x20 + DMR mic gain (plus the Mic input step, `hrc_mic_gain_steps`, clamped to 0..31); DTMF tone table (section 8) | |
 
 A page 1 burst from 0x60 (a table of 32 three-byte entries `nn EF 00`) is not needed. Don't send it.
 

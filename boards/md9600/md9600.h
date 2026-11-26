@@ -156,6 +156,7 @@ void md9600_c6000_init(void);
 extern const hal_audio_tap_t md9600_audio_tap;
 #endif
 void md9600_c6000_mode(bool dmr, uint32_t hz);	// set_mode: into or out of DMR at the receive frequency
+void md9600_c6000_mic_input(int8_t steps);	// hal mic_input: 4:0xE4 for DMR, now in DMR mode, else at entry
 void md9600_c6000_retune(uint32_t hz);		// after every receiver retune: reference offset, DMR receiver restart
 void md9600_speaker_fm(bool on, bool vhf);	// the core's FM squelch (hal_radio_t.audio)
 // FM transmit: the chip in FM TX (the microphone, the band's FM modulation pair) before the PA keys, and back to the

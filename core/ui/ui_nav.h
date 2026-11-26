@@ -50,6 +50,10 @@ typedef enum {
 #if CONFIG_P25_PARROT
 	SCR_P25_PARROT,
 #endif
+#if CONFIG_MIC_CHECK
+	SCR_MIC_CHECK,			// Settings > Advanced > Mic check
+#endif
+	SCR_ROOMS, SCR_ROOM_LIST,	// Rooms (CONFIG_YSF, ui_rooms.c): the node and room; a page of rooms
 #if CONFIG_BACKLIGHT_TEST
 	SCR_BL_TEST,			// Settings > Advanced > Backlight tests
 #endif
@@ -127,12 +131,20 @@ typedef struct {
 	bool (*key)(const input_event_t *ev);		// screen keys before the list's own (true: used)
 	void (*draw)(void);				// own drawing instead of the list
 	void (*enter)(void);				// on push
-#if CONFIG_BACKLIGHT_TEST || CONFIG_SATELLITE_TLE || CONFIG_P25_PARROT
+#if CONFIG_BACKLIGHT_TEST || CONFIG_SATELLITE_TLE || CONFIG_P25_PARROT || CONFIG_MIC_CHECK
 	void (*leave)(void);				// on leaving the stack (BACK, Home, replaced)
 #endif
 	const ui_filter_def_t *filter;			// SF_FILTER: the rows before filtering (NULL: not a filtered list)
 } ui_scr_def_t;
 
+#if CONFIG_YSF
+// Rooms (ui_rooms.c): open its page, or say it needs a YSF channel
+void ui_rooms_open(void);
+#endif
+#if CONFIG_CHANNEL_EDIT
+// Text entry for another screen's field: target holds max characters; done runs once the text is kept
+void ui_menus_text(char *target, uint8_t max, void (*done)(void));
+#endif
 extern const ui_scr_def_t *const ui_scr[SCR_COUNT];
 extern ui_state_t ui_st;
 extern ui_target_t ui_target;		// the target of SCR_ACTIONS / SCR_COMPOSE
@@ -240,7 +252,16 @@ typedef struct {
 	bool gps_range;		// the caller sent its position (ETSI GPS Info) and ours was known: how far, which way
 	uint16_t gps_bearing;
 	uint32_t gps_dist_m;
+#if CONFIG_YSF
+	bool ysf;		// a YSF call heard: name is the caller's callsign, dgid its DG-ID; no IDs, no DMR actions
+	uint8_t dgid;
+#endif
 } ui_recent_t;
+#if CONFIG_YSF
+#define ui_recent_ysf(r)	((r)->ysf)
+#else
+#define ui_recent_ysf(r)	false
+#endif
 uint8_t ui_recent_count(void);
 const ui_recent_t *ui_recent_get(uint8_t i);
 // The recent entry as an actions target (the caller of a heard call, the target of one we made)

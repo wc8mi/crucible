@@ -17,7 +17,8 @@ MAXIMAL_VARS := LTO=1
 # (docs/spec/ppp.md), and this one has the adapter; the APRS iGate is off by default (above); French, off by
 # default, so that the maximal build keeps satellite tracking and still fits the app region; Chinese stays out too
 # (its glyph table does not fit beside the rest)
-MAXIMAL_SKIP := NET_PPP APRS_IGATE LANG_FR LANG_ZH LANG_DEFAULT_ZH
+# kf8sforkysf: trunking stays out of maximal as of the default build, the room YSF takes
+MAXIMAL_SKIP := NET_PPP APRS_IGATE LANG_FR LANG_ZH LANG_DEFAULT_ZH DMR_TRUNK P25_TRUNK
 
 # What the radio's hardware can't do, one switch per line with the reason (tools/boards.py checks there is one;
 # docs/build-config.md, "Unsupported, not written, unconfirmed"): ci's maximal configuration leaves these off
@@ -35,3 +36,13 @@ BOARD_UNSUPPORTED += FAULT_TRACE	# needs a host UART: the host port is USB, and 
 # a wide language is in use (core/ui/ui_screens.c, docs/spec/ui.md 2.5), so a 16 px CJK glyph fits; Home then has no
 # zone line and a list shows 5 rows instead of 7. Off by default like on every radio. Its glyph table (about 27 KB,
 # docs/feature-matrix.md) is far smaller than the old GB2312 one: the `chinese` CI extra builds it beside the default build
+
+# kf8sforkysf experiment: YSF (C4FM DN) on this radio, made room for by leaving trunking out. P25, NXDN and
+# conventional DMR stay. YSF receives through the soft modem on the FM copy (the HR_C6000's correlator can't sync on
+# YSF frames); untested on this radio
+CONFIG_DMR_TRUNK ?= n
+CONFIG_P25_TRUNK ?= n
+CONFIG_YSF ?= $(CONFIG_DMR)
+# The soft modem's tone and code removal for YSF through repeaters (docs/spec/air-interface.md 6.1), on with YSF and
+# the standard tone lists
+CONFIG_AIR_RX_ADAPT ?= $(if $(filter y,$(CONFIG_SUBTONE)),$(CONFIG_YSF),n)

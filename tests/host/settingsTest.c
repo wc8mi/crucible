@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include "storage/storage.h"
 #include "settings/settings.h"
+#include "audio/rx_agc.h"
 #include "sim/sim_flash.h"
 
 static int failures;
@@ -981,15 +982,17 @@ static void test_settings_layout(void)
 		{ offsetof(settings_t, t3_stun), 396 },
 		{ offsetof(settings_t, t3_kill), 397 },
 		{ offsetof(settings_t, satellite_index), 398 },
-		{ offsetof(settings_t, reserved10), 399 },
+		{ offsetof(settings_t, mic_input), 399 },
 		{ offsetof(settings_t, sig_dmr), 400 },
 		{ offsetof(settings_t, sig_fm), 403 },
 		{ offsetof(settings_t, caller_flags), 406 },
-		{ offsetof(settings_t, reserved11), 407 },
+		{ offsetof(settings_t, tx_level_dmr), 407 },
 		{ offsetof(settings_t, aes_mi_res), 408 },
 		{ offsetof(settings_t, rx_agc), 412 },
 		{ offsetof(settings_t, rx_audio_levels), 415 },
 		{ offsetof(settings_t, aes_migration), 416 },
+		{ offsetof(settings_t, rx_agc_ysf), 422 },
+		{ offsetof(settings_t, tx_level_ysf), 423 },
 	};
 	CHECK(sizeof(settings_t) == 424);
 	for (unsigned i = 0; i < sizeof(offs) / sizeof(offs[0]); i++) {
@@ -1336,6 +1339,7 @@ static void check_audio_record(const settings_t *expected, settings_load_t load,
 	CHECK(st.load == load && st.seq == seq);
 	CHECK(memcmp(&s, expected, LEGACY_SETTINGS_BYTES) == 0);
 	CHECK(memcmp(s.rx_agc, expected->rx_agc, sizeof s.rx_agc) == 0 && s.rx_audio_levels == expected->rx_audio_levels);
+	CHECK(s.rx_agc_ysf == expected->rx_agc_ysf);
 	CHECK(s.aes_migration == expected->aes_migration);
 	CHECK(memcmp(s.rssi_correction, expected->rssi_correction, sizeof s.rssi_correction) == 0);
 	CHECK(settings_aes_migration_required() == (expected->aes_migration != SETTINGS_AES_READY));
@@ -1372,8 +1376,19 @@ static void test_settings_receive_agc(void)
 	check_audio_record(&current, SETTINGS_UPGRADED, 2);
 	current.rssi_correction[0] = -20;
 	current.rssi_correction[1] = 20;
+	current.rx_agc_ysf = 4;
+	{	// a record from before the YSF byte reads it as 0, Off
+		settings_t before = current;
+		before.rssi_correction[0] = before.rssi_correction[1] = 0;
+		before.rx_agc_ysf = 0;
+		boot_audio_record(&current, PRE_RSSI_SETTINGS_BYTES);
+		check_audio_record(&before, SETTINGS_UPGRADED, 2);
+	}
 	boot_audio_record(&current, CURRENT_SETTINGS_BYTES);
 	check_audio_record(&current, SETTINGS_LOADED, 2);
+	CHECK(settings_rx_agc(&current, RX_AGC_YSF) == 4 && settings_rx_agc(&current, RX_AGC_NXDN) == 9);
+	CHECK(settings_rx_agc_offset(RX_AGC_YSF) == offsetof(settings_t, rx_agc_ysf) &&
+	      settings_rx_agc_offset(RX_AGC_P25) == offsetof(settings_t, rx_agc) + 1);
 	current.squelch = 5;
 	settings_begin()->squelch = current.squelch;
 	settings_end(1);

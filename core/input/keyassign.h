@@ -45,6 +45,7 @@ typedef enum {
 	KEYFN_SCAN_SKIP,	// skip the channel that stopped the scan, until the scan stops
 	KEYFN_MONITOR_TOGGLE,	// latch the monitor on / off, as quick tile 5 does (FM: the squelch held open; DMR: digital monitor)
 	KEYFN_BACK,		// ordinary Back; long press follows the normal Home navigation
+	KEYFN_YSF_ROOMS,	// the Rooms page (CONFIG_YSF; on a YSF channel)
 	KEYFN_COUNT
 } keyfn_t;
 

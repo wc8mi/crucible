@@ -59,6 +59,8 @@ typedef struct {
 	uint32_t tx_gain_q16;	// last software gain; 65536 is unity
 	uint32_t tx_limited_blocks;	// blocks whose gain was reduced by peak protection
 	uint32_t tx_mic_low_q8;	// lowest software mic gain in the latest transmission; 0 when unavailable
+	uint32_t tx_profile;	// ambe_tx_profile_t of the latest transmission
+	uint32_t tx_target_rms;	// its leveling target (relative to 32768), 0 = the manual gain with the peak limiter
 	uint32_t tx_frames;	// frames encoded
 	uint32_t tx_overflows;	// encoded frames dropped, queue full (the stack didn't pull)
 	// What the mic delivered in the latest transmission, block by block (20 ms), to tell speech from a cut or
@@ -105,6 +107,53 @@ void ambeVoiceSetMicGate(ambe_voice_mic_gate_t gate);
 void ambeVoiceSetMicGainQ8(uint16_t q8);
 // Manual gain step alone (0..10, 2 dB per step, 5 is unity).
 void ambeVoiceSetMicGain(uint8_t step);
+
+// Encoder input leveling per transmit profile (CONFIG_TX_MIC_LIMITER; docs/spec/radio-features.md 3.6). DMR and NXDN
+// transmit as AMBE_TX_DMR, YSF as AMBE_TX_YSF. A profile's target is an RMS level relative to 32768: the mic is then
+// leveled to it (tx_level.h, the same leveler as P25's mic AGC, peaks still held under the ceiling) and the codec's
+// own input AGC is left off, since two AGCs in a row work against each other. 0 = the manual gain with the peak
+// limiter, as before. Any task; a running transmission follows a change from its next block
+typedef enum { AMBE_TX_DMR, AMBE_TX_YSF, AMBE_TX_PROFILES } ambe_tx_profile_t;
+void ambeVoiceSetTxTarget(ambe_tx_profile_t profile, uint16_t target_rms);
+uint16_t ambeVoiceTxTarget(ambe_tx_profile_t profile);
+// The profile of the next transmission, set just before the source's begin(); begin() takes it and sets AMBE_TX_DMR
+// again, so a caller that never sets one transmits as DMR. Call task
+void ambeVoiceTxProfile(ambe_tx_profile_t profile);
+
+// Mic check (CONFIG_MIC_CHECK): while on and not transmitting, every mic block goes through the chain a transmission
+// of the profile would use (gain, leveler, limiter) without the encoder, and the levels are published every
+// AMBE_MIC_CHECK_BLOCKS blocks. Needs the audio stream running (ambeVoiceStart) and the mic routed. Any task
+#define AMBE_MIC_CHECK_BLOCKS	10u	// 200 ms a window
+#define AMBE_MIC_CLIP		32000	// a sample this large or larger counts as at the rail
+// Record and play back (the parrot, as P25's): ambeVoiceMicCheckRecord encodes the chain's output, up to
+// AMBE_MIC_CHECK_FRAMES frames (2 s), as a transmission would (the codec's AGC off when the profile has a target);
+// then, or at ambeVoiceMicCheckPlay, the frames are decoded to the speaker and the decoded level is metered: what the
+// other end hears, to set the target by. Receive is muted meanwhile. A transmission or the check turned off ends it
+#define AMBE_MIC_CHECK_FRAMES	100u
+#define AMBE_MIC_ACTIVE_DB10	(-500)	// a decoded block quieter than -50 dBFS is a pause: not in the decoded RMS
+enum { AMBE_CHECK_LIVE, AMBE_CHECK_RECORD, AMBE_CHECK_PLAY };
+typedef struct {
+	uint32_t windows;	// windows published since on (0: none yet)
+	int16_t in_peak_db10;	// the board's samples: largest, dBFS in tenths (-960: silent)
+	int16_t in_rms_db10;	// ... RMS over the window
+	int16_t out_peak_db10;	// what the encoder would get
+	int16_t out_rms_db10;
+	int16_t gain_db10;	// the gain in force at the window's end
+	uint16_t clips;		// input samples at the rail (AMBE_MIC_CLIP) in the window
+	uint16_t limited;	// blocks the peak limiter cut in the window
+	uint16_t target_rms;	// the profile's target (0: manual gain)
+	uint8_t profile;	// ambe_tx_profile_t
+	uint8_t on;
+	uint8_t phase;		// AMBE_CHECK_*
+	uint8_t frames;		// frames recorded (RECORD), or left to play (PLAY)
+	uint16_t played;	// playbacks finished since on: the dec_* below are the latest one's (0: none yet)
+	int16_t dec_rms_db10;	// decoded RMS over the blocks louder than AMBE_MIC_ACTIVE_DB10 (-960: none)
+	int16_t dec_peak_db10;	// decoded largest sample
+} ambe_mic_check_t;
+void ambeVoiceMicCheck(bool on, ambe_tx_profile_t profile);
+void ambeVoiceMicCheckView(ambe_mic_check_t *out);
+void ambeVoiceMicCheckRecord(void);
+void ambeVoiceMicCheckPlay(void);
 // Test signal for DMR transmissions (the debug link's RADIO op 33, RAM only): on, the encoder gets a generated tone
 // that changes pitch every 60 ms in place of the mic, so an over carries known, varying audio whatever the mic hears
 // (the HIL audio smoke test). Any task

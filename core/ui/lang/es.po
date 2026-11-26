@@ -492,6 +492,11 @@ msgctxt "QUICK_WHY_FM_ONLY_NXDN_CHANNEL"
 msgid "FM only: this is NXDN"
 msgstr "Solo FM: es NXDN"
 
+#: core/ui/ui_app.c
+msgctxt "QUICK_WHY_FM_ONLY_YSF_CHANNEL"
+msgid "FM only: this is YSF"
+msgstr "Solo FM: es YSF"
+
 #: core/ui/ui_app.c core/ui/ui_menus.c
 msgctxt "WHY_NOT_IN_BUILD"
 msgid "Not in this build"
@@ -607,7 +612,7 @@ msgctxt "QUICK_TOAST_TONE_RX_ONLY"
 msgid "Tone for RX only"
 msgstr "Tono solo en RX"
 
-#: core/ui/ui_app.c
+#: core/ui/ui_app.c core/ui/ui_menus.c
 msgctxt "TOAST_NO_ACTIONS_HERE"
 msgid "No actions here"
 msgstr "Sin acciones aquí"
@@ -802,7 +807,7 @@ msgctxt "VALUE_30_MIN"
 msgid "30 min"
 msgstr "30 min"
 
-#: core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_screens.c
+#: core/ui/ui_aprs.c core/ui/ui_menus.c core/ui/ui_rooms.c core/ui/ui_screens.c
 msgctxt "VALUE_NONE"
 msgid "None"
 msgstr "Ninguno"
@@ -1216,6 +1221,11 @@ msgstr "Llamada P25"
 msgctxt "DUAL_VALUE_NXDN_CALL"
 msgid "NXDN call"
 msgstr "Llamada NXDN"
+
+#: core/ui/ui_dual.c
+msgctxt "DUAL_VALUE_YSF_CALL"
+msgid "YSF call"
+msgstr "Llamada YSF"
 
 #: core/ui/ui_dual.c
 msgctxt "DUAL_VALUE_AM_SIGNAL"
@@ -3052,10 +3062,20 @@ msgctxt "MYID_LABEL_DMR_ID"
 msgid "DMR ID"
 msgstr "ID DMR"
 
-#: core/ui/ui_menus.c core/ui/ui_position.c
+#: core/ui/ui_menus.c core/ui/ui_position.c core/ui/ui_rooms.c
 msgctxt "VALUE_NOT_SET"
 msgid "Not set"
 msgstr "Sin definir"
+
+#: core/ui/ui_menus.c
+msgctxt "MYID_LABEL_YSF_CALLSIGN"
+msgid "YSF callsign"
+msgstr "Indicativo YSF"
+
+#: core/ui/ui_menus.c
+msgctxt "MYID_LABEL_YSF_RID"
+msgid "YSF RID"
+msgstr "RID YSF"
 
 #: core/ui/ui_menus.c
 msgctxt "MYID_LABEL_RADIO_NAME"
@@ -3083,6 +3103,11 @@ msgid "Radio: "
 msgstr "Radio: "
 
 #: core/ui/ui_menus.c
+msgctxt "MYID_TOAST_YSF_CALL_CHARS"
+msgid "Letters, digits, - and / only"
+msgstr "Solo letras, dígitos, - y /"
+
+#: core/ui/ui_menus.c
 msgctxt "TOAST_SAVED"
 msgid "Saved"
 msgstr "Guardado"
@@ -3096,6 +3121,11 @@ msgstr "ID desde 1"
 msgctxt "MYID_TOAST_SAVED"
 msgid "DMR ID saved"
 msgstr "ID DMR guardado"
+
+#: core/ui/ui_menus.c
+msgctxt "VALUE_READ_ONLY"
+msgid "Read only"
+msgstr "Solo lectura"
 
 #: core/ui/ui_menus.c
 msgctxt "WHY_TYPING_NOT_IN_BUILD"
@@ -3228,6 +3258,11 @@ msgid "Date: "
 msgstr "Fecha: "
 
 #: core/ui/ui_menus.c
+msgctxt "ABOUT_BODY_YSF_RID"
+msgid "YSF RID: "
+msgstr "RID YSF: "
+
+#: core/ui/ui_menus.c
 msgctxt "ABOUT_BODY_LICENSE"
 msgid "License: "
 msgstr "Licencia: "
@@ -3268,14 +3303,19 @@ msgid "AMBE+2 codec: DVSI (stock)"
 msgstr "Códec AMBE+2: DVSI (original)"
 
 #: core/ui/ui_menus.c
-msgctxt "P25_PARROT_OPENING"
-msgid "Opening"
-msgstr "Abriendo"
+msgctxt "MIC_CHECK_STOP_PLAY"
+msgid "Stop and play"
+msgstr "Parar y reproducir"
 
 #: core/ui/ui_menus.c
-msgctxt "P25_PARROT_READY"
-msgid "Ready: no RF"
-msgstr "Listo: sin RF"
+msgctxt "P25_CAL_RECORD"
+msgid "Record speech"
+msgstr "Grabar voz"
+
+#: core/ui/ui_menus.c
+msgctxt "MIC_CHECK_NEEDS_CHANNEL"
+msgid "Needs a DMR or YSF channel"
+msgstr "Requiere canal DMR o YSF"
 
 #: core/ui/ui_menus.c
 msgctxt "P25_PARROT_RECORDING"
@@ -3283,14 +3323,84 @@ msgid "Recording"
 msgstr "Grabando"
 
 #: core/ui/ui_menus.c
-msgctxt "P25_CAL_MEASURING"
-msgid "Measuring"
-msgstr "Midiendo"
-
-#: core/ui/ui_menus.c
 msgctxt "P25_PARROT_PLAYING"
 msgid "Playing"
 msgstr "Reproduciendo"
+
+#: core/ui/ui_menus.c
+msgctxt "MIC_CHECK_LIVE"
+msgid "Live: no RF"
+msgstr "En vivo: sin RF"
+
+#: core/ui/ui_menus.c
+msgctxt "P25_PARROT_OPENING"
+msgid "Opening"
+msgstr "Abriendo"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_YSF_TX_LEVEL"
+msgid "YSF TX level"
+msgstr "Nivel TX YSF"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_DMR_TX_LEVEL"
+msgid "DMR TX level"
+msgstr "Nivel TX DMR"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_MIC_INPUT"
+msgid "Mic input"
+msgstr "Entrada mic"
+
+#: core/ui/ui_menus.c
+msgctxt "MIC_CHECK_MIC_LEVEL"
+msgid "Mic dBFS"
+msgstr "Mic dBFS"
+
+#: core/ui/ui_menus.c
+msgctxt "P25_PARROT_RAILS"
+msgid "Mic rail samples"
+msgstr "Muestras al límite"
+
+#: core/ui/ui_menus.c
+msgctxt "MIC_CHECK_ENC_LEVEL"
+msgid "Encoder dBFS"
+msgstr "Codif. dBFS"
+
+#: core/ui/ui_menus.c
+msgctxt "MIC_CHECK_GAIN"
+msgid "Gain dB"
+msgstr "Ganancia dB"
+
+#: core/ui/ui_menus.c
+msgctxt "MIC_CHECK_LIMITED"
+msgid "Limited blocks"
+msgstr "Bloques limitados"
+
+#: core/ui/ui_menus.c
+msgctxt "MIC_CHECK_DECODED"
+msgid "Decoded dBFS"
+msgstr "Decod. dBFS"
+
+#: core/ui/ui_menus.c
+msgctxt "MIC_CHECK_TITLE"
+msgid "Mic check"
+msgstr "Prueba de mic"
+
+#: core/ui/ui_menus.c
+msgctxt "MIC_CHECK_HINT"
+msgid "OK: up  Hold: down"
+msgstr "OK: subir  Mant.: bajar"
+
+#: core/ui/ui_menus.c
+msgctxt "P25_PARROT_READY"
+msgid "Ready: no RF"
+msgstr "Listo: sin RF"
+
+#: core/ui/ui_menus.c
+msgctxt "P25_CAL_MEASURING"
+msgid "Measuring"
+msgstr "Midiendo"
 
 #: core/ui/ui_menus.c
 msgctxt "P25_PARROT_AUDIO_FAILED"
@@ -3338,11 +3448,6 @@ msgid "Mic speech dBFS"
 msgstr "Voz mic. dBFS"
 
 #: core/ui/ui_menus.c
-msgctxt "P25_PARROT_RAILS"
-msgid "Mic rail samples"
-msgstr "Muestras al límite"
-
-#: core/ui/ui_menus.c
 msgctxt "P25_CAL_STARTUP_RAILS"
 msgid "Startup rails"
 msgstr "Picos al iniciar"
@@ -3356,11 +3461,6 @@ msgstr "Media CC mic."
 msgctxt "P25_CAL_STOP"
 msgid "Stop recording"
 msgstr "Detener grabación"
-
-#: core/ui/ui_menus.c
-msgctxt "P25_CAL_RECORD"
-msgid "Record speech"
-msgstr "Grabar voz"
 
 #: core/ui/ui_menus.c
 msgctxt "P25_CAL_GOAL"
@@ -3721,6 +3821,11 @@ msgstr "Diagnóstico"
 msgctxt "TOOLS_ROW_SHARES_RECEIVED"
 msgid "Zones/Chs Received"
 msgstr "Zonas/Can recibidos"
+
+#: core/ui/ui_menus.c core/ui/ui_rooms.c
+msgctxt "WX_TITLE"
+msgid "Rooms"
+msgstr "Salas"
 
 #: core/ui/ui_menus.c
 msgctxt "WORD_DUAL_WATCH"
@@ -4218,6 +4323,11 @@ msgid "NXDN RX AGC"
 msgstr "AGC RX NXDN"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_YSF_RX_AGC"
+msgid "YSF RX AGC"
+msgstr "AGC RX YSF"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_P25_CONTACT_LOOKUP"
 msgid "P25 contact lookup"
 msgstr "Consulta de contactos P25"
@@ -4603,6 +4713,11 @@ msgid "Not on this radio"
 msgstr "No en esta radio"
 
 #: core/ui/ui_menus.c
+msgctxt "WHY_TX_LEVEL_NOT_IN_BUILD"
+msgid "TX level: not in this build"
+msgstr "Nivel TX: no incluido"
+
+#: core/ui/ui_menus.c
 msgctxt "WHY_MIC_AGC_NOT_IN_BUILD"
 msgid "Mic AGC: not in this build"
 msgstr "AGC mic: no disponible"
@@ -4842,6 +4957,106 @@ msgctxt "POS_TOAST_RANGE"
 msgid "Up to 90 N/S, 180 E/W"
 msgstr "Hasta 90 N/S, 180 E/W"
 
+#: core/ui/ui_rooms.c
+msgctxt "WX_TOAST_YSF_ONLY"
+msgid "Rooms: on a YSF channel"
+msgstr "Salas: en un canal YSF"
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_LABEL_NODE"
+msgid "Node"
+msgstr "Nodo"
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_LABEL_ROOM"
+msgid "Room"
+msgstr "Sala"
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_LABEL_ROOM_ID"
+msgid "Room ID"
+msgstr "ID de sala"
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_ROW_CONNECT"
+msgid "Connect"
+msgstr "Conectar"
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_ROW_DISCONNECT"
+msgid "Disconnect"
+msgstr "Desconectar"
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_ROW_ROOMS"
+msgid "Rooms"
+msgstr "Salas"
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_ROW_SEARCH"
+msgid "Search"
+msgstr "Buscar"
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_VALUE_WAITING"
+msgid "Waiting..."
+msgstr "Esperando..."
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_VALUE_NO_ANSWER"
+msgid "No answer"
+msgstr "Sin respuesta"
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_TOAST_ROOM_ID_FIRST"
+msgid "Type a room ID first"
+msgstr "Escriba antes un ID de sala"
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_BODY_NODE"
+msgid "Node: "
+msgstr "Nodo: "
+
+#: core/ui/ui_rooms.c
+msgctxt "HINT_TYPE_OK_SEND_BACK"
+msgid "0-9 room  OK send  Back"
+msgstr "0-9 sala  OK enviar  Atrás"
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_ROW_NEXT_PAGE"
+msgid "Next page"
+msgstr "Página siguiente"
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_BODY_WAITING"
+msgid "Waiting for the node..."
+msgstr "Esperando al nodo..."
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_BODY_NOTHING_FOUND"
+msgid "Nothing found"
+msgstr "Nada encontrado"
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_BODY_NO_LIST"
+msgid "No list yet"
+msgstr "Aún sin lista"
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_BODY_OF"
+msgid " of "
+msgstr " de "
+
+#: core/ui/ui_rooms.c
+msgctxt "WX_TITLE_ROOMS"
+msgid "Rooms"
+msgstr "Salas"
+
+#: core/ui/ui_rooms.c
+msgctxt "HINT_OK_CONNECT_BACK"
+msgid "OK connect  Back"
+msgstr "OK conectar  Atrás"
+
 #: core/ui/ui_satellite.c
 msgctxt "SATELLITE_TLE_STALE"
 msgid "TLE is 14+ days old; refresh from site"
@@ -5018,11 +5233,6 @@ msgid "Finding system"
 msgstr "Buscando sistema"
 
 #: core/ui/ui_screens.c
-msgctxt "HOME_STATE_P25T_BLOCKED"
-msgid "Blocked system"
-msgstr "Sistema bloqueado"
-
-#: core/ui/ui_screens.c
 msgctxt "HOME_STATE_P25T_WAIT"
 msgid "Wait"
 msgstr "Espere"
@@ -5061,6 +5271,11 @@ msgstr "Siguiendo"
 msgctxt "HOME_STATE_NO_TX_FREQ"
 msgid "No TX frequency"
 msgstr "Sin frecuencia TX"
+
+#: core/ui/ui_screens.c
+msgctxt "HOME_STATE_NO_CALLSIGN"
+msgid "No callsign"
+msgstr "Sin indicativo"
 
 #: core/ui/ui_screens.c
 msgctxt "HOME_CHIP_BROADCAST_FM"
@@ -5219,8 +5434,8 @@ msgstr "Canal de voz inválido"
 
 #: core/ui/ui_screens.c
 msgctxt "DENY_WHY_P25T_WACN_BLOCKED"
-msgid "Blocked system: no TX"
-msgstr "Sistema bloqueado: sin TX"
+msgid "RX-only system: no TX"
+msgstr "Sistema solo RX: sin TX"
 
 #: core/ui/ui_screens.c
 msgctxt "DENY_WHY_TRUNK_OTHER_SYS"
@@ -5578,6 +5793,21 @@ msgid "MON: digital monitor"
 msgstr "MON: monitor digital"
 
 #: core/ui/ui_screens.c
+msgctxt "CALL_WHY_NOT_DN"
+msgid "Not DN voice: not played"
+msgstr "No es voz DN: no se oye"
+
+#: core/ui/ui_screens.c
+msgctxt "CALL_WHY_OTHER_DGID"
+msgid "Other DG-ID: not played"
+msgstr "Otro DG-ID: no se oye"
+
+#: core/ui/ui_screens.c
+msgctxt "CALL_VALUE_DATA"
+msgid "Data"
+msgstr "Datos"
+
+#: core/ui/ui_screens.c
 msgctxt "STATE_RECEIVING"
 msgid "Receiving"
 msgstr "Recibiendo"
@@ -5878,6 +6108,11 @@ msgid "{TX freq|TXFreq}"
 msgstr "{Frec TX|FrecTX}"
 
 #: core/ui/ui_screens.c
+msgctxt "QUICK_LABEL_ROOMS"
+msgid "Rooms"
+msgstr "Salas"
+
+#: core/ui/ui_screens.c
 msgctxt "QUICK_LABEL_TONE_TX"
 msgid "Tone TX"
 msgstr "Tono TX"
@@ -5891,6 +6126,11 @@ msgstr "Tono RX"
 msgctxt "QUICK_VALUE_COPY"
 msgid "Copy"
 msgstr "Copiar"
+
+#: core/ui/ui_screens.c
+msgctxt "QUICK_VALUE_OPEN"
+msgid "Open"
+msgstr "Abrir"
 
 #: core/ui/ui_screens.c
 msgctxt "QUICK_VALUE_ALL"

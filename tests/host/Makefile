@@ -136,8 +136,13 @@ run-nxdn-scramble: nxdnScrambleTest
 .PHONY: run-nxdn-scramble
 nxdnTest: nxdnTest.c $(NXDN) $(wildcard $(CORE)/nxdn/*.h) $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ nxdnTest.c $(NXDN) $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
-nxdnEngineTest: nxdnEngineTest.c $(CORE)/nxdn/nxdn_engine.c $(NXDN) $(CORE)/nxdn/nxdn_scramble.c $(CORE)/dmr/ambe/ambeFec.c $(wildcard $(CORE)/nxdn/*.h) $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(CORE)/air/air_softmodem.c $(FEC)
-	$(CC) $(CFLAGS) -DCONFIG_NXDN_SCRAMBLER=1 -I$(ROOT)/hal -Wshadow -o $@ nxdnEngineTest.c $(CORE)/nxdn/nxdn_engine.c $(NXDN) $(CORE)/nxdn/nxdn_scramble.c $(CORE)/dmr/ambe/ambeFec.c $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(CORE)/air/air_softmodem.c $(FEC) -lm
+nxdnEngineTest: nxdnEngineTest.c $(CORE)/nxdn/nxdn_engine.c $(CORE)/air/air_voice.c $(NXDN) $(CORE)/nxdn/nxdn_scramble.c $(CORE)/dmr/ambe/ambeFec.c $(wildcard $(CORE)/nxdn/*.h) $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(CORE)/air/air_softmodem.c $(FEC)
+	$(CC) $(CFLAGS) -DCONFIG_NXDN_SCRAMBLER=1 -I$(ROOT)/hal -Wshadow -o $@ nxdnEngineTest.c $(CORE)/nxdn/nxdn_engine.c $(CORE)/air/air_voice.c $(NXDN) $(CORE)/nxdn/nxdn_scramble.c $(CORE)/dmr/ambe/ambeFec.c $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(CORE)/air/air_softmodem.c $(FEC) -lm
+# YSF frames, their FEC, calls through the framer and the engine on two made-up providers (core/ysf)
+YSF     := $(CORE)/ysf/ysf_frame.c $(CORE)/ysf/ysf_rx.c $(CORE)/ysf/ysf_call.c $(CORE)/ysf/ysf_id.c $(CORE)/ysf/ysf_wx.c
+TESTS   += ysfTest
+ysfTest: ysfTest.c $(YSF) $(CORE)/ysf/ysf_engine.c $(CORE)/air/air_voice.c $(wildcard $(CORE)/ysf/*.h) $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ ysfTest.c $(YSF) $(CORE)/ysf/ysf_engine.c $(CORE)/air/air_voice.c $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
 
 # The MBE synthesis core and the full-rate voice decoder on it (core/mbe), against golden vectors
 MBE     := $(wildcard $(CORE)/mbe/*.c)
@@ -191,8 +196,8 @@ fxpTest: fxpTest.c $(CORE)/dsp/fxp.h
 
 # The soft modem's receiver on a modeled tap, alone and under the framer and the P25 receive hooks
 TESTS   += airSoftmodemTest
-airSoftmodemTest: airSoftmodemTest.c $(CORE)/air/air_softmodem.c $(CORE)/air/air_softmodem.h $(CORE)/dsp/fxp.h $(CORE)/air/air_framer.c $(P25) $(FEC) $(ROOT)/hal/hal_baseband.h
-	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ airSoftmodemTest.c $(CORE)/air/air_softmodem.c $(CORE)/air/air_framer.c $(P25) $(FEC) -lm
+airSoftmodemTest: airSoftmodemTest.c $(CORE)/air/air_softmodem.c $(CORE)/air/air_softmodem.h $(CORE)/radio/tones.c $(CORE)/dsp/fxp.h $(CORE)/air/air_framer.c $(P25) $(FEC) $(ROOT)/hal/hal_baseband.h
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -DCONFIG_AIR=1 -DCONFIG_AIR_RX_ADAPT=1 -o $@ airSoftmodemTest.c $(CORE)/air/air_softmodem.c $(CORE)/radio/tones.c $(CORE)/air/air_framer.c $(P25) $(FEC) -lm
 
 airFramerTest: airFramerTest.c $(CORE)/air/air_framer.c $(CORE)/air/air_framer.h $(CORE)/air/air_syms.h $(ROOT)/hal/hal_air.h
 	$(CC) $(CFLAGS) -Wshadow -o $@ airFramerTest.c $(CORE)/air/air_framer.c
@@ -270,6 +275,7 @@ run: $(TESTS)
 	./p25EngineTest
 	./nxdnTest | tail -1
 	./nxdnEngineTest | tail -1
+	./ysfTest | tail -1
 	./p25TrunkTest
 	./p25VoiceTest
 	./p25VoiceLevelTest
@@ -353,7 +359,7 @@ RCP25   := $(RCORE) $(CORE)/radio/radio_p25.c $(CORE)/p25/p25_engine.c $(CORE)/a
 radioCoreTestP25: $(RCP25) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/call/*.h) $(CORE)/dmr/dmrDataService.h \
                   $(CORE)/ui/ui_svc.h $(wildcard $(CORE)/p25/*.h) $(wildcard $(CORE)/air/*.h)
 	$(CC) $(CFLAGS) $(CORE_HAL) -I. -DDMR_RX_TRACE=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_SFR=1 -DCONFIG_APRS=0 \
-		-DCONFIG_P25=1 -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_TX_DC_BLOCK=1 -DCONFIG_P25_PARROT=1 -DCONFIG_P25_TX_AGC=1 -DCONFIG_AIR_RAW=1 -DCONFIG_SATELLITE_TLE=1 -DHAL_VOCODER_LEND_BYTES=0x4000 -o $@ $(RCP25) -lm
+		-DCONFIG_P25=1 -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_MIC_CHECK=1 -DCONFIG_TX_DC_BLOCK=1 -DCONFIG_P25_PARROT=1 -DCONFIG_P25_TX_AGC=1 -DCONFIG_AIR_RAW=1 -DCONFIG_SATELLITE_TLE=1 -DHAL_VOCODER_LEND_BYTES=0x4000 -o $@ $(RCP25) -lm
 
 TESTS   += radioCoreTestP25NoAgc
 radioCoreTestP25NoAgc: $(RCP25) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/call/*.h) $(CORE)/dmr/dmrDataService.h \
@@ -372,7 +378,7 @@ radioCoreTestP25T: $(RCP25T) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dm
 # The same with NXDN conventional (CONFIG_NXDN): the far end is an NXDN engine on the fake board.air; the voice goes
 # through the DMR side's vocoder path. No vocoder lends memory (as on the STM32 platform)
 TESTS   += radioCoreTestNxdn radioCoreTestP25Nxdn
-RCNXDN  := $(RCORE) $(CORE)/radio/radio_nxdn.c $(CORE)/nxdn/nxdn_engine.c $(CORE)/nxdn/nxdn_scramble.c $(NXDN) $(CORE)/air/air_session.c \
+RCNXDN  := $(RCORE) $(CORE)/radio/radio_nxdn.c $(CORE)/radio/radio_air_mem.c $(CORE)/radio/radio_air_voice.c $(CORE)/nxdn/nxdn_engine.c $(CORE)/air/air_voice.c $(CORE)/nxdn/nxdn_scramble.c $(NXDN) $(CORE)/air/air_session.c \
            $(CORE)/air/air_framer.c $(FEC) $(CORE)/debuglink/debuglink_view_nxdn.c $(CORE)/hostlink/build_info.c
 radioCoreTestNxdn: $(RCNXDN) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/call/*.h) $(CORE)/dmr/dmrDataService.h \
                    $(CORE)/ui/ui_svc.h $(wildcard $(CORE)/nxdn/*.h) $(wildcard $(CORE)/air/*.h) $(wildcard $(CORE)/dmr/ambe/*.h)
@@ -388,6 +394,17 @@ radioCoreTestP25Nxdn: $(RCP25NX) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE
                       $(wildcard $(CORE)/dmr/ambe/*.h)
 	$(CC) $(CFLAGS) $(CORE_HAL) -I. -DDMR_RX_TRACE=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_SFR=1 -DCONFIG_APRS=0 \
 		-DCONFIG_P25=1 -DCONFIG_NXDN=1 -DCONFIG_NXDN_SCRAMBLER=1 -DCONFIG_AIR_RAW=1 -DCONFIG_RADIO_DETOUR=1 -o $@ $(RCP25NX) -lm
+
+# Every air mode together (P25, NXDN, YSF), no lending vocoder: dual watch between YSF and each other mode, DMR
+# included, and the air modes with DMR
+TESTS   += radioCoreTestAir
+RCAIR   := $(RCP25NX) $(CORE)/radio/radio_ysf.c $(CORE)/ysf/ysf_engine.c $(YSF) $(CORE)/air/air_softmodem.c \
+           $(CORE)/debuglink/debuglink_view_ysf.c
+radioCoreTestAir: $(RCAIR) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/call/*.h) $(CORE)/dmr/dmrDataService.h \
+                  $(CORE)/ui/ui_svc.h $(wildcard $(CORE)/nxdn/*.h) $(wildcard $(CORE)/p25/*.h) $(wildcard $(CORE)/ysf/*.h) \
+                  $(wildcard $(CORE)/air/*.h) $(wildcard $(CORE)/dmr/ambe/*.h)
+	$(CC) $(CFLAGS) $(CORE_HAL) -I. -DDMR_RX_TRACE=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_SFR=1 -DCONFIG_APRS=0 \
+		-DCONFIG_P25=1 -DCONFIG_NXDN=1 -DCONFIG_NXDN_SCRAMBLER=1 -DCONFIG_YSF=1 -DCONFIG_AIR_RAW=1 -o $@ $(RCAIR) -lm
 
 # The same with APRS: what the data service hears goes into the station list (a DMR APRS position, docs/spec/aprs.md 8.2)
 TESTS   += radioCoreTestAprs
@@ -510,7 +527,7 @@ boardBandTest: boardBandTest.c $(ROOT)/hal/board.h
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ boardBandTest.c
 
 run: run-core
-run-core: radioCoreTest radioCoreTestNoVfoDmr radioCoreTestP25 radioCoreTestP25NoAgc radioCoreTestP25T radioCoreTestNxdn radioCoreTestP25Nxdn radioCoreTestAprs radioCoreTestAprsDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest inputTest switchFollowTest aprsRadioTest quadratureTest serialmicTest miclevelTest resampleTest \
+run-core: radioCoreTest radioCoreTestNoVfoDmr radioCoreTestP25 radioCoreTestP25NoAgc radioCoreTestP25T radioCoreTestNxdn radioCoreTestP25Nxdn radioCoreTestAir radioCoreTestAprs radioCoreTestAprsDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest inputTest switchFollowTest aprsRadioTest quadratureTest serialmicTest miclevelTest resampleTest \
           rx2LinkTest keyassignTest powerSwitchTest powerKeyTest boardBandTest batteryTest
 	./aprsRadioTest
 	./radioCoreTest
@@ -519,6 +536,7 @@ run-core: radioCoreTest radioCoreTestNoVfoDmr radioCoreTestP25 radioCoreTestP25N
 	./radioCoreTestP25NoAgc
 	./radioCoreTestNxdn
 	./radioCoreTestP25Nxdn
+	./radioCoreTestAir
 	./radioCoreTestP25T
 	./radioCoreTestAprs
 	./radioCoreTestAprsDmr
@@ -727,7 +745,7 @@ i18nTestDefault: i18nTest.c $(I18N) $(LANG_H) $(wildcard $(CORE)/ui/*.h $(CORE)/
 # the long-press rules; uiSim renders screens to PNG (make ui-gallery: docs/ux/screens/, contact sheets in
 # docs/ux/screens/sheets/). Built without the __attribute__ override above so the weak service stubs
 # (ui_svc_stub.c) give way to the simulator's.
-UIAPP   := $(UI) $(CORE)/ui/ui_app.c $(CORE)/ui/ui_menus.c $(CORE)/ui/ui_find.c $(CORE)/ui/ui_aprs.c $(CORE)/ui/ui_position.c $(CORE)/ui/ui_gps.c $(CORE)/ui/ui_satellite.c $(CORE)/ui/ui_dual.c $(CORE)/radio/tones.c \
+UIAPP   := $(UI) $(CORE)/ui/ui_app.c $(CORE)/ui/ui_menus.c $(CORE)/ui/ui_rooms.c $(CORE)/ui/ui_find.c $(CORE)/ui/ui_aprs.c $(CORE)/ui/ui_position.c $(CORE)/ui/ui_gps.c $(CORE)/ui/ui_satellite.c $(CORE)/ui/ui_dual.c $(CORE)/radio/tones.c \
            $(CORE)/codeplug/codeplug_talk.c $(CORE)/codeplug/zone_edit.c $(CORE)/codeplug/zone_shift.c $(CORE)/radio/radio_am.c \
            $(CORE)/radio/radio_bcast.c $(CORE)/support/sha256.c $(CORE)/support/image_hash.c \
            $(CORE)/support/support_info.c sim/ui_sim.c sim/ui_png.c
@@ -748,7 +766,7 @@ uiFlowTestNoPowerMenu: uiFlowTest.c $(UIDEPS)
 
 
 uiFlowTest: uiFlowTest.c $(UIDEPS) $(CORE)/p25/p25_parrot.h $(CORE)/dsp/tx_level.h
-	$(CC) $(UIFLAGS) -DCONFIG_P25=1 -DCONFIG_P25_TX_AGC=1 -DCONFIG_TX_DC_BLOCK=1 -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_P25_PARROT=1 -DCONFIG_P25_TRUNK=1 -DCONFIG_NXDN=1 -o $@ uiFlowTest.c $(UIAPP) -lz
+	$(CC) $(UIFLAGS) -DCONFIG_P25=1 -DCONFIG_P25_TX_AGC=1 -DCONFIG_TX_DC_BLOCK=1 -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_MIC_CHECK=1 -DCONFIG_P25_PARROT=1 -DCONFIG_P25_TRUNK=1 -DCONFIG_NXDN=1 -DCONFIG_YSF=1 -o $@ uiFlowTest.c $(UIAPP) -lz
 
 TESTS   += uiFlowTestP25NoAgc
 uiFlowTestP25NoAgc: uiFlowTest.c $(UIDEPS) $(CORE)/p25/p25_parrot.h $(CORE)/dsp/tx_level.h
@@ -774,7 +792,8 @@ uiFlowTestSatellite: uiFlowTest.c $(UIDEPS)
 # off by default: make -B uiSim UI_LANG=fr (docs/dev/translating.md). The CJK face compiles to nothing without Chinese
 UI_LANG_FLAG := $(if $(UI_LANG),-DCONFIG_LANG_$(shell echo '$(UI_LANG)' | tr a-z A-Z)=1)
 uiSim: uiSim.c $(UIDEPS) $(CJK)
-	$(CC) $(UIFLAGS) $(UI_LANG_FLAG) -DCONFIG_SATELLITE_TLE=1 -DCONFIG_P25=1 -o $@ uiSim.c $(UIAPP) $(CJK) -lz
+	$(CC) $(UIFLAGS) $(UI_LANG_FLAG) -DCONFIG_SATELLITE_TLE=1 -DCONFIG_P25=1 -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_MIC_CHECK=1 \
+		-o $@ uiSim.c $(UIAPP) $(CJK) -lz
 
 uiSimParrot: uiSim.c $(UIDEPS) $(CJK) $(CORE)/p25/p25_parrot.h $(CORE)/dsp/tx_level.h
 	$(CC) $(UIFLAGS) $(UI_LANG_FLAG) -DCONFIG_SATELLITE_TLE=1 -DCONFIG_P25=1 -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_TX_DC_BLOCK=1 -DCONFIG_P25_PARROT=1 -o $@ uiSim.c $(UIAPP) $(CJK) -lz
@@ -844,7 +863,7 @@ ambeVoiceTest: $(CORE)/audio/rx_agc.c $(CORE)/audio/rx_agc.h $(CORE)/dsp/speech_
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ $(CORE)/audio/rx_agc.c ambeVoiceTest.c $(CORE)/dmr/ambe/ambeVoice.c $(CORE)/radio/sigtone.c $(CORE)/radio/beep.c $(CORE)/dmr/ambe/ambeFec.c
 # Exercise the shared fixed-gain limiter through the actual AMBE voice glue.
 ambeVoiceLevelTest: $(CORE)/audio/rx_agc.c $(CORE)/audio/rx_agc.h $(CORE)/dsp/speech_meter.h $(CORE)/dsp/mic_gain.h ambeVoiceTest.c $(CORE)/dmr/ambe/ambeVoice.c $(CORE)/dmr/ambe/ambeVoice.h $(CORE)/dsp/tx_level.h $(CORE)/dmr/ambe/ambeFec.c
-	$(CC) $(CFLAGS) -DCONFIG_TX_MIC_LIMITER=1 -I$(ROOT)/hal -Wshadow -o $@ $(CORE)/audio/rx_agc.c ambeVoiceTest.c $(CORE)/dmr/ambe/ambeVoice.c $(CORE)/radio/sigtone.c $(CORE)/radio/beep.c $(CORE)/dmr/ambe/ambeFec.c
+	$(CC) $(CFLAGS) -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_MIC_CHECK=1 -I$(ROOT)/hal -Wshadow -o $@ $(CORE)/audio/rx_agc.c ambeVoiceTest.c $(CORE)/dmr/ambe/ambeVoice.c $(CORE)/radio/sigtone.c $(CORE)/radio/beep.c $(CORE)/dmr/ambe/ambeFec.c
 # The same with the voice capture built (CONFIG_VOICE_CAPTURE)
 ambeVoiceCaptureTest: $(CORE)/audio/rx_agc.c $(CORE)/audio/rx_agc.h $(CORE)/dsp/speech_meter.h $(CORE)/dsp/tx_level.h $(CORE)/dsp/mic_gain.h ambeVoiceTest.c $(CORE)/dmr/ambe/ambeVoice.c $(CORE)/dmr/ambe/ambeVoice.h $(CORE)/dmr/ambe/ambeFec.c \
 	       $(ROOT)/drivers/vocoder/ambe2_flags.h $(ROOT)/hal/hal_vocoder.h
@@ -869,7 +888,7 @@ micGainTest: micGainTest.c $(CORE)/radio/mic_gain.c $(CORE)/radio/mic_gain.h $(R
 # The DMR debug view must leave room for all existing fields in a single reply.
 TESTS   += dmrViewTest dmrViewNoLimiterTest
 DMRVIEW := dmrViewTest.c $(CORE)/debuglink/debuglink_view_dmr.c $(CORE)/debuglink/dl_fmt.c
-dmrViewTest: DMRVIEW_LIMITER := -DCONFIG_TX_MIC_LIMITER=1
+dmrViewTest: DMRVIEW_LIMITER := -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_MIC_CHECK=1
 dmrViewTest dmrViewNoLimiterTest: $(DMRVIEW) $(wildcard $(CORE)/debuglink/*.h) $(CORE)/dmr/ambe/ambeVoice.h $(CORE)/dsp/mic_gain.h
 	$(CC) $(CFLAGS) $(DMRVIEW_LIMITER) -I$(ROOT)/hal -Wshadow -o $@ $(DMRVIEW)
 
@@ -1647,6 +1666,17 @@ run: run-nxdncp
 run-nxdncp: nxdnCodeplugTest
 	./nxdnCodeplugTest
 .PHONY: run-nxdncp
+
+TESTS   += ysfCodeplugTest
+YSFCP   := $(CPTAG) $(CORE)/codeplug/codeplug_talk.c $(CORE)/codeplug/codeplug_tag.c $(CORE)/codeplug/codeplug_records.c $(CORE)/ysf/ysf_codeplug.c
+
+ysfCodeplugTest: ysfCodeplugTest.c $(YSFCP) $(wildcard $(CORE)/codeplug/*.h $(CORE)/ysf/*.h) ../vectors/channel-modes.txt
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -I. -Wshadow -DCONFIG_AIR=1 -DCONFIG_YSF=1 -o $@ ysfCodeplugTest.c $(YSFCP)
+
+run: run-ysfcp
+run-ysfcp: ysfCodeplugTest
+	./ysfCodeplugTest
+.PHONY: run-ysfcp
 
 # Zone editing (core/codeplug/zone_edit.c) on the real codeplug over a simulated flash: add, move, remove, copy,
 # rename, delete, a new channel added in one step, the limits

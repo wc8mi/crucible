@@ -10,7 +10,7 @@ def test_receive_agc_diagnostics(radio):
     audio = radio.view(["audio"])
     if int(audio.get("agc.built", 0)) != 1:
         rfoundry_hil.skip("not_built", "CONFIG_RX_AGC is off or firmware predates receive AGC")
-    for mode in range(3):
+    for mode in range(4):  # DMR, P25, NXDN, YSF (rx_agc_mode_t)
         for field in ("enabled", "valid", "acquiring", "cached"):
             assert int(audio[f"agc.{mode}.{field}"]) in (0, 1)
         for field in ("input", "output"):
