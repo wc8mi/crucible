@@ -195,10 +195,6 @@ static const struct { const char *name, *script; } gallery[] = {
 	{ "signaling_steps", "ok 7 up up ok down down down down down down ok" },
 	{ "signaling_step_edit", "ok 7 up up ok down down down down down down ok ok 1 5 7 0" },
 	{ "settings_advanced", "ok 7 up ok" },
-#if CONFIG_MIC_CHECK
-	{ "mic_check", "ok 7 up ok up ok expect:screen=miccheck" },	// Settings > Advanced > Mic check (radio-features.md 3.6)
-	{ "mic_check_meters", "ok 7 up ok up ok down down down down down expect:focus=Encoder_dBFS" },
-#endif
 #if CONFIG_SIGNAL_METER
 	{ "settings_rssi_correction", "7 7 7 4 ok ok" },
 #endif

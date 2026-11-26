@@ -636,13 +636,6 @@ void ui_svc_apply(uint8_t id, int32_t value)
 	rs_send(&was);
 }
 
-#if CONFIG_MIC_CHECK
-void ui_svc_mic_check(bool on) { radio_req_mic_check(on); }
-void ui_svc_mic_check_record(void) { ambeVoiceMicCheckRecord(); }
-void ui_svc_mic_check_play(void) { ambeVoiceMicCheckPlay(); }
-void ui_svc_mic_check_view(ambe_mic_check_t *out) { ambeVoiceMicCheckView(out); }
-bool ui_svc_mic_input_available(void) { return board.radio->mic_input != NULL; }
-#endif
 #if CONFIG_P25_PARROT
 bool ui_svc_p25_parrot(uint8_t command, bool agc, int8_t target)
 {

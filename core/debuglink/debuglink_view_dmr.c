@@ -219,19 +219,6 @@ void debuglink_view_dmr_tx_audio(dl_text_t *t)
 	dl_text(t, "voice.tx_target_dmr=%u\nvoice.tx_target_ysf=%u\n", ambeVoiceTxTarget(AMBE_TX_DMR),
 		ambeVoiceTxTarget(AMBE_TX_YSF));
 #endif
-#if CONFIG_MIC_CHECK
-	// Mic check (Settings > Advanced): the live meters in dBFS x10 and the decoded level of the last playback
-	ambe_mic_check_t m;
-	ambeVoiceMicCheckView(&m);
-	dl_text(t, "mic_check.on=%u\nmic_check.phase=%u\nmic_check.profile=%s\nmic_check.windows=%u\n", m.on,
-		m.phase, m.profile == AMBE_TX_YSF ? "ysf" : "dmr", (unsigned)m.windows);
-	dl_text(t, "mic_check.in_rms_db10=%d\nmic_check.in_peak_db10=%d\nmic_check.out_rms_db10=%d\n"
-		"mic_check.out_peak_db10=%d\nmic_check.gain_db10=%d\n", m.in_rms_db10, m.in_peak_db10, m.out_rms_db10,
-		m.out_peak_db10, m.gain_db10);
-	dl_text(t, "mic_check.clips=%u\nmic_check.limited=%u\nmic_check.frames=%u\nmic_check.played=%u\n"
-		"mic_check.dec_rms_db10=%d\nmic_check.dec_peak_db10=%d\n", (unsigned)m.clips, (unsigned)m.limited,
-		(unsigned)m.frames, (unsigned)m.played, m.dec_rms_db10, m.dec_peak_db10);
-#endif
 }
 
 bool debuglink_dmr_diag_line(uint8_t i, char *buf, uint8_t len)

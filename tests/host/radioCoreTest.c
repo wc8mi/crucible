@@ -4378,11 +4378,6 @@ void radio_req_mic_input(int8_t steps)
 	radio_req_t r = { RREQ_MIC, RADIO_MIC_INPUT, (uint32_t)(int32_t)steps };
 	radio_sm_request(&sm, &r, now);
 }
-void radio_req_mic_check(bool on)
-{
-	radio_req_t r = { RREQ_MIC, RADIO_MIC_CHECK, on };
-	radio_sm_request(&sm, &r, now);
-}
 #if CONFIG_P25
 // As radio_task.c: the settings copied in, then the request
 void radio_req_p25_settings(const radio_p25_settings_t *s) { radio_p25_set_settings(s); req(RREQ_P25_SET, 0); }
@@ -12646,7 +12641,7 @@ static void detour_req(uint8_t op, uint32_t backstop_ms)
 
 // A detour (docs/spec/debuglink.md 7.4): every setting the debug link can change while one runs is back after the
 // deadline, and nothing of it was stored, not by the save timer, not by a power-off's flush
-// The Mic input setting reaches the board's hook, a negative step intact; the Mic check follows the channel
+// The Mic input setting reaches the board's hook, a negative step intact
 static void test_mic(void)
 {
 	dmr_start(true);
@@ -12654,20 +12649,6 @@ static void test_mic(void)
 	CHECK(mic_input_steps == -3);
 	radio_req_mic_input(5);
 	CHECK(mic_input_steps == 5);
-	radio_req_mic_check(true);
-	CHECK(sm.mic_check);
-	run(50);
-#if CONFIG_MIC_CHECK
-	ambe_mic_check_t v;
-	ambeVoiceMicCheckView(&v);
-	CHECK(v.on && v.profile == AMBE_TX_DMR);	// a DMR channel, the board in DMR
-#endif
-	radio_req_mic_check(false);
-	CHECK(!sm.mic_check);
-#if CONFIG_MIC_CHECK
-	ambeVoiceMicCheckView(&v);
-	CHECK(!v.on);
-#endif
 }
 
 static void test_detour(void)

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
-"""The TX level settings and Mic check (docs/spec/radio-features.md 3.6) as the dmr_tx_audio view shows them. Read
+"""The TX level settings (docs/spec/radio-features.md 3.6) as the dmr_tx_audio view shows them. Read
 only: nothing keys, nothing is written."""
 import pytest
 
@@ -18,17 +18,3 @@ def test_tx_level_targets(radio):
         assert rms in TX_LEVEL_RMS, (p, rms)
     assert v["voice.tx_profile"] in ("dmr", "ysf"), v["voice.tx_profile"]
     assert int(v["voice.tx_target_rms"]) in TX_LEVEL_RMS, v["voice.tx_target_rms"]
-
-
-@pytest.mark.feature("mic_check")
-def test_mic_check_view(radio):
-    """The Mic check keys are there and in range, open or not."""
-    v = radio.view(["dmr_tx_audio"])
-    assert v["mic_check.on"] in ("0", "1"), v
-    assert int(v["mic_check.phase"]) in (0, 1, 2), v["mic_check.phase"]
-    assert v["mic_check.profile"] in ("dmr", "ysf"), v["mic_check.profile"]
-    assert 0 <= int(v["mic_check.frames"]) <= 100, v["mic_check.frames"]
-    for k in ("in_rms", "in_peak", "out_rms", "out_peak", "dec_rms", "dec_peak"):
-        assert -960 <= int(v["mic_check.%s_db10" % k]) <= 0, (k, v["mic_check.%s_db10" % k])
-    if v["mic_check.on"] == "0":
-        assert v["mic_check.phase"] == "0", "a recording or playback outlived the screen"

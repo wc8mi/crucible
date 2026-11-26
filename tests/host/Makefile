@@ -359,7 +359,7 @@ RCP25   := $(RCORE) $(CORE)/radio/radio_p25.c $(CORE)/p25/p25_engine.c $(CORE)/a
 radioCoreTestP25: $(RCP25) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/call/*.h) $(CORE)/dmr/dmrDataService.h \
                   $(CORE)/ui/ui_svc.h $(wildcard $(CORE)/p25/*.h) $(wildcard $(CORE)/air/*.h)
 	$(CC) $(CFLAGS) $(CORE_HAL) -I. -DDMR_RX_TRACE=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_SFR=1 -DCONFIG_APRS=0 \
-		-DCONFIG_P25=1 -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_MIC_CHECK=1 -DCONFIG_TX_DC_BLOCK=1 -DCONFIG_P25_PARROT=1 -DCONFIG_P25_TX_AGC=1 -DCONFIG_AIR_RAW=1 -DCONFIG_SATELLITE_TLE=1 -DHAL_VOCODER_LEND_BYTES=0x4000 -o $@ $(RCP25) -lm
+		-DCONFIG_P25=1 -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_TX_DC_BLOCK=1 -DCONFIG_P25_PARROT=1 -DCONFIG_P25_TX_AGC=1 -DCONFIG_AIR_RAW=1 -DCONFIG_SATELLITE_TLE=1 -DHAL_VOCODER_LEND_BYTES=0x4000 -o $@ $(RCP25) -lm
 
 TESTS   += radioCoreTestP25NoAgc
 radioCoreTestP25NoAgc: $(RCP25) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/call/*.h) $(CORE)/dmr/dmrDataService.h \
@@ -766,7 +766,7 @@ uiFlowTestNoPowerMenu: uiFlowTest.c $(UIDEPS)
 
 
 uiFlowTest: uiFlowTest.c $(UIDEPS) $(CORE)/p25/p25_parrot.h $(CORE)/dsp/tx_level.h
-	$(CC) $(UIFLAGS) -DCONFIG_P25=1 -DCONFIG_P25_TX_AGC=1 -DCONFIG_TX_DC_BLOCK=1 -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_MIC_CHECK=1 -DCONFIG_P25_PARROT=1 -DCONFIG_P25_TRUNK=1 -DCONFIG_NXDN=1 -DCONFIG_YSF=1 -o $@ uiFlowTest.c $(UIAPP) -lz
+	$(CC) $(UIFLAGS) -DCONFIG_P25=1 -DCONFIG_P25_TX_AGC=1 -DCONFIG_TX_DC_BLOCK=1 -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_P25_PARROT=1 -DCONFIG_P25_TRUNK=1 -DCONFIG_NXDN=1 -DCONFIG_YSF=1 -o $@ uiFlowTest.c $(UIAPP) -lz
 
 TESTS   += uiFlowTestP25NoAgc
 uiFlowTestP25NoAgc: uiFlowTest.c $(UIDEPS) $(CORE)/p25/p25_parrot.h $(CORE)/dsp/tx_level.h
@@ -792,7 +792,7 @@ uiFlowTestSatellite: uiFlowTest.c $(UIDEPS)
 # off by default: make -B uiSim UI_LANG=fr (docs/dev/translating.md). The CJK face compiles to nothing without Chinese
 UI_LANG_FLAG := $(if $(UI_LANG),-DCONFIG_LANG_$(shell echo '$(UI_LANG)' | tr a-z A-Z)=1)
 uiSim: uiSim.c $(UIDEPS) $(CJK)
-	$(CC) $(UIFLAGS) $(UI_LANG_FLAG) -DCONFIG_SATELLITE_TLE=1 -DCONFIG_P25=1 -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_MIC_CHECK=1 \
+	$(CC) $(UIFLAGS) $(UI_LANG_FLAG) -DCONFIG_SATELLITE_TLE=1 -DCONFIG_P25=1 -DCONFIG_TX_MIC_LIMITER=1 \
 		-o $@ uiSim.c $(UIAPP) $(CJK) -lz
 
 uiSimParrot: uiSim.c $(UIDEPS) $(CJK) $(CORE)/p25/p25_parrot.h $(CORE)/dsp/tx_level.h
@@ -863,7 +863,7 @@ ambeVoiceTest: $(CORE)/audio/rx_agc.c $(CORE)/audio/rx_agc.h $(CORE)/dsp/speech_
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ $(CORE)/audio/rx_agc.c ambeVoiceTest.c $(CORE)/dmr/ambe/ambeVoice.c $(CORE)/radio/sigtone.c $(CORE)/radio/beep.c $(CORE)/dmr/ambe/ambeFec.c
 # Exercise the shared fixed-gain limiter through the actual AMBE voice glue.
 ambeVoiceLevelTest: $(CORE)/audio/rx_agc.c $(CORE)/audio/rx_agc.h $(CORE)/dsp/speech_meter.h $(CORE)/dsp/mic_gain.h ambeVoiceTest.c $(CORE)/dmr/ambe/ambeVoice.c $(CORE)/dmr/ambe/ambeVoice.h $(CORE)/dsp/tx_level.h $(CORE)/dmr/ambe/ambeFec.c
-	$(CC) $(CFLAGS) -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_MIC_CHECK=1 -I$(ROOT)/hal -Wshadow -o $@ $(CORE)/audio/rx_agc.c ambeVoiceTest.c $(CORE)/dmr/ambe/ambeVoice.c $(CORE)/radio/sigtone.c $(CORE)/radio/beep.c $(CORE)/dmr/ambe/ambeFec.c
+	$(CC) $(CFLAGS) -DCONFIG_TX_MIC_LIMITER=1 -I$(ROOT)/hal -Wshadow -o $@ $(CORE)/audio/rx_agc.c ambeVoiceTest.c $(CORE)/dmr/ambe/ambeVoice.c $(CORE)/radio/sigtone.c $(CORE)/radio/beep.c $(CORE)/dmr/ambe/ambeFec.c
 # The same with the voice capture built (CONFIG_VOICE_CAPTURE)
 ambeVoiceCaptureTest: $(CORE)/audio/rx_agc.c $(CORE)/audio/rx_agc.h $(CORE)/dsp/speech_meter.h $(CORE)/dsp/tx_level.h $(CORE)/dsp/mic_gain.h ambeVoiceTest.c $(CORE)/dmr/ambe/ambeVoice.c $(CORE)/dmr/ambe/ambeVoice.h $(CORE)/dmr/ambe/ambeFec.c \
 	       $(ROOT)/drivers/vocoder/ambe2_flags.h $(ROOT)/hal/hal_vocoder.h
@@ -888,7 +888,7 @@ micGainTest: micGainTest.c $(CORE)/radio/mic_gain.c $(CORE)/radio/mic_gain.h $(R
 # The DMR debug view must leave room for all existing fields in a single reply.
 TESTS   += dmrViewTest dmrViewNoLimiterTest
 DMRVIEW := dmrViewTest.c $(CORE)/debuglink/debuglink_view_dmr.c $(CORE)/debuglink/dl_fmt.c
-dmrViewTest: DMRVIEW_LIMITER := -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_MIC_CHECK=1
+dmrViewTest: DMRVIEW_LIMITER := -DCONFIG_TX_MIC_LIMITER=1
 dmrViewTest dmrViewNoLimiterTest: $(DMRVIEW) $(wildcard $(CORE)/debuglink/*.h) $(CORE)/dmr/ambe/ambeVoice.h $(CORE)/dsp/mic_gain.h
 	$(CC) $(CFLAGS) $(DMRVIEW_LIMITER) -I$(ROOT)/hal -Wshadow -o $@ $(DMRVIEW)
 
