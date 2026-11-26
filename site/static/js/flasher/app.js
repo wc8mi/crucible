@@ -212,6 +212,9 @@ function versionBanner() {
 }
 
 async function api(method, path, body) {
+	// a release page (RELEASES) never uses the build service, whatever route reached here (Troubleshooting's Reinstall,
+	// ?version=): it installs only its own releases, and a fork's page must not reach RadioFoundry's API
+	if (RELEASES) throw new ApiError(t("flash.release.first_install"));
 	const r = await fetch(new URL(path, API), body ? { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : { method });
 	const j = await r.json().catch(() => ({}));
 	if (!r.ok) throw new ApiError(typeof j.detail === "string" ? j.detail : `HTTP ${r.status}`);
@@ -1110,7 +1113,7 @@ function updateView() {
 		const go = async () => {
 			if (S.editBuild) return next();
 			if (!S.firmware && S.sim) await ensureFirmware();
-			if (!S.firmware && !S.sim) await requestBuild(draw);
+			if (!S.firmware && !S.sim && !RELEASES) await requestBuild(draw);
 			if (S.firmware) next();
 		};
 		S.forward(button(busy ? [spinner(), t("flash.nav.building")] : t(S.editBuild ? "flash.update.to_build" : "flash.update.go"), go,
@@ -1301,7 +1304,7 @@ function buildView() {
 			if (yes === "release") dropVersion(false);	// and go on with the release
 		}
 		if (!S.firmware && S.sim) await ensureFirmware();
-		if (!S.firmware && !S.sim) await requestBuild(draw);
+		if (!S.firmware && !S.sim && !RELEASES) await requestBuild(draw);
 		if (S.firmware || S.sim) next();
 	};
 	const forward = S.forward;

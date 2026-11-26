@@ -1080,3 +1080,16 @@ test("the backup after a first install reads through the loader the new build of
 	const done = src.slice(src.indexOf("function doneView()"));
 	assert.match(done.slice(0, done.indexOf("backupNow(")), /afterOffer: f4Board\(\) \? await Stub\.rfoundryOffer\(link\) : null/);
 });
+
+// app.js needs the DOM, so its source is checked: a release page (data-releases) never asks the build service, on any
+// route (Troubleshooting's Reinstall reaches the build step with the release dropped)
+test("a release page never calls the build service", () => {
+	const src = readFileSync(new URL("../static/js/flasher/app.js", import.meta.url), "utf8");
+	const api = src.slice(src.indexOf("async function api("));
+	assert.ok(api.indexOf("if (RELEASES) throw") > 0 && api.indexOf("if (RELEASES) throw") < api.indexOf("await fetch("),
+		"api() refuses before it fetches");
+	for (const m of src.matchAll(/await requestBuild\(/g)) {
+		const line = src.slice(src.lastIndexOf("\n", m.index), m.index);
+		assert.ok(/RELEASES/.test(line), `requestBuild guarded: ${line.trim()}`);
+	}
+});
