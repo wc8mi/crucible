@@ -1,10 +1,14 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 David Behnke
 blank_issues_enabled: false
 contact_links:
-  - name: User manual
+  - name: Want to contribute code? Go to RadioFoundry
+    url: https://github.com/radiofoundry/radiofoundry/blob/main/docs/dev/contributing.md
+    about: Crucible is downstream. Fixes and features go to RadioFoundry, and Crucible picks them up.
+  - name: User manual (RadioFoundry)
     url: https://github.com/radiofoundry/radiofoundry/tree/main/docs/user
-    about: Installing, first boot, channels, DMR, FM and every setting.
-  - name: Developer docs
-    url: https://github.com/radiofoundry/radiofoundry/tree/main/docs/dev
-    about: Building, architecture, testing and contributing.
+    about: How the shared features work. Crucible's differences are in its usage guide.
+  - name: Crucible usage guide
+    url: https://github.com/wc8mi/crucible/tree/main/docs/kf8sfork
+    about: What Crucible changes, and how to test a release.

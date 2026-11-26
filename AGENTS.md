@@ -4,6 +4,9 @@
 
 ODR / OpenDigitalRadio is a legacy name for this project (now RadioFoundry).
 
+**This tree is Crucible**, a downstream build of RadioFoundry. Read [CRUCIBLE.md](CRUCIBLE.md) first: it overrides
+this file where they differ.
+
 RadioFoundry is MIT-licensed firmware for DMR radios: one tree, many radios. The radios and their chips
 (MCU, DMR chip, RF) are in [docs/spec/radios.md](docs/spec/radios.md); a board's platform is `PLATFORM` in
 `boards/<radio>/board.mk`. What each radio supports is in [docs/feature-matrix.md](docs/feature-matrix.md); check it

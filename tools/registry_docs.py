@@ -32,6 +32,8 @@ import os
 import re
 import subprocess
 
+import crucible
+
 REPO_URL = "https://github.com/radiofoundry/radiofoundry"
 SURVEY = "docs/spec/radios.md"
 SURVEY_HEADING = "Summary table"
@@ -411,7 +413,9 @@ def generate(root, boards):
     out = {}
     for rel, block, source, gen, *style in BLOCKS:
         text = out.get(rel) or open(os.path.join(root, rel), encoding="utf-8").read()
-        out[rel] = fill(text, block, source, gen(root, boards, rows), rel, *style)
+        public = crucible.active(root) and (rel == "README.md" or rel.startswith(".github/"))	# Crucible's four
+        out[rel] = fill(text, block, source, gen(root, crucible.shown(boards, root) if public else boards,
+                                                 [] if public else rows), rel, *style)
     out[SURVEY] = survey_text(open(os.path.join(root, SURVEY), encoding="utf-8").read(), boards)
     return out, problems
 
@@ -472,6 +476,8 @@ def floor(root, ref, new_readme=None):
     problems = []
     for code, (st, marks) in old.items():
         if code not in now:
+            if crucible.active(root):
+                continue	# Crucible lists a subset on purpose (crucible.toml)
             problems.append("README.md: %s is listed at %s but not now" % (code, ref))
             continue
         nst, nmarks = now[code]

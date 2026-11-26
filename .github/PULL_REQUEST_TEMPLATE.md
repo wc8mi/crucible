@@ -1,15 +1,22 @@
 <!-- SPDX-License-Identifier: MIT -->
-<!-- Read docs/dev/contributing.md and docs/CLEANROOM.md first. Delete what doesn't apply. -->
+<!-- Copyright (c) 2026 David Behnke -->
+<!-- Crucible doesn't take outside pull requests: send code to https://github.com/radiofoundry/radiofoundry instead.
+     Maintainers: read CRUCIBLE.md, docs/dev/contributing.md and docs/CLEANROOM.md first. Delete what doesn't apply. -->
 
 ## What and why
 
 <!-- What changes, and the reason. Link the issue: "Fixes #123". -->
 
+## Upstream
+
+<!-- Would this help RadioFoundry? Then it goes there first (link the upstream PR), and this PR only carries it until
+the next merge. "Crucible only" says why upstream won't take it: identity, the radio subset, our defaults, packaging. -->
+
 ## Radios
 
 <!-- Which radios this touches, from this list, or all (core only), or none (tools, docs):
 generated: tools/boards.py docs radios; edit boards/*/board.toml
-DM-32UV, DM-1701, DM-1801 Pro, DB25-D PRO, MD-380, MD-UV380, MD-9600, RT10
+DM-32UV, DM-1701, MD-UV380, MD-9600
 end generated
 -->
 

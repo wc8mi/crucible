@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 David Behnke
+# Crucible's identity and scope: the one place that says what this downstream build is called, who answers for it and
+# which radios it ships. Build, release, docs and site tools read it (CRUCIBLE.md); nothing here changes RadioFoundry's
+# own files, so merges from upstream stay clean.
+
+[project]
+name = "Crucible"
+tagline = "Experimental DMR firmware by KF8S, based on RadioFoundry"
+maintainer = "KF8S (David Behnke)"
+repo = "https://github.com/wc8mi/crucible"
+issues = "https://github.com/wc8mi/crucible/issues"
+flasher = "https://tinker.wc8mi.net/crucible/"
+upstream = "https://github.com/radiofoundry/radiofoundry"
+
+# The radios Crucible builds, releases, tests and documents: board ids (boards/<id>/). The other boards stay in the tree
+# untouched, so upstream changes to them merge without conflicts; they are just never built or listed here.
+[radios]
+boards = ["dm1701", "dm32", "md9600", "mduv380"]

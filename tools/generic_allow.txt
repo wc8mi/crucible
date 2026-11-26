@@ -11,7 +11,7 @@ docs/spec/* a radio's own pages cite the radio a fact was compared with; to link
 # Docs with per-radio notes and examples: to move per-radio values into docs/user/23-radios.md and hardware pages.
 docs/ux/* the UX research and wireframes name the radio each screen size was drawn for
 docs/testing/* test plans and bring-up pages compare with the radio a case was first run on
-README.md the front page's text around the generated radio table names the radios
+README.zh.md the Chinese front page lists Crucible's four radios (crucible.toml)
 boot/README.md the first-stage index describes the one board with a first stage (to generate from boot/<id>/)
 stub/README.md the stub guide's per-radio entry steps (to move into each radio's hardware page)
 stub/USER-GUIDE.md the stub guide's per-radio entry steps (to move into each radio's hardware page)
@@ -23,7 +23,6 @@ docs/kf8sfork/CHANGELOG.md owner-requested fork release history, including model
 docs/kf8sfork/README.md owner-requested package inventory and model-specific testing guide
 
 # Owned by the workflows work in this pull request: fix there.
-.github/ISSUE_TEMPLATE/radio_request.yml the request form's placeholder example
 tools/ci.sh usage examples and the per-board skip notes
 
 # Per-radio tools: each reads one stock format or updater. To fold into a generic tool keyed by board.toml.

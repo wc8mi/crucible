@@ -1,13 +1,15 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 David Behnke
 name: Bug report
-description: Something on the radio, in a tool or on the web site doesn't work as documented.
+description: Something in a Crucible release or the Crucible flasher doesn't work.
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        One problem per issue. Never attach the AMBE codec, a stock firmware file, a bootloader key, a flash or memory
+        One problem per issue, about Crucible. If RadioFoundry's own release does the same, report it to
+        [RadioFoundry](https://github.com/radiofoundry/radiofoundry/issues) instead. Never attach the AMBE codec, a stock firmware file, a bootloader key, a flash or memory
         dump or audio recordings: they can't be in this repository, and issues are public.
   - type: dropdown
     id: radio
@@ -17,12 +19,8 @@ body:
         # generated: tools/boards.py docs radios; edit boards/*/board.toml
         - Baofeng DM-32UV
         - Baofeng DM-1701 / Retevis RT84
-        - Baofeng DM-1801 Pro / DM-1801
-        - Radioddity DB25-D PRO / Kydera CDR-300UV
-        - TYT MD-380 / MD-390 / Retevis RT3
         - TYT MD-UV380 / MD-UV390 / Retevis RT3S / MD-UV390 Plus 10 W
         - TYT MD-9600 / Retevis RT90
-        - Retevis RT10
         # end generated
         - Not radio-specific (tools, web site, docs)
         - Other (say which below)
@@ -33,7 +31,7 @@ body:
     attributes:
       label: Firmware version
       description: Settings > Advanced > About shows the version and commit. Or `tools/rfoundry_debug.py version`.
-      placeholder: v26.11 (3029db9)
+      placeholder: kf8s-0ecb3b49-b7c98a85-261126-1
     validations:
       required: true
   - type: dropdown
@@ -41,9 +39,8 @@ body:
     attributes:
       label: Build
       options:
-        - Full (release)
-        - Amateur (release)
-        - Commercial (release)
+        - Crucible release
+        - Crucible pre-release (test build)
         - Built myself (give the make command below)
     validations:
       required: true
@@ -59,7 +56,7 @@ body:
         - Channels, zones, contacts, codeplug (qdmr, CPS)
         - Hotspot, SFR, USB network
         - Battery, power, boot
-        - Installing (rfoundry, web flasher)
+        - Installing (Crucible flasher, rfoundry)
         - Web site or docs
         - Other
     validations:
@@ -125,7 +122,7 @@ body:
     attributes:
       label: Before you send
       options:
-        - label: I searched the open issues and [docs/spec/gotchas.md](https://github.com/radiofoundry/radiofoundry/blob/main/docs/spec/gotchas.md).
+        - label: I searched Crucible's open issues.
           required: true
         - label: Nothing attached is a codec, stock firmware, key, dump or recording.
           required: true
