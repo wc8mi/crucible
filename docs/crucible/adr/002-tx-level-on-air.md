@@ -15,7 +15,7 @@ The DMR TX level and YSF TX level settings (Settings > Talk & listen) set the RM
 microphone at **before the encoder**: Off, or -30 to -12 dBFS in 2 dB steps (`core/dsp/tx_level.h`,
 `tx_level_choice_rms`). The level a listener hears is what the encoder makes of that input, decoded at the other end.
 
-On the air, with the receiver's `AGC in > out dBFS` reading as the meter (the two-radio method), the maintainer
+On the air, with a Yaesu receiver as the meter, body mic and one voice, the maintainer
 found these settings give about -34 dBFS, the level Yaesu receivers handle well:
 
 | Radio | Encoder target for -34 on air | Difference to the setting |
@@ -53,13 +53,14 @@ Two more facts:
 2. **A trim per radio, per profile.** `board_t` gets `int8_t tx_level_trim_db[AMBE_TX_PROFILES]` (DMR, YSF), in whole
    dB, 0 when not given. The encoder target is the on-air setting plus the trim. `core/` reads the field and never
    names a radio (AGENTS.md rule 4).
-3. **Starting trims** from the measurements above: DM-32UV DMR +8, DM-1701 DMR +4. YSF, the MD-UV380 and the MD-9600
-   stay 0 until measured. A radio's bring-up record says "untested" for a trim not yet measured on the air.
+3. **Starting trims** from the measurements above (body mic, one voice, Yaesu receiver): DM-32UV DMR +8, DM-1701
+   DMR +4. They are provisional until the method below adds a second voice and the hand mic. YSF, the MD-UV380 and
+   the MD-9600 stay 0 until measured. A radio's bring-up record says "untested" for a trim not yet measured on the air.
 4. **The range moves.** On-air choices: Off, -40 to -22 dBFS in 2 dB steps (10 choices, as now). The encoder target
    (setting plus trim) is clamped to -42 to -10 dBFS, so the leveler table covers 1 dB steps across that span.
-5. **The reference receiver is fixed.** Trims are measured against one receiver, named in
-   `docs/spec/dmr-voice.md`: a Yaesu radio when one is at the bench, else one stated Crucible radio. All trims use the
-   same one, so they agree with each other.
+5. **The reference receiver is a Yaesu radio.** Trims are measured against one Yaesu receiver, named in
+   `docs/spec/dmr-voice.md`, the same one for every trim, so they agree with each other and match the listeners that
+   matter.
 6. **Default stays Off** in this change. A follow-up sets -34 dBFS as the default once all four radios have a
    measured DMR trim.
 7. **Saved settings.** The stored value stays a choice index. Its meaning changes, so a saved level shifts by the
@@ -93,9 +94,9 @@ For each radio and each profile (DMR, then YSF):
 | Step | Do this |
 |---|---|
 | 1 | Set the radio under test to an on-air level of -34 dBFS and its trim to 0. |
-| 2 | Use the reference receiver (decision 5), 3 m away, same channel. |
+| 2 | Use the reference Yaesu receiver (decision 5), 3 m away, same channel. |
 | 3 | Read the text below at a normal voice, 5 cm from the microphone, 30 seconds. |
-| 4 | Note the receiver's mean `AGC in` reading during speech. |
+| 4 | Note the receiver's mean level reading during speech. |
 | 5 | Repeat with a second voice, and with the hand mic if the radio has one. |
 | 6 | Trim = -34 minus the mean of the readings, rounded to whole dB. |
 | 7 | Set the trim, transmit once more, and check the reading is within 1 dB of -34. |
@@ -111,9 +112,10 @@ Record each radio's readings and trim on its bring-up page. Nothing transmits in
 | 3 | YSF trims; MD-UV380 and MD-9600 trims | The maintainer at the bench |
 | 4 | Default -34 dBFS on air | Phases 2 and 3 |
 
-## Questions for the maintainer
+## Maintainer answers
 
-1. What was the meter for -34: a Yaesu radio's reading, or a Crucible receiver's `AGC in`? If a Crucible radio,
-   which one? (Decision 5.)
-2. Were your -26 and -30 with the hand mic or the body mic, and one voice or more?
-3. Is a one-time shift of saved levels at the update acceptable (decision 7), or do you want a conversion?
+| Question | Answer |
+|---|---|
+| 1. What was the meter for -34? | A Yaesu receiver. It is the reference receiver (decision 5). |
+| 2. Hand mic or body mic, how many voices? | Body mic, the maintainer's voice. The starting trims are provisional (decision 3). |
+| 3. Saved levels shift once at the update: acceptable? | Yes. No conversion; the release notes say to pick the level again (decision 7). |
