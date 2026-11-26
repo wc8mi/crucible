@@ -40,6 +40,9 @@ MARK = ('<svg viewBox="0 0 70 80" aria-hidden="true" focusable="false"><path fil
 THEME_ICON = ('<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7.5" fill="none" '
               'stroke="currentColor" stroke-width="1.8"/><path d="M10 2.5a7.5 7.5 0 0 1 0 15z" fill="currentColor"/></svg>')
 
+# The update page sends a visitor who has not accepted the terms on this computer to the front page (ADR 001)
+TERMS_FIRST = '<script>try{if(localStorage.getItem("crucible-terms")!=="1")location.replace("./#terms")}catch(e){}</script>'
+
 
 class SiteError(Exception):
     pass
@@ -189,6 +192,7 @@ def crucible_page(flash, project, assets, built):
             f'<link rel="stylesheet" href="static/css/site.css?v={assets}">\n'
             f'<link rel="stylesheet" href="crucible/crucible.css?v={assets}">\n'
             '<script>try{var t=localStorage.getItem("rfoundry-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>\n'
+            f'{TERMS_FIRST}\n'
             '</head>')
     m = one(r'<head>.*?</head>', page, 'head')
     page = page[:m.start()] + head + page[m.end():]
@@ -222,6 +226,23 @@ def crucible_page(flash, project, assets, built):
     return page
 
 
+def front_page(template, project, radios, assets, built):
+    """Crucible's front page (site/crucible/installer/page.html): the browser gate, the terms and the two doors."""
+    items = []
+    for r in sorted(radios, key=lambda r: r.get('order', 0)):
+        maker, model = r.get('maker', ''), r.get('model') or r['name'].removeprefix(r.get('maker', '') + ' ')
+        also = ', '.join(a.removeprefix(maker + ' ') for a in r.get('also', []))
+        small = html.escape(maker + (f' · also {also}' if also else ''))
+        items.append(f'\t\t\t<li>{html.escape(model)} <small>{small}</small></li>')
+    fill = {k: html.escape(project[k]) for k in ('name', 'tagline', 'repo', 'issues', 'upstream', 'maintainer')}
+    fill.update(assets=html.escape(assets), built=html.escape(built), radios='\n'.join(items),
+                repo_slug=html.escape(project['repo'].removeprefix('https://github.com/')))
+    page = re.sub(r'\{\{(\w+)\}\}', lambda m: fill[m.group(1)], template)
+    if not items:
+        raise SiteError('front page: no radios')
+    return page
+
+
 def build(out, packages, github, site_out=None):
     cfg = crucible.config(ROOT)
     project = cfg['project']
@@ -249,14 +270,16 @@ def build(out, packages, github, site_out=None):
         info.update({'version': f'crucible-{commit}', 'branch': '', 'repo': project['repo'], 'community': '', 'release': '', 'beta': '', 'reports': {'sentry_dsn': ''}})
         info.pop('tool', None)
         (out / 'data' / 'site.json').write_text(json.dumps(info, indent=1))
-        shutil.copytree(ROOT / 'site' / 'crucible', out / 'crucible')
+        shutil.copytree(ROOT / 'site' / 'crucible', out / 'crucible', ignore=shutil.ignore_patterns('page.html'))
         brand = ROOT / 'docs' / 'crucible' / 'brand'
         for size in (32, 180, 512):
             shutil.copy2(brand / f'hot-core-icon-{size}.png', out / 'crucible' / f'icon-{size}.png')
         flash = (site / 'flash' / 'index.html').read_text()
         assets = re.search(r'\?v=([0-9a-f]+)', flash).group(1)
         built = f'{project["name"]} {commit} · page built {info.get("built", "")}'
-        (out / 'index.html').write_text(crucible_page(flash, project, assets, built))
+        (out / 'update.html').write_text(crucible_page(flash, project, assets, built))
+        template = (ROOT / 'site' / 'crucible' / 'installer' / 'page.html').read_text()
+        (out / 'index.html').write_text(front_page(template, project, radios['radios'], assets, built))
     releases = [local_release(p) for p in packages]
     if github:
         releases += github_releases(repo_slug, ROOT / 'build' / 'crucible-releases')
@@ -322,7 +345,15 @@ def self_test():
     assert 'data-releases="releases/index.json"' in page and 'data-reporting="off"' in page
     assert 'Runs Crucible' in page and 'beta-notice' not in page and 'site-header' not in page
     assert '"static/js/flasher/app.js' in page and '../' not in page and 'not affiliated' in page
-    print('crucible site: package checks, index, page shell checks passed')
+    assert 'location.replace("./#terms")' in page, 'the update page asks for the terms first'
+    tpl = '<h1>{{name}}</h1><ul>\n{{radios}}\n</ul><p>{{built}}</p><a href="{{issues}}">{{repo_slug}}</a>'
+    radios = [{'name': 'TYT X-2', 'maker': 'TYT', 'model': 'X-2', 'also': ['TYT X-3', 'Other Y'], 'order': 2},
+              {'name': 'B Z-1', 'maker': 'B', 'model': 'Z-1', 'also': [], 'order': 1}]
+    front = front_page(tpl, proj, radios, '1', 'v <b>')
+    assert '{{' not in front and '<h1>Crucible</h1>' in front and 'v &lt;b&gt;' in front
+    assert front.index('Z-1') < front.index('X-2'), 'radios in their order'
+    assert '<li>X-2 <small>TYT · also X-3, Other Y</small></li>' in front and '>o/r</a>' in front
+    print('crucible site: package checks, index, page shell, front page checks passed')
 
 
 def main():

@@ -1,0 +1,129 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 David Behnke */
+/*
+ * Crucible's installer front page (ADR 001, docs/crucible/adr/): the browser gate, the terms and the two doors. The
+ * foundry world of DESIGN.md: hot-core band, iron or greensand ground, Barlow Condensed for h1, h2 and the wordmark
+ * only. Dark is the default; light with the system setting unless the visitor picked dark, always with
+ * data-theme="light".
+ */
+
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; font-display: swap;
+	src: url("../fonts/barlow-condensed-700-latin.woff2") format("woff2"); }
+
+:root {
+	--hot: #ff7738; --hot-lift: #ff8a52; --flame: #ffc45d; --iron: #1a120c;
+	--bg: #14100d; --plate: #1e1915; --plate-2: #2a231d; --line: #3d332b; --line-2: #54473c;
+	--text: #f2ece6; --muted: #b9aca0; --faint: #968a80; --link: #ff9e6a; --focus: var(--flame);
+	--cast: "Barlow Condensed", "Arial Narrow", sans-serif;
+	--sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme="dark"]) {
+		--bg: #d8dbd4; --plate: #eff1ec; --plate-2: #c8ccc3; --line: #aeb2a8; --line-2: #8f9489;
+		--text: #1c1612; --muted: #4c4f47; --faint: #595c54; --link: #a33d0b; --focus: #a33d0b;
+		color-scheme: light;
+	}
+}
+:root[data-theme="light"] {
+	--bg: #d8dbd4; --plate: #eff1ec; --plate-2: #c8ccc3; --line: #aeb2a8; --line-2: #8f9489;
+	--text: #1c1612; --muted: #4c4f47; --faint: #595c54; --link: #a33d0b; --focus: #a33d0b;
+	color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { scrollbar-color: var(--line) var(--bg); accent-color: var(--hot); caret-color: var(--hot); }
+::selection { background: var(--hot); color: var(--iron); }
+html, body { margin: 0; }
+body { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); color: var(--text);
+	font: 1.0625rem/1.55 var(--sans); -webkit-font-smoothing: antialiased; }
+a { color: var(--link); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 2px; }
+
+/* The band */
+.band { background: var(--hot); color: var(--iron); border-bottom: 1px solid rgb(0 0 0 / 22%); }
+.band .in, main, .foot .in { width: 100%; max-width: 46rem; margin: 0 auto; padding-inline: 1.25rem; }
+.band .in { display: flex; align-items: center; gap: .65rem; min-height: 60px; }
+.band .brand { display: flex; align-items: center; gap: .65rem; color: inherit; text-decoration: none; }
+.band svg.mark { width: 26px; height: 30px; }
+.band .word { font: 700 1.7rem/1 var(--cast); letter-spacing: .06em; text-transform: uppercase; }
+.band .theme-toggle { margin-left: auto; display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0;
+	border-radius: 4px; background: transparent; border: 1px solid rgb(26 18 12 / 35%); color: var(--iron); cursor: pointer; }
+.band .theme-toggle:hover { background: rgb(26 18 12 / 10%); }
+.band .theme-toggle svg { width: 20px; height: 20px; }
+.band :focus-visible { outline-color: var(--iron); }
+main { flex: 1; padding-block: 2.75rem 4rem; }
+.foot { border-top: 1px solid var(--line); color: var(--faint); font-size: .875rem; }
+.foot .in { display: grid; gap: .35rem; padding-block: 1rem 1.4rem; }
+.foot p { margin: 0; }
+.foot a { color: inherit; }
+
+/* Casting marks: h1, h2 and the wordmark only */
+h1, h2 { margin: 0; font-family: var(--cast); font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+	text-wrap: balance; }
+h1 { font-size: clamp(2rem, 4.2vw, 2.9rem); line-height: 1; }
+.home h1 { font-size: clamp(2.4rem, 7vw, 3.6rem); line-height: .95; }
+.label { margin: 0 0 .55rem; font-size: .875rem; font-weight: 600; color: var(--muted); }
+.lead { margin: .8rem 0 0; font-size: 1.15rem; color: var(--muted); max-width: 34rem; text-wrap: pretty; }
+p { margin: .6rem 0 0; text-wrap: pretty; }
+.note { margin-top: 1rem; color: var(--muted); font-size: .95rem; }
+.after { margin-top: 1rem; color: var(--muted); }
+.narrow { max-width: 36rem; }
+.back { display: inline-flex; gap: .35rem; align-items: center; margin-bottom: 1.4rem; color: var(--muted);
+	text-decoration: none; font-weight: 600; }
+.back:hover { color: var(--text); }
+
+/* Buttons: label type, sentence case */
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 1.25rem;
+	border-radius: 3px; border: 1px solid transparent; font: 600 1.0625rem/1 var(--sans); text-decoration: none;
+	cursor: pointer; }
+.btn.hot { background: var(--hot); color: var(--iron); }
+.btn.hot:not([disabled]):hover { background: var(--hot-lift); }
+.btn[disabled] { background: var(--plate-2); color: var(--faint); border-color: var(--line); cursor: not-allowed; }
+.btn.big { min-height: 3.25rem; padding: 0 1.75rem; font-size: 1.15rem; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: .9rem 1.4rem; margin-top: 1.5rem; }
+
+/* Gate */
+.browsers { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; margin-top: 1.6rem; }
+.browsers a { display: block; padding: 1rem 1.1rem; background: var(--plate); border: 1px solid var(--line);
+	border-radius: 4px; color: var(--text); text-decoration: none; }
+.browsers a:hover { border-color: var(--hot); }
+.browsers b { display: block; font-size: 1.2rem; }
+.browsers span { color: var(--muted); font-size: .95rem; }
+
+/* Terms */
+.terms { margin: 1.6rem 0 0; padding: 0; list-style: none; counter-reset: t; }
+.terms li { position: relative; padding: .85rem 0 .85rem 2.6rem; border-top: 1px solid var(--line); counter-increment: t; }
+.terms li:last-child { border-bottom: 1px solid var(--line); }
+.terms li::before { content: counter(t); position: absolute; left: 0; top: .62rem; font: 700 1.6rem/1 var(--cast);
+	color: var(--hot); }
+.accept { display: flex; gap: .8rem; align-items: center; margin-top: 1.4rem; font-weight: 600; cursor: pointer; }
+.accept input { flex: none; width: 1.35rem; height: 1.35rem; margin: 0; }
+
+/* Home: two equal doors */
+.doors { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 2.2rem; }
+.door { display: flex; flex-direction: column; min-height: 17rem; padding: 1.5rem; background: var(--plate);
+	border: 1px solid var(--line); border-radius: 4px; color: var(--text); text-decoration: none; }
+.door:hover { border-color: var(--hot); }
+.door .art { display: flex; align-items: flex-end; gap: .2rem; height: 6rem; color: var(--line-2); }
+.door .art svg { height: 100%; width: auto; }
+.door .art .lit { height: 52%; color: var(--hot); }
+.door .art .arrow { height: 46%; }
+.door h2 { margin-top: auto; padding-top: 1.2rem; font-size: 2rem; line-height: 1.05; }
+.door p { color: var(--muted); }
+.door .btn { align-self: flex-start; margin-top: 1.2rem; }
+.home-links { display: flex; flex-wrap: wrap; gap: .6rem 1.6rem; margin-top: 1.4rem; font-weight: 600; }
+.fits { margin-top: 2.6rem; }
+.fits ul { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }
+.fits li { font-weight: 600; }
+.fits li small { color: var(--faint); font-weight: 400; font-size: .875rem; }
+
+/* One screen at a time */
+[data-screen] { display: none; }
+[data-screen].show { display: block; }
+
+@media (max-width: 40rem) {
+	main { padding-block: 2rem 3rem; }
+	.doors, .browsers { grid-template-columns: 1fr; }
+	.door { min-height: 0; }
+	.door .art { height: 4.25rem; }
+}

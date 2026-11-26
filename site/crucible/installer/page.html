@@ -1,0 +1,118 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 David Behnke -->
+<!-- Crucible's front page (ADR 001, phase 1): tools/crucible_site.py fills {{...}} and writes it as index.html -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{name}} · Install and update</title>
+<meta name="description" content="{{tagline}}">
+<meta name="theme-color" content="#ff7738">
+<meta name="robots" content="noindex">
+<link rel="icon" href="crucible/icon-32.png?v={{assets}}" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="crucible/icon-180.png?v={{assets}}">
+<link rel="preload" href="crucible/fonts/barlow-condensed-700-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="crucible/installer/installer.css?v={{assets}}">
+<script>try{var t=localStorage.getItem("rfoundry-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+	<defs>
+		<symbol id="handheld" viewBox="0 0 60 120">
+			<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+				<path d="M15 34V6a3 3 0 0 1 6 0v28"/>
+				<rect x="36" y="22" width="9" height="12" rx="2"/>
+				<rect x="8" y="34" width="44" height="82" rx="6"/>
+				<rect x="14" y="42" width="32" height="20" rx="2"/>
+				<path d="M15 72h6M27 72h6M39 72h6M15 82h6M27 82h6M39 82h6M15 92h6M27 92h6M39 92h6M15 102h6M27 102h6M39 102h6"/>
+			</g>
+		</symbol>
+		<symbol id="arrow" viewBox="0 0 40 40"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M20 33V9M10 18l10-10 10 10"/></symbol>
+		<symbol id="mark" viewBox="0 0 70 80"><path fill="currentColor" fill-rule="evenodd" d="M9 0H22V18H55Q65 18 65 28V34H70V47H65V70Q65 80 55 80H14Q4 80 4 70V49H0V35H4V26Q4 21 9 19Z M15 44H25Q23 36 38 26Q36 33 42 36Q47 38 46 44H55L49 65Q47 70 41 70H29Q22 70 20 64Z"/></symbol>
+	</defs>
+</svg>
+
+<header class="band"><div class="in">
+	<a class="brand" href="./"><svg class="mark" viewBox="0 0 70 80" aria-hidden="true"><use href="#mark"/></svg><span class="word">{{name}}</span></a>
+	<button class="theme-toggle" type="button" aria-label="Change light and dark" title="Change light and dark"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 2.5a7.5 7.5 0 0 1 0 15z" fill="currentColor"/></svg></button>
+</div></header>
+
+<main>
+
+<noscript><div class="narrow"><h1>Turn on JavaScript</h1><p class="lead">The installer cannot operate without JavaScript.</p></div></noscript>
+
+<section data-screen="gate">
+	<div class="narrow">
+		<h1>Use Chrome or Edge</h1>
+		<p class="lead">This browser cannot connect to a radio. Open this page on a computer in one of these browsers.</p>
+		<div class="browsers">
+			<a href="https://www.google.com/chrome/"><b>Chrome</b><span>Windows, Mac or Linux computer</span></a>
+			<a href="https://www.microsoft.com/edge"><b>Edge</b><span>Windows, Mac or Linux computer</span></a>
+		</div>
+		<p class="note">Safari, Firefox and phone browsers cannot install {{name}}. Opera on a computer can also connect.</p>
+	</div>
+</section>
+
+<section data-screen="terms">
+	<div class="narrow">
+		<h1>Before you start</h1>
+		<p class="lead">Read these four items. The installer shows them one time on this computer.</p>
+		<ol class="terms">
+			<li>{{name}} is experimental firmware. It is for tinkerers.</li>
+			<li>{{name}} has no warranty. You accept all risk.</li>
+			<li>An install can cause damage to your radio. Keep your backup files.</li>
+			<li>You are responsible for your radio and for its transmissions.</li>
+		</ol>
+		<label class="accept"><input type="checkbox" id="terms-ok"> I understand these items and I accept the risk.</label>
+		<div class="actions"><button class="btn hot big" id="terms-go" type="button" disabled>Continue</button></div>
+		<p class="after">If you do not accept, close this page.</p>
+	</div>
+</section>
+
+<section data-screen="home" class="home">
+	<h1>What do you want to do?</h1>
+	<div class="doors">
+		<a class="door" href="#install">
+			<span class="art"><svg viewBox="0 0 60 120" aria-hidden="true"><use href="#handheld"/></svg><svg class="lit" viewBox="0 0 70 80" aria-hidden="true"><use href="#mark"/></svg></span>
+			<h2>Install {{name}}</h2>
+			<p>My radio has the manufacturer's firmware.</p>
+			<span class="btn hot">Install</span>
+		</a>
+		<a class="door" href="update.html">
+			<span class="art"><svg viewBox="0 0 60 120" aria-hidden="true"><use href="#handheld"/></svg><svg class="arrow" viewBox="0 0 40 40" aria-hidden="true"><use href="#arrow"/></svg></span>
+			<h2>Update {{name}}</h2>
+			<p>My radio has {{name}} or RadioFoundry.</p>
+			<span class="btn hot">Update</span>
+		</a>
+	</div>
+	<div class="home-links"><a href="{{issues}}">Help</a></div>
+	<div class="fits">
+		<p class="label">For these radios</p>
+		<ul>
+{{radios}}
+		</ul>
+	</div>
+</section>
+
+<section data-screen="install">
+	<div class="narrow">
+		<a class="back" href="#home">← Back</a>
+		<h1>Install is not available yet</h1>
+		<p class="lead">The installer for radios with the manufacturer's firmware comes in a later version of this page.</p>
+		<p>If your radio has {{name}} or RadioFoundry, you can update it now.</p>
+		<div class="actions"><a class="btn hot big" href="update.html">Update</a></div>
+	</div>
+</section>
+
+</main>
+
+<footer class="foot"><div class="in">
+	<p><strong>Help:</strong> <a href="{{issues}}">open an issue on {{repo_slug}}</a>. This page sends nothing to a server.</p>
+	<p>{{name}} is maintained by {{maintainer}}. It is based on <a href="{{upstream}}">RadioFoundry</a> (MIT) and is not affiliated with it. Do not ask RadioFoundry about {{name}}. <a href="{{repo}}">Source</a>.</p>
+	<p>{{built}}</p>
+</div></footer>
+
+<script type="module" src="crucible/installer/installer.js?v={{assets}}"></script>
+</body>
+</html>
