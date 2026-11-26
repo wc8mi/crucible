@@ -627,18 +627,6 @@ static const flow_t flows[] = {
 	{ "11 dual watch modes: NXDN call", "nxdn chkind:3,nxdn up down quick 7 tune:a", "fmrx",
 	  "dual=1 shows=NXDN_call hides=FM_signal hides=DMR_call", 0, false },
 #endif
-#if CONFIG_MIC_CHECK
-	{ "S Mic check opens", "", "ok 7 up ok up up ok",
-	  "screen=miccheck shows=Mic_check shows=Record_speech shows=Live:_no_RF shows=YSF_TX_level", 7, false },
-	{ "S Mic check meters", "ok 7 up ok up up ok", "down down down",
-	  "screen=miccheck focus=Mic_dBFS shows=-31.2/-9.5", 3, false },
-	{ "S Mic check encoder level", "ok 7 up ok up up ok", "down down down down down",
-	  "screen=miccheck focus=Encoder_dBFS shows=-20.1/-4.1", 5, false },
-	{ "S Mic check decoded level", "ok 7 up ok up up ok", "down down down down down down down down",
-	  "screen=miccheck focus=Decoded_dBFS shows=-23.6/-6.2", 8, false },
-	{ "S Mic check steps the YSF target", "ok 7 up ok up up ok", "down ok",
-	  "screen=miccheck shows=YSF_TX_level shows=-30_dBFS", 2, false },
-#endif
 #if CONFIG_P25_PARROT
 	{ "S P25 calibration opens", "", "ok 7 up ok up ok",
 	  "screen=p25parrot shows=P25_calibration shows=Record_speech shows=Ready:_no_RF shows=Decode_goal_dBFS", 6, false },
@@ -1092,6 +1080,16 @@ static const flow_t flows[] = {
 	{ "S hear all by default", "ok 7 3 down down down down down down down ok long:back", "up up", "hearall=1 pos=5", 2, false },
 	{ "S hear all by default: BACK", "ok 7 3 down down down down down down down ok long:back up up", "back", "hearall=0", 1, false },
 	{ "S mic noise reduction off", "", "ok 7 3 down down down down down down ok", "set70=0", 10, false },
+#if CONFIG_TX_MIC_LIMITER
+	// The TX level rows sit just above the end of Talk & listen: set on one radio, read on another's RX audio levels
+#if CONFIG_YSF
+	{ "S DMR TX level row", "", "ok 7 3 up up up up up", "screen=group focus=DMR_TX_level shows=Off", 8, false },
+	{ "S YSF TX level row", "", "ok 7 3 up up up up", "screen=group focus=YSF_TX_level", 7, false },
+#else
+	{ "S DMR TX level row", "", "ok 7 3 up up up up", "screen=group focus=DMR_TX_level shows=Off", 7, false },
+#endif
+	{ "S Mic input row", "", "ok 7 3 up up up", "screen=group focus=Mic_input", 6, false },
+#endif
 	// Mic AGC on: Mic gain (the row above) shows "AGC", is dimmed and says why
 	{ "S mic AGC on", "", "ok 7 3 down down down down down ok", "set71=1 shows=AGC", 9, false },
 	{ "S mic gain while AGC is on", "ok 7 3 down down down down down ok", "up ok", "toast=Mic_AGC_sets set13=5", 2, false },

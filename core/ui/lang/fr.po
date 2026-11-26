@@ -3303,94 +3303,9 @@ msgid "AMBE+2 codec: DVSI (stock)"
 msgstr "Codec AMBE+2: DVSI"
 
 #: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_STOP_PLAY"
-msgid "Stop and play"
-msgstr "Arrêt et lecture"
-
-#: core/ui/ui_menus.c
-msgctxt "P25_CAL_RECORD"
-msgid "Record speech"
-msgstr "Enregistrer la voix"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_NEEDS_CHANNEL"
-msgid "Needs a DMR or YSF channel"
-msgstr "Canal DMR ou YSF requis"
-
-#: core/ui/ui_menus.c
-msgctxt "P25_PARROT_RECORDING"
-msgid "Recording"
-msgstr "Enregistrement"
-
-#: core/ui/ui_menus.c
-msgctxt "P25_PARROT_PLAYING"
-msgid "Playing"
-msgstr "Lecture"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_LIVE"
-msgid "Live: no RF"
-msgstr "Direct : sans RF"
-
-#: core/ui/ui_menus.c
 msgctxt "P25_PARROT_OPENING"
 msgid "Opening"
 msgstr "Ouverture"
-
-#: core/ui/ui_menus.c
-msgctxt "SET_LABEL_YSF_TX_LEVEL"
-msgid "YSF TX level"
-msgstr "Niveau TX YSF"
-
-#: core/ui/ui_menus.c
-msgctxt "SET_LABEL_DMR_TX_LEVEL"
-msgid "DMR TX level"
-msgstr "Niveau TX DMR"
-
-#: core/ui/ui_menus.c
-msgctxt "SET_LABEL_MIC_INPUT"
-msgid "Mic input"
-msgstr "Entrée micro"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_MIC_LEVEL"
-msgid "Mic dBFS"
-msgstr "Micro dBFS"
-
-#: core/ui/ui_menus.c
-msgctxt "P25_PARROT_RAILS"
-msgid "Mic rail samples"
-msgstr "Échantillons saturés"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_ENC_LEVEL"
-msgid "Encoder dBFS"
-msgstr "Codeur dBFS"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_GAIN"
-msgid "Gain dB"
-msgstr "Gain dB"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_LIMITED"
-msgid "Limited blocks"
-msgstr "Blocs limités"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_DECODED"
-msgid "Decoded dBFS"
-msgstr "Décodé dBFS"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_TITLE"
-msgid "Mic check"
-msgstr "Test micro"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_HINT"
-msgid "OK: up  Hold: down"
-msgstr "OK : plus  Appui : moins"
 
 #: core/ui/ui_menus.c
 msgctxt "P25_PARROT_READY"
@@ -3398,9 +3313,19 @@ msgid "Ready: no RF"
 msgstr "Prêt : sans RF"
 
 #: core/ui/ui_menus.c
+msgctxt "P25_PARROT_RECORDING"
+msgid "Recording"
+msgstr "Enregistrement"
+
+#: core/ui/ui_menus.c
 msgctxt "P25_CAL_MEASURING"
 msgid "Measuring"
 msgstr "Mesure en cours"
+
+#: core/ui/ui_menus.c
+msgctxt "P25_PARROT_PLAYING"
+msgid "Playing"
+msgstr "Lecture"
 
 #: core/ui/ui_menus.c
 msgctxt "P25_PARROT_AUDIO_FAILED"
@@ -3448,6 +3373,11 @@ msgid "Mic speech dBFS"
 msgstr "Voix micro dBFS"
 
 #: core/ui/ui_menus.c
+msgctxt "P25_PARROT_RAILS"
+msgid "Mic rail samples"
+msgstr "Échantillons saturés"
+
+#: core/ui/ui_menus.c
 msgctxt "P25_CAL_STARTUP_RAILS"
 msgid "Startup rails"
 msgstr "Satur. au départ"
@@ -3461,6 +3391,11 @@ msgstr "Moyenne CC micro"
 msgctxt "P25_CAL_STOP"
 msgid "Stop recording"
 msgstr "Arrêter la prise"
+
+#: core/ui/ui_menus.c
+msgctxt "P25_CAL_RECORD"
+msgid "Record speech"
+msgstr "Enregistrer la voix"
 
 #: core/ui/ui_menus.c
 msgctxt "P25_CAL_GOAL"
@@ -4326,6 +4261,21 @@ msgstr "AGC RX NXDN"
 msgctxt "SET_LABEL_YSF_RX_AGC"
 msgid "YSF RX AGC"
 msgstr "AGC RX YSF"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_DMR_TX_LEVEL"
+msgid "DMR TX level"
+msgstr "Niveau TX DMR"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_YSF_TX_LEVEL"
+msgid "YSF TX level"
+msgstr "Niveau TX YSF"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_MIC_INPUT"
+msgid "Mic input"
+msgstr "Entrée micro"
 
 #: core/ui/ui_menus.c
 msgctxt "SET_LABEL_P25_CONTACT_LOOKUP"

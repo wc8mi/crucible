@@ -55,7 +55,6 @@ is `tools/bringup.py list --radio <id>`.
 | `caller_details` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `p25_id_lookup` | not recorded | not recorded | not recorded | not recorded | off | not recorded | not recorded | not recorded |
 | `tx_mic_limiter` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
-| `mic_check` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `tx_dc_block` | not recorded | not recorded | not recorded | not recorded | off | not recorded | not recorded | not recorded |
 | `p25_tx_agc` | not recorded | not recorded | not recorded | not recorded | off | not recorded | not recorded | not recorded |
 | `p25_parrot` | off | off | off | off | off | off | off | off |
@@ -320,7 +319,6 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | `CONTACT_EDIT` | ● | ● | ● | ● | ● | ● | ● | ✕ |
 | `VOLUME_BAR` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `TX_MIC_LIMITER` | ● | ● | ● | ● | ● | ● | ● | ● |
-| `MIC_CHECK` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `P25` | ● | ● | ● | ● | … | ● | ● | ● |
 | `P25_ID_LOOKUP` | ● | ● | ● | ● | ○ | ● | ● | ● |
 | `CALLER_DETAILS` | ● | ● | ● | ● | ● | ● | ● | ● |
@@ -354,7 +352,6 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | Receive past the rated bands, Settings > Advanced | `RX_EXT` | 560 | — | Receive only, FM, off by default; ranges from each receiver chip's documents. MD-380: no receiver range in its chip documents |
 | DMR Tier II voice (modem, call stack, AMBE FEC, vocoder) | `DMR` | 377,332 | 275,716 | Includes every DMR feature and everything on IP over DMR |
 | Digital microphone peak limiter and TX levels | `TX_MIC_LIMITER` | — | — | Protects microphone PCM before AMBE encoding, including NXDN, and during manual P25 gain; the DMR and YSF TX level targets. The Mic input setting (`hal_radio_t.mic_input`) is on the DM-1701, MD-UV380 and MD-9600; elsewhere it is dimmed. See [Mic gain](spec/radio-features.md#36-mic-gain). |
-| Mic check, Settings > Advanced | `MIC_CHECK` | — | — | Meters the AMBE mic path without transmitting and plays back 2 s of encoded speech with its decoded level. About 700 bytes of RAM. Needs `TX_MIC_LIMITER`. See [Mic gain](spec/radio-features.md#36-mic-gain). |
 | P25 Phase 1 conventional: the air interface (framer, soft modem, shared FEC), the engine, the P25 channel mode and the full-rate voice decoder on the MBE core | `P25` | 40,588 | 24,640* | Needs a board with an air interface provider (`board.air`); without one nothing runs ([air-interface.md](spec/air-interface.md)). Off on the MD-380 until receive is written ([hardware-md380.md](spec/hardware-md380.md) 4.11). Receive and transmit checked on air against the SDR bench on the DM-32UV and the DM-1701, receive, zone scan and dual watch on the MD-9600; the VFO's mode tile, the debug link or a stored P25 channel sets it ([p25.md](spec/p25.md)). RAM: 6,640 B on the DM-1701, 424 B on the MD-380 |
 | Computed microphone DC removal before P25 gain | `TX_DC_BLOCK` | — | — | Shared streaming blocker, reset per transmission; enabled before the temporary P25 calibration capture. Live AMBE/FM/RX unchanged. See [Microphone input leveling](spec/p25.md#52-microphone-input-leveling). |
 | P25 transmit microphone AGC | `P25_TX_AGC` | — | — | The Mic AGC setting enables automatic PCM gain and peak protection before IMBE encoding. The setting defaults to off. See [Microphone input leveling](spec/p25.md#52-microphone-input-leveling). |

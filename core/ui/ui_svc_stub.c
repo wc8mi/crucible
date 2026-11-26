@@ -297,26 +297,6 @@ WEAK bool ui_svc_setting_set(uint8_t id, int32_t value)
 	return ui_svc_ram_set(id, value);
 }
 
-#if CONFIG_MIC_CHECK
-// The host's stand-in: a check running on a YSF channel, with a playback measured (the gallery's picture)
-__attribute__((weak)) void ui_svc_mic_check(bool on) { (void)on; }
-__attribute__((weak)) void ui_svc_mic_check_record(void) {}
-__attribute__((weak)) void ui_svc_mic_check_play(void) {}
-__attribute__((weak)) void ui_svc_mic_check_view(ambe_mic_check_t *out)
-{
-	memset(out, 0, sizeof *out);
-	out->on = 1;
-	out->windows = 12;
-	out->profile = AMBE_TX_YSF;
-	out->in_rms_db10 = -312; out->in_peak_db10 = -95;
-	out->out_rms_db10 = -201; out->out_peak_db10 = -41;
-	out->gain_db10 = 110;
-	out->clips = 0; out->limited = 1;
-	out->played = 1;
-	out->dec_rms_db10 = -236; out->dec_peak_db10 = -62;
-}
-__attribute__((weak)) bool ui_svc_mic_input_available(void) { return true; }
-#endif
 #if CONFIG_P25_PARROT
 __attribute__((weak)) bool ui_svc_p25_parrot(uint8_t command, bool agc, int8_t target) { return false; }
 __attribute__((weak)) bool ui_svc_codec_diagnostic(uint8_t command, bool agc, int8_t target, uint8_t mode, bool dc) { return false; }

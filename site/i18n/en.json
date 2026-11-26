@@ -397,8 +397,6 @@
  "screen.dual_zones": "Dual watch: B from another zone or the VFO",
  "screen.dual_actions": "Dual watch actions",
  "screen.settings_advanced": "Advanced settings",
- "screen.mic_check": "Mic check in Advanced settings",
- "screen.mic_check_meters": "Mic check meters and TX level",
  "screen.settings_rssi_correction": "RSSI correction in Advanced settings",
  "screen.settings_sound": "Sound settings",
  "screen.settings_sound_tones": "Sound settings: tones",

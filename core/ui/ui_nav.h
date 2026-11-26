@@ -50,9 +50,6 @@ typedef enum {
 #if CONFIG_P25_PARROT
 	SCR_P25_PARROT,
 #endif
-#if CONFIG_MIC_CHECK
-	SCR_MIC_CHECK,			// Settings > Advanced > Mic check
-#endif
 	SCR_ROOMS, SCR_ROOM_LIST,	// Rooms (CONFIG_YSF, ui_rooms.c): the node and room; a page of rooms
 #if CONFIG_BACKLIGHT_TEST
 	SCR_BL_TEST,			// Settings > Advanced > Backlight tests
@@ -131,7 +128,7 @@ typedef struct {
 	bool (*key)(const input_event_t *ev);		// screen keys before the list's own (true: used)
 	void (*draw)(void);				// own drawing instead of the list
 	void (*enter)(void);				// on push
-#if CONFIG_BACKLIGHT_TEST || CONFIG_SATELLITE_TLE || CONFIG_P25_PARROT || CONFIG_MIC_CHECK
+#if CONFIG_BACKLIGHT_TEST || CONFIG_SATELLITE_TLE || CONFIG_P25_PARROT
 	void (*leave)(void);				// on leaving the stack (BACK, Home, replaced)
 #endif
 	const ui_filter_def_t *filter;			// SF_FILTER: the rows before filtering (NULL: not a filtered list)

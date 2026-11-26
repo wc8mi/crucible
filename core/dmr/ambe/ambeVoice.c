@@ -96,25 +96,6 @@ static uint16_t tx_target[AMBE_TX_PROFILES];	// ambeVoiceSetTxTarget: any task
 static uint8_t tx_profile_next;		// ambeVoiceTxProfile: the call task's, taken by source_begin
 static uint8_t tx_profile;		// the running transmission's: source_begin, before tx_seq moves
 #endif
-#if CONFIG_MIC_CHECK
-static uint8_t check_on, check_profile;	// ambeVoiceMicCheck: any task
-static uint8_t check_gen, check_gen_seen;	// bumped each time it turns on: a check the stream stopped under starts over
-static ambe_mic_check_t check_view;	// published by the audio callback, a field at a time
-static tx_level_t check_level;		// the rest: the audio callback's
-static bool check_running;
-static uint8_t check_blocks;
-static uint16_t check_in_peak, check_out_peak, check_clips;
-static uint32_t check_in_power, check_out_power, check_limited0;
-static uint8_t check_rec_req, check_play_req;	// ambeVoiceMicCheckRecord / _Play: bumped by any task
-static uint8_t check_rec_seen, check_play_seen;
-static uint8_t check_phase, check_n, check_i;	// AMBE_CHECK_*, frames recorded, the next to play
-static uint8_t check_frames[AMBE_MIC_CHECK_FRAMES][7];	// 49 bits each, packed MSB first
-static uint32_t check_dec_power;
-static uint16_t check_dec_blocks, check_dec_peak;
-#endif
-// The encoder's input after gain, tones or the gate: the audio callback's (off its stack). The mic check uses it too,
-// only while nothing is transmitted
-static int16_t scaled[AUDIO_BLOCK_SAMPLES];
 static bool test_signal;		// ambeVoiceSetTestSignal
 
 #if CONFIG_SIG_TONES
@@ -586,206 +567,13 @@ static uint16_t tx_target_of(uint8_t profile)
 }
 #endif
 
-#if CONFIG_MIC_CHECK
-// dB in tenths of a gain, Q16
-static int16_t gain_db10(uint32_t gain_q16)
-{
-	uint32_t q8 = gain_q16 >> 8;	// the ratio of two powers that fit: (gain / 256)^2 against 256^2
-	return (int16_t)(tx_level_db10(q8 * q8) - tx_level_db10(256u * 256u));
-}
-
-static void check_set_phase(uint8_t phase)
-{
-	check_phase = phase;
-	STORE(check_view.phase, phase);
-}
-
-// Encode the chain's output into the recording, as tx_block would (same options, the codec's AGC off with a target)
-static void mic_check_record(const int16_t *pcm, uint16_t target)
-{
-	if (!voc_ok()) {
-		check_set_phase(AMBE_CHECK_LIVE);
-		return;
-	}
-	if (check_n == 0) {
-		voc->reset();
-		uint32_t opts = LOAD(enc_opts);
-		if (target != 0) {
-			opts &= ~VOCODER_OPT_AGC;
-		}
-		if (voc->set_options != NULL) {
-			voc->set_options(opts);
-		}
-		cb_enc_opts_set = false;	// the next transmission sets its own again
-	}
-	uint8_t bits[VOCODER_BITS];
-	voc->encode(pcm, bits);
-	uint8_t *f = check_frames[check_n];
-	memset(f, 0, 7);
-	for (unsigned b = 0; b < VOCODER_BITS; b++) {
-		f[b >> 3] |= (uint8_t)((bits[b] & 1u) << (7u - (b & 7u)));
-	}
-	check_n++;
-	STORE(check_view.frames, check_n);
-	if (check_n >= AMBE_MIC_CHECK_FRAMES) {
-		STORE(check_play_req, (uint8_t)(LOAD(check_play_req) + 1u));	// full: play it
-	}
-}
-
-// Record or playback owns the speaker block: true when it did (receive is muted meanwhile)
-static bool mic_check_spk(int16_t *spk)
-{
-	if (!check_running) {
-		return false;
-	}
-	uint8_t play = LOAD(check_play_req);
-	if (play != check_play_seen) {
-		check_play_seen = play;
-		if (check_phase == AMBE_CHECK_RECORD && check_n > 0 && voc_ok()) {
-			check_set_phase(AMBE_CHECK_PLAY);
-			check_i = 0;
-			check_dec_power = 0;
-			check_dec_blocks = check_dec_peak = 0;
-			voc->reset();
-		}
-	}
-	if (check_phase == AMBE_CHECK_LIVE) {
-		return false;
-	}
-	if (check_phase == AMBE_CHECK_RECORD) {
-		memset(spk, 0, AUDIO_BLOCK_SAMPLES * sizeof(int16_t));
-		return true;
-	}
-	uint8_t bits[VOCODER_BITS];
-	const uint8_t *f = check_frames[check_i];
-	for (unsigned b = 0; b < VOCODER_BITS; b++) {
-		bits[b] = (uint8_t)((f[b >> 3] >> (7u - (b & 7u))) & 1u);
-	}
-	voc->decode(bits, spk);
-	speaker(true);
-	tx_level_meter_t m = tx_level_measure(spk, AUDIO_BLOCK_SAMPLES, true);
-	if (m.peak > check_dec_peak) {
-		check_dec_peak = m.peak;
-	}
-	if (tx_level_db10(m.power) > AMBE_MIC_ACTIVE_DB10) {
-		check_dec_power += m.power / AMBE_MIC_CHECK_FRAMES;
-		check_dec_blocks++;
-	}
-	check_i++;
-	STORE(check_view.frames, (uint8_t)(check_n - check_i));
-	if (check_i >= check_n) {
-		uint32_t power = check_dec_blocks != 0 ? check_dec_power / check_dec_blocks * AMBE_MIC_CHECK_FRAMES : 0u;
-		STORE(check_view.dec_rms_db10, tx_level_db10(power));
-		STORE(check_view.dec_peak_db10, tx_level_db10((uint32_t)check_dec_peak * check_dec_peak));
-		STORE(check_view.played, (uint16_t)(check_view.played + 1u));
-		check_set_phase(AMBE_CHECK_LIVE);
-		cb_dec_fresh = true;	// the next call's decoder starts fresh
-		if (!cb_rx_playing && !cb_mixing) {
-			speaker(false);
-		}
-	}
-	return true;
-}
-
-// A block heard while not transmitting: the transmit chain without the encoder (ambeVoice.h, mic check)
-static void mic_check_block(const int16_t *mic)
-{
-	if (!LOAD(check_on)) {
-		if (check_running && check_phase != AMBE_CHECK_LIVE && !cb_rx_playing) {
-			speaker(false);
-		}
-		check_running = false;
-		check_set_phase(AMBE_CHECK_LIVE);
-		return;
-	}
-	uint8_t profile = LOAD(check_profile);
-	uint32_t gain = (uint32_t)LOAD(mic_gain_q8) << 8;
-	uint16_t target = tx_target_of(profile);
-	uint8_t gen = LOAD(check_gen);
-	if (gen != check_gen_seen) {
-		check_gen_seen = gen;
-		check_running = false;
-	}
-	if (!check_running) {
-		check_running = true;
-		tx_level_reset(&check_level, gain);
-		check_blocks = 0;
-		check_in_peak = check_out_peak = check_clips = 0;
-		check_in_power = check_out_power = 0;
-		check_limited0 = 0;
-		STORE(check_view.windows, 0u);
-		STORE(check_view.played, 0u);
-		check_set_phase(AMBE_CHECK_LIVE);
-		check_rec_seen = LOAD(check_rec_req);
-		check_play_seen = LOAD(check_play_req);
-	}
-	uint8_t rec = LOAD(check_rec_req);
-	if (rec != check_rec_seen) {
-		check_rec_seen = rec;
-		if (check_phase == AMBE_CHECK_LIVE) {
-			check_n = 0;
-			STORE(check_view.frames, 0u);
-			check_set_phase(AMBE_CHECK_RECORD);
-		}
-	}
-	tx_level_meter_t in;
-	uint16_t out_peak = tx_level_process(&check_level, mic, scaled, AUDIO_BLOCK_SAMPLES, gain, target, &in);
-	if (target == 0) {
-		in = tx_level_measure(mic, AUDIO_BLOCK_SAMPLES, true);	// the manual path measures only the peak
-	}
-	for (unsigned i = 0; i < AUDIO_BLOCK_SAMPLES; i++) {
-		if (mic[i] >= AMBE_MIC_CLIP || mic[i] <= -AMBE_MIC_CLIP) {
-			check_clips++;
-		}
-	}
-	if (in.peak > check_in_peak) {
-		check_in_peak = in.peak;
-	}
-	if (out_peak > check_out_peak) {
-		check_out_peak = out_peak;
-	}
-	check_in_power += in.power / AMBE_MIC_CHECK_BLOCKS;
-	check_out_power += tx_level_measure(scaled, AUDIO_BLOCK_SAMPLES, true).power / AMBE_MIC_CHECK_BLOCKS;
-	if (check_phase == AMBE_CHECK_RECORD && check_n < AMBE_MIC_CHECK_FRAMES) {
-		mic_check_record(scaled, target);
-	}
-	if (++check_blocks < AMBE_MIC_CHECK_BLOCKS) {
-		return;
-	}
-	STORE(check_view.in_peak_db10, tx_level_db10((uint32_t)check_in_peak * check_in_peak));
-	STORE(check_view.in_rms_db10, tx_level_db10(check_in_power));
-	STORE(check_view.out_peak_db10, tx_level_db10((uint32_t)check_out_peak * check_out_peak));
-	STORE(check_view.out_rms_db10, tx_level_db10(check_out_power));
-	STORE(check_view.gain_db10, gain_db10(check_level.gain_q16));
-	STORE(check_view.clips, check_clips);
-	STORE(check_view.limited, (uint16_t)(check_level.limited_blocks - check_limited0));
-	STORE(check_view.target_rms, target);
-	STORE(check_view.profile, profile);
-	STORE(check_view.windows, check_view.windows + 1u);
-	check_limited0 = check_level.limited_blocks;
-	check_blocks = 0;
-	check_in_peak = check_out_peak = check_clips = 0;
-	check_in_power = check_out_power = 0;
-}
-#endif
-
 static void tx_block(const int16_t *mic)
 {
 	uint8_t seq = LOAD(tx_seq);
 	cb_tx_on = LOAD(tx_end_seq) != seq;
 	if (!cb_tx_on) {
-#if CONFIG_MIC_CHECK
-		mic_check_block(mic);
-#endif
 		return;	// not transmitting
 	}
-#if CONFIG_MIC_CHECK
-	if (check_running && check_phase == AMBE_CHECK_PLAY) {
-		cb_dec_fresh = true;
-	}
-	check_running = false;	// a check after the transmission starts its windows again
-	check_set_phase(AMBE_CHECK_LIVE);
-#endif
 	if (seq != cb_tx_seq) {
 		cb_tx_seq = seq;
 		stats.tx_mic_level_db = stats.tx_mic_spread_db = stats.tx_mic_zc = stats.tx_mic_blocks = 0;
@@ -851,6 +639,7 @@ static void tx_block(const int16_t *mic)
 		stats.tx_mic_peak = mic_peak;
 	}
 	uint8_t bits[VOCODER_BITS];
+	static int16_t scaled[AUDIO_BLOCK_SAMPLES];	// the audio callback only (off its stack)
 	// A beep on the speaker is in the mic's samples too: the block goes out as silence. Not a block the test signal or
 	// a signaling tone replaces (below): that one isn't the mic's, so it isn't counted either
 	bool replaced = LOAD(test_signal);
@@ -958,14 +747,6 @@ void ambeVoiceAudioBlock(const int16_t *mic, int16_t *spk, void *ctx)
 	(void)ctx;
 	// DMR is simplex: TX first (a fresh transmission resets the vocoder), then RX playback (silent while transmitting)
 	tx_block(mic);
-#if CONFIG_MIC_CHECK
-	if (mic_check_spk(spk)) {
-		if (LOAD(cb_speaker_unsent)) {
-			speaker(cb_speaker);
-		}
-		return;	// the check's recording or playback has the speaker
-	}
-#endif
 #if CONFIG_RX_AGC
 	cb_rx_good = false;
 #endif
@@ -1028,62 +809,6 @@ void ambeVoiceTxProfile(ambe_tx_profile_t profile)
 	STORE(tx_profile_next, (uint8_t)(profile < AMBE_TX_PROFILES ? profile : AMBE_TX_DMR));
 #else
 	(void)profile;
-#endif
-}
-
-void ambeVoiceMicCheck(bool on, ambe_tx_profile_t profile)
-{
-#if CONFIG_MIC_CHECK
-	STORE(check_profile, (uint8_t)(profile < AMBE_TX_PROFILES ? profile : AMBE_TX_DMR));
-	if (on && !LOAD(check_on)) {
-		STORE(check_gen, (uint8_t)(LOAD(check_gen) + 1u));
-	}
-	if (!on) {
-		STORE(check_view.phase, (uint8_t)AMBE_CHECK_LIVE);	// the stream may stop before a block sees it off
-	}
-	STORE(check_view.on, (uint8_t)on);
-	STORE(check_on, (uint8_t)on);
-#else
-	(void)on;
-	(void)profile;
-#endif
-}
-
-void ambeVoiceMicCheckView(ambe_mic_check_t *out)
-{
-#if CONFIG_MIC_CHECK
-	out->windows = LOAD(check_view.windows);
-	out->in_peak_db10 = LOAD(check_view.in_peak_db10);
-	out->in_rms_db10 = LOAD(check_view.in_rms_db10);
-	out->out_peak_db10 = LOAD(check_view.out_peak_db10);
-	out->out_rms_db10 = LOAD(check_view.out_rms_db10);
-	out->gain_db10 = LOAD(check_view.gain_db10);
-	out->clips = LOAD(check_view.clips);
-	out->limited = LOAD(check_view.limited);
-	out->target_rms = LOAD(check_view.target_rms);
-	out->profile = LOAD(check_view.profile);
-	out->on = LOAD(check_view.on);
-	out->phase = LOAD(check_view.phase);
-	out->frames = LOAD(check_view.frames);
-	out->played = LOAD(check_view.played);
-	out->dec_rms_db10 = LOAD(check_view.dec_rms_db10);
-	out->dec_peak_db10 = LOAD(check_view.dec_peak_db10);
-#else
-	memset(out, 0, sizeof *out);
-#endif
-}
-
-void ambeVoiceMicCheckRecord(void)
-{
-#if CONFIG_MIC_CHECK
-	STORE(check_rec_req, (uint8_t)(LOAD(check_rec_req) + 1u));
-#endif
-}
-
-void ambeVoiceMicCheckPlay(void)
-{
-#if CONFIG_MIC_CHECK
-	STORE(check_play_req, (uint8_t)(LOAD(check_play_req) + 1u));
 #endif
 }
 

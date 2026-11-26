@@ -5803,165 +5803,6 @@ static const ui_scr_def_t about_screen = {
 	.name = "about", .flags = SF_FIELD | SF_NO_STRIP, .key = about_key, .draw = about_draw, .enter = about_enter,
 };
 
-#if CONFIG_MIC_CHECK
-// Settings > Advanced > Mic check (docs/spec/radio-features.md 3.6): the DMR or YSF transmit chain metered live
-// without RF, the level knobs at hand, and a record-and-play parrot that meters what the decoder gives back
-enum { MC_ROW_RECORD, MC_ROW_STATUS, MC_ROW_LEVEL, MC_ROW_INPUT, MC_ROW_MIC, MC_ROW_CLIPS, MC_ROW_ENC, MC_ROW_GAIN,
-       MC_ROW_LIMITED, MC_ROW_DECODED, MC_ROW_COUNT };
-
-// dBFS in tenths, one decimal ("--": silent)
-static void mc_db(sbuf_t *b, int16_t db)
-{
-	if (db <= -960) { sb_str(b, "--"); return; }
-	if (db < 0) sb_chr(b, '-');
-	unsigned a = (unsigned)(db < 0 ? -db : db);
-	sb_u32(b, a / 10, 1); sb_chr(b, '.'); sb_u32(b, a % 10, 1);
-}
-
-static uint16_t mic_check_count(void) { return MC_ROW_COUNT; }
-static void mic_check_leave(void) { ui_svc_mic_check(false); }
-
-static uint8_t mic_check_level_id(const ambe_mic_check_t *v)
-{
-	return v->profile == AMBE_TX_YSF ? UI_SET_TX_LEVEL_YSF : UI_SET_TX_LEVEL_DMR;
-}
-
-// rms/peak in dBFS, one decimal each
-static void mic_check_pair(sbuf_t *b, int16_t rms, int16_t peak)
-{
-	mc_db(b, rms);
-	sb_chr(b, '/');
-	mc_db(b, peak);
-}
-
-static void mic_check_item(uint16_t i, ui_item_t *it)
-{
-	ambe_mic_check_t v;
-	ui_svc_mic_check_view(&v);
-	bool live = v.on && v.windows != 0;
-	sbuf_t value;
-	sb_init(&value, it->value, sizeof it->value);
-	switch (i) {
-	case MC_ROW_RECORD:
-		str_copy(it->label, sizeof it->label, v.phase == AMBE_CHECK_RECORD ? TR(MIC_CHECK_STOP_PLAY, "Stop and play") :
-			TR(P25_CAL_RECORD, "Record speech"));
-		if (!live || v.phase == AMBE_CHECK_PLAY)
-			it->flags |= UI_ITEM_DIM;
-		break;
-	case MC_ROW_STATUS:
-		str_copy(it->label, sizeof it->label, !v.on ? TR(MIC_CHECK_NEEDS_CHANNEL, "Needs a DMR or YSF channel") :
-			v.phase == AMBE_CHECK_RECORD ? TR(P25_PARROT_RECORDING, "Recording") :
-			v.phase == AMBE_CHECK_PLAY ? TR(P25_PARROT_PLAYING, "Playing") :
-			live ? TR(MIC_CHECK_LIVE, "Live: no RF") : TR(P25_PARROT_OPENING, "Opening"));
-		it->flags |= UI_ITEM_INFO;
-		if (!v.on)
-			it->flags |= UI_ITEM_WARN;
-		else if (v.phase != AMBE_CHECK_LIVE)
-			sb_u32(&value, v.frames / 50u, 1), sb_chr(&value, '.'), sb_u32(&value, (v.frames % 50u) * 2u, 2),
-				sb_str(&value, " s");
-		else
-			sb_str(&value, v.profile == AMBE_TX_YSF ? "YSF" : "DMR");
-		break;
-	case MC_ROW_LEVEL: {
-		str_copy(it->label, sizeof it->label, v.profile == AMBE_TX_YSF ? TR(SET_LABEL_YSF_TX_LEVEL, "YSF TX level") :
-			TR(SET_LABEL_DMR_TX_LEVEL, "DMR TX level"));
-		int32_t c = ui_svc_setting_get(mic_check_level_id(&v));
-		if (c > 0 && c < (int32_t)TX_LEVEL_CHOICES)
-			sb_i32(&value, TX_LEVEL_CHOICE_DBFS(c)), sb_str(&value, " dBFS");
-		else
-			sb_str(&value, tr(TRN(VALUE_OFF, "Off")));
-		break;
-	}
-	case MC_ROW_INPUT: {
-		str_copy(it->label, sizeof it->label, TR(SET_LABEL_MIC_INPUT, "Mic input"));
-		int32_t s = ui_svc_setting_get(UI_SET_MIC_INPUT);
-		if (s > 0)
-			sb_chr(&value, '+');
-		sb_i32(&value, s);
-		if (!ui_svc_mic_input_available())
-			it->flags |= UI_ITEM_DIM;
-		break;
-	}
-	case MC_ROW_MIC:
-		str_copy(it->label, sizeof it->label, TR(MIC_CHECK_MIC_LEVEL, "Mic dBFS"));
-		if (live) mic_check_pair(&value, v.in_rms_db10, v.in_peak_db10); else sb_str(&value, "--");
-		break;
-	case MC_ROW_CLIPS:
-		str_copy(it->label, sizeof it->label, TR(P25_PARROT_RAILS, "Mic rail samples"));
-		sb_u32(&value, live ? v.clips : 0u, 1);
-		if (live && v.clips != 0)
-			it->flags |= UI_ITEM_WARN;
-		break;
-	case MC_ROW_ENC:
-		str_copy(it->label, sizeof it->label, TR(MIC_CHECK_ENC_LEVEL, "Encoder dBFS"));
-		if (live) mic_check_pair(&value, v.out_rms_db10, v.out_peak_db10); else sb_str(&value, "--");
-		break;
-	case MC_ROW_GAIN:
-		str_copy(it->label, sizeof it->label, TR(MIC_CHECK_GAIN, "Gain dB"));
-		if (live) {
-			if (v.gain_db10 > 0) sb_chr(&value, '+');
-			mc_db(&value, v.gain_db10);
-		} else {
-			sb_str(&value, "--");
-		}
-		break;
-	case MC_ROW_LIMITED:
-		str_copy(it->label, sizeof it->label, TR(MIC_CHECK_LIMITED, "Limited blocks"));
-		sb_u32(&value, live ? v.limited : 0u, 1);
-		break;
-	case MC_ROW_DECODED:
-		str_copy(it->label, sizeof it->label, TR(MIC_CHECK_DECODED, "Decoded dBFS"));
-		if (v.played != 0) mic_check_pair(&value, v.dec_rms_db10, v.dec_peak_db10); else sb_str(&value, "--");
-		break;
-	}
-}
-
-// OK on a knob steps it up, a long press down (wrapping): the change is saved and in force at once
-static void mic_check_step(uint8_t id, int32_t lo, int32_t hi, bool down)
-{
-	int32_t v = ui_svc_setting_get(id) + (down ? -1 : 1);
-	if (v > hi) v = lo;
-	if (v < lo) v = hi;
-	if (ui_svc_setting_set(id, v))
-		ui_svc_apply(id, v);
-	else
-		ui_toast(TR(TOAST_SAVE_FAILED, "Couldn't save: try again"));
-}
-
-static void mic_check_select(uint16_t i, bool hold)
-{
-	ambe_mic_check_t v;
-	ui_svc_mic_check_view(&v);
-	switch (i) {
-	case MC_ROW_RECORD:
-		if (hold || !v.on || v.windows == 0)
-			return;
-		if (v.phase == AMBE_CHECK_LIVE)
-			ui_svc_mic_check_record();
-		else if (v.phase == AMBE_CHECK_RECORD)
-			ui_svc_mic_check_play();
-		break;
-	case MC_ROW_LEVEL:
-		mic_check_step(mic_check_level_id(&v), 0, (int32_t)TX_LEVEL_CHOICES - 1, hold);
-		break;
-	case MC_ROW_INPUT:
-		if (ui_svc_mic_input_available())
-			mic_check_step(UI_SET_MIC_INPUT, HAL_MIC_INPUT_MIN, HAL_MIC_INPUT_MAX, hold);
-		break;
-	default:
-		return;
-	}
-	ui_dirty();
-}
-
-static const ui_scr_def_t mic_check_screen = {
-	.name = "miccheck", .flags = SF_LIST,
-	.prefix = TRN(MIC_CHECK_TITLE, "Mic check"), .hint = TRN(MIC_CHECK_HINT, "OK: up  Hold: down"),
-	.count = mic_check_count, .item = mic_check_item, .select = mic_check_select,
-	.leave = mic_check_leave,
-};
-#endif
-
 #if CONFIG_P25_PARROT
 enum { PARROT_ROW_RECORD, PARROT_ROW_STATUS, PARROT_ROW_GOAL, PARROT_ROW_RESULT, PARROT_ROW_TIME, PARROT_ROW_REPORT };
 enum { PARROT_MIC_SPEECH, PARROT_MIC_RAILS, PARROT_MIC_STARTUP_RAILS, PARROT_MIC_DC, PARROT_MIC_COUNT };
@@ -7166,7 +7007,7 @@ bool ui_menus_home_leave(ui_scr_t scr, bool text_open)
 typedef enum { ST_TOGGLE, ST_LIST, ST_NUMBER, ST_ACTION } set_type_t;
 enum { SA_DIAG, SA_FIRMWARE, SA_CODEPLUG, SA_RESET, SA_MY_RADIO, SA_CRASH, SA_LANGUAGE, SA_HARDWARE, SA_FIXED_POS,
 	SA_SAVE_GPS_POS, SA_DATA_SERVICES, SA_BL_TEST, SA_P25_PARROT, SA_AES_RECOVERY, SA_SIG_BEGIN, SA_SIG_END,
-	SA_SIG_IDLE, SA_RSSI, SA_RSSI_RESET, SA_MIC_CHECK };	// signaling tone steps, by sig_event_t
+	SA_SIG_IDLE, SA_RSSI, SA_RSSI_RESET };	// signaling tone steps, by sig_event_t
 
 typedef struct {
 	tr_id_t name;			// TRN; TR_NONE for a key's row (set_name)
@@ -7700,9 +7541,6 @@ static const set_item_t s_advanced[] = {
 #endif
 #if CONFIG_RX_EXT
 	TOGGLE(TRN(SET_LABEL_RX_PAST_BANDS, "RX past bands"), "extended out of band receive range", UI_SET_RX_EXT),
-#endif
-#if CONFIG_MIC_CHECK
-	ACTION(TRN(MIC_CHECK_TITLE, "Mic check"), "audio microphone levels DMR YSF parrot TX level", SA_MIC_CHECK),
 #endif
 #if CONFIG_P25_PARROT
 	ACTION(TRN(P25_PARROT_TITLE, "P25 calibration"), "audio microphone codec levels", SA_P25_PARROT),
@@ -8401,12 +8239,6 @@ static void group_select(uint16_t i, bool hold)
 		case SA_BL_TEST: ui_push(SCR_BL_TEST, 0); break;
 #endif
 #endif
-#if CONFIG_MIC_CHECK
-		case SA_MIC_CHECK:
-			ui_svc_mic_check(true);
-			ui_push(SCR_MIC_CHECK, 0);
-			break;
-#endif
 #if CONFIG_P25_PARROT
 		case SA_P25_PARROT:
 			if (ui_svc_p25_parrot(P25_PARROT_OPEN, false, -25))
@@ -9036,9 +8868,6 @@ const ui_scr_def_t *const ui_scr[SCR_COUNT] = {
 #endif
 #if CONFIG_P25_PARROT
 	[SCR_P25_PARROT] = &parrot_screen,
-#endif
-#if CONFIG_MIC_CHECK
-	[SCR_MIC_CHECK] = &mic_check_screen,
 #endif
 	[SCR_DIAG] = &diag_screen, [SCR_EMERGENCY] = &emergency_screen, [SCR_SCAN] = &scan_screen,
 	[SCR_ROAM] = &roam_screen, [SCR_APRS] = &ui_aprs_screen, [SCR_APRS_HEARD] = &ui_aprs_heard_screen,

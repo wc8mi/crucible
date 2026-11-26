@@ -640,11 +640,9 @@ void radio_req_zone_pos(uint16_t pos);		// jump to a position in the zone
 void radio_req_zone(uint16_t index);
 void radio_req_vfo(bool on);
 void radio_req_vfo_swap(void);
-// The microphone: the board's analog input gain for digital voice (hal_radio_t.mic_input, the Mic input setting),
-// and the Mic check (ambeVoice.h): the transmit chain metered while on a DMR, NXDN or YSF channel, never keyed
-enum { RADIO_MIC_INPUT, RADIO_MIC_CHECK };
+// The microphone: the board's analog input gain for digital voice (hal_radio_t.mic_input, the Mic input setting)
+enum { RADIO_MIC_INPUT };
 void radio_req_mic_input(int8_t steps);
-void radio_req_mic_check(bool on);
 void radio_req_vfo_step(int8_t dir);
 void radio_req_vfo_set(uint32_t hz);		// RX frequency; TX keeps a split's offset where it can transmit, else = RX
 void radio_req_vfo_tx(uint32_t hz);		// the VFO's TX frequency (split), 0 = simplex; in the VFO only

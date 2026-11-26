@@ -397,8 +397,6 @@
  "screen.dual_zones": "Doppio ascolto: B da un'altra zona o dal VFO",
  "screen.dual_actions": "Azioni del doppio ascolto",
  "screen.settings_advanced": "Impostazioni avanzate",
- "screen.mic_check": "Test microfono nelle impostazioni Avanzate",
- "screen.mic_check_meters": "Indicatori del test microfono e livello TX",
  "screen.settings_rssi_correction": "Correzione RSSI nelle impostazioni Avanzate",
  "screen.settings_sound": "Impostazioni audio",
  "screen.settings_sound_tones": "Impostazioni audio: toni",

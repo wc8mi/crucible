@@ -358,9 +358,6 @@
 #ifndef CONFIG_TX_MIC_LIMITER
 #define CONFIG_TX_MIC_LIMITER 0
 #endif
-#ifndef CONFIG_MIC_CHECK
-#define CONFIG_MIC_CHECK 0
-#endif
 #ifndef CONFIG_TX_DC_BLOCK
 #define CONFIG_TX_DC_BLOCK 0
 #endif
@@ -636,9 +633,6 @@
 #endif
 #if CONFIG_TX_MIC_LIMITER && !CONFIG_DMR
 #error "CONFIG_TX_MIC_LIMITER needs CONFIG_DMR"
-#endif
-#if CONFIG_MIC_CHECK && !CONFIG_TX_MIC_LIMITER
-#error "CONFIG_MIC_CHECK needs CONFIG_TX_MIC_LIMITER"
 #endif
 #if (CONFIG_TX_DC_BLOCK || CONFIG_P25_TX_AGC || CONFIG_P25_PARROT) && !CONFIG_P25
 #error "P25 input leveling and parrot need CONFIG_P25"

@@ -381,32 +381,11 @@ before any software gain, so it is the control for clipping at the ADC: a target
 board applies it through `hal_radio_t.mic_input` in the radio task, at once when in digital mode and again on each
 digital mode entry. Boards without the hook dim the row; [feature-matrix.md](../feature-matrix.md) lists them.
 
-**Mic check (`CONFIG_MIC_CHECK`, needs `CONFIG_TX_MIC_LIMITER`).** Settings > Advanced > Mic check meters the AMBE
-microphone path without transmitting, on a DMR, NXDN or YSF channel (`RREQ_MIC`, `radio_req_mic_check`; NXDN
-uses the DMR profile). The radio
-core keeps the AMBE stream running while the screen is open and selects the channel's profile. Each 200 ms window
-(`AMBE_MIC_CHECK_BLOCKS`) shows:
-
-| Row | Meaning |
-|---|---|
-| TX level | the profile's target. OK steps it up, a long press down; saved and in force at once |
-| Mic input | the board's analog step, as the setting |
-| Mic dBFS | the board's samples: RMS / peak |
-| Mic rail samples | samples at or past 32000 (`AMBE_MIC_CLIP`): the ADC is clipping; lower Mic input |
-| Encoder dBFS | what the encoder would get after the gain and limiter: RMS / peak |
-| Gain dB | the gain in force at the window's end |
-| Limited blocks | blocks the peak ceiling cut |
-| Decoded dBFS | the last playback: RMS over blocks louder than -50 dBFS, and peak |
-
-Record speech keeps up to 2 s of encoded frames (`AMBE_MIC_CHECK_FRAMES`, 7 bytes each). Stop and play, or the 2 s
-limit, decodes them to the speaker and meters the decoded audio: the level the far end hears, to set the target
-by. Receive audio is muted while recording or playing. The vocoder keeps one state for encode and decode, so the
-check records first and decodes after, never both at once. A transmission, a channel change away from DMR or YSF,
-or leaving the screen ends it. The debug link's `dmr_tx_audio` view shows `voice.tx_profile`,
-`voice.tx_target_rms`, `voice.tx_target_dmr`, `voice.tx_target_ysf` and the `mic_check.*` meters (dBFS x 10).
-
-Without a mic check, a second radio's receive audio levels row ([rx-agc.md](rx-agc.md)) gives the decoded level
-of a real transmission.
+**Setting a target.** Two radios: one transmits, the other's receive audio levels row
+([rx-agc.md](rx-agc.md)) shows the decoded level of each call before its receive AGC (the `in` figure). Step the
+transmitting radio's TX level until the receiver reads the level wanted, then swap. The debug link's
+`dmr_tx_audio` view shows `voice.tx_profile`, `voice.tx_target_rms`, `voice.tx_target_dmr` and
+`voice.tx_target_ysf`.
 
 ### 3.7 DTMF transmit (CONFIG_DTMF)
 

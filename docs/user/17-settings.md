@@ -75,9 +75,9 @@ Some settings are on the menu before the feature behind them exists, or don't ap
 | FM broadcast step | 200 kHz, 100 kHz | 200 kHz | The VFO step in the broadcast band. 200 kHz lands on the odd tenths (88.1, 88.3), the stations in the Americas. You can still type any frequency. Only on radios with a broadcast receiver ([Air band and FM broadcast](07-channels-zones-vfo.md#air-band-and-fm-broadcast)) | Works |
 | Mic gain | 0 to 10 | 5 | Microphone level, 2 dB a step. 5 is the radio's normal level. Sets DMR and P25, and FM on the radios that set the level in their microphone path ([Radio reference](23-radios.md)). Digital peak protection holds back loud peaks before encoding when built in. A change counts from the next transmission. The row shows "AGC" and is dimmed when AGC applies to the selected mode. P25 uses the saved step when its AGC is off or compiled out | Works (DMR); FM not checked on air |
 | Mic AGC | On, Off | Off | Automatically adjusts microphone level for digital voice. P25 builds with `CONFIG_P25_TX_AGC` target -20 dBFS RMS before encoding. DMR uses the codec's own AGC and retains the board's fixed AMBE calibration, unless a DMR or YSF TX level is set: then the TX level levels instead. When AGC applies, it takes over from the manual step. Software cannot repair audio already clipped by the microphone input | P25 host tested; on-device checks pending |
-| DMR TX level | Off, -30 to -12 dBFS | Off | The level the radio holds your voice at before the DMR (and NXDN) encoder, 2 dB a step. Off uses Mic gain and Mic AGC as above. A level replaces the codec's AGC. Use [Mic check](#mic-check) to choose one. Requires `CONFIG_TX_MIC_LIMITER` | Host tested; on-air checks pending |
+| DMR TX level | Off, -30 to -12 dBFS | Off | The level the radio holds your voice at before the DMR (and NXDN) encoder, 2 dB a step. Off uses Mic gain and Mic AGC as above. A level replaces the codec's AGC. To choose one, see [Setting a TX level](#setting-a-tx-level). Requires `CONFIG_TX_MIC_LIMITER` | Host tested; on-air checks pending |
 | YSF TX level | Off, -30 to -12 dBFS | Off | The same for YSF transmissions. Only in builds with YSF | Host tested; on-air checks pending |
-| Mic input | -7 to +8 | 0 | The microphone's analog level into the radio's digital audio, before any of the above. Lower it if [Mic check](#mic-check) counts rail samples: a TX level can't repair a clipped input. Applies at once. Dimmed on radios without it ([which radios](../feature-matrix.md)) | Host tested; on-air checks pending |
+| Mic input | -7 to +8 | 0 | The microphone's analog level into the radio's digital audio, before any of the above. Lower it if your voice sounds harsh or distorted at every TX level: a TX level can't repair a clipped input. Applies at once. Dimmed on radios without it ([which radios](../feature-matrix.md)) | Host tested; on-air checks pending |
 | Mic noise reduction | On, Off | On | Reduces steady background noise (fans, engines, wind) in what you send on DMR, also between words. Turn it off if a steady sound you want heard is cut. Dimmed on radios whose voice codec can't do it | Needs an on-air check (DMR) |
 | Monitor by default | On, Off | Off | Digital monitor (DMR: every talkgroup, promiscuous; Tier III: every talkgroup's call on the system) goes on each time you select a DMR channel, and a scan started from it keeps it on at every channel. **Back** on Home turns it off until the next channel | Works |
 | Show talker alias | On, Off | On | Show received talker aliases (names) under the caller's ID | Works |
@@ -199,7 +199,6 @@ When the keys lock by themselves and what still works while they are locked ([Ke
 | Factory reset | Restores the default preferences and keeps the AES counter and recovery state ([below](#factory-reset)) |
 | Crash log | What the last crash left, and sending it to the developers ([below](#crash-log)) |
 | RX past bands | Only on radios with a range for it: receive above the radio's rated bands, FM only. Off by default. Sensitivity isn't rated there, and the radio never transmits there |
-| Mic check | Meters your DMR or YSF transmit audio without transmitting, records two seconds and plays it back with its decoded level ([below](#mic-check)). Needs a DMR or YSF channel. Builds with `CONFIG_MIC_CHECK` |
 | P25 calibration | A local microphone and IMBE test in builds with `CONFIG_P25_PARROT`. It recommends a P25 input AGC target for -25 dBFS decoded speech. Press **OK** on **Record speech** and speak normally. The radio compares input targets using the same recording. **Back** exits and restores the channel. Transmission, including Emergency, is suspended while this screen is open |
 | Freq trim | Moves the radio's receive and transmit frequency together, for a radio that is off frequency. Measure the error (a frequency counter, a service monitor, or a hotspot's BER test) and enter it with the sign reversed. The page shows what the trim comes to in Hz at 440 MHz and 144 MHz: a radio 2 kHz high at 440 MHz takes about -4.5 ppm (-1980 Hz). The page shows the trim in large type over a slider from -10 to +10, with "+ to increase frequency" under it where the display has room. Up and Down (or the knob) step 0.1 ppm, # flips the sign, digits type it (# 4 5 OK is -4.5 ppm). Takes effect once you stop changing it. Only on radios that have it ([which radios](../feature-matrix.md)). Range -10.0 to +10.0 ppm in 0.1 ppm steps, default 0 |
 | Hardware | Only on radios that need it: facts about the radio the firmware can't detect, such as a board revision (one the radio detects isn't listed). **OK** steps through the choices, holding **OK** stores the one shown. "Not set" shows in the warning color until one is stored, and the radio won't transmit until then. A choice other than the one the radio runs applies from the next start-up |
@@ -209,24 +208,17 @@ When the keys lock by themselves and what still works while they are locked ([Ke
 
 <img src="../ux/screens/160x120i5/settings_advanced.png" width="200" alt="Settings, Advanced">
 
-#### Mic check
+#### Setting a TX level
 
-<img src="../ux/screens/160x120i5/mic_check_meters.png" width="320" alt="Mic check showing the mic and encoder levels">
+You need two radios. Do this once on a DMR channel and once on a YSF channel.
 
-Select a DMR or YSF channel first: the check uses that mode's TX level. Nothing is transmitted.
-
-1. Speak normally at your usual distance and watch **Mic dBFS** (RMS / peak) and **Mic rail samples**. If rail
-   samples count up, the input is clipping: lower **Mic input** (**OK** up, hold **OK** down) until they stay at 0.
-2. Press **OK** on **Record speech**, say a phrase, then **OK** on **Stop and play** (or wait two seconds). The
-   radio plays the recording through its speaker and shows **Decoded dBFS**: the level the other station hears.
-3. Step **DMR TX level** or **YSF TX level** with **OK** (up) or a long **OK** (down) and repeat step 2 until
-   **Decoded dBFS** reads the level you want. The change is saved and used from the next transmission.
-
-**Encoder dBFS** is what goes into the encoder, **Gain dB** the gain the level applied and **Limited blocks** how
-often the peak limiter cut in. Receive audio is muted while recording or playing. Leaving the screen, a
-transmission or a change to a non-DMR/YSF channel ends the check.
-
-Without Mic check, transmit to a second radio and read its [digital receive audio levels](#digital-receive-audio-levels).
+1. On the receiving radio, turn on **Settings > Display > RX audio levels** and that mode's **RX AGC**
+   ([Digital receive audio levels](#digital-receive-audio-levels)). The row reads `AGC in > out dBFS`.
+2. Transmit from the other radio, speaking normally at your usual distance, for a few seconds.
+3. Read **in** on the receiving radio: the level it decoded. **out** is after its own AGC, so ignore it.
+4. Step the transmitting radio's **DMR TX level** or **YSF TX level** and repeat until **in** reads the level you
+   want.
+5. Swap the radios and set the other one the same way.
 
 #### P25 calibration
 

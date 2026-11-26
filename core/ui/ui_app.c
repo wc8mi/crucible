@@ -149,7 +149,7 @@ static void update_focus_target(void)
 		ui_svc_focus_target(0, false);
 }
 
-#if CONFIG_BACKLIGHT_TEST || CONFIG_SATELLITE_TLE || CONFIG_P25_PARROT || CONFIG_MIC_CHECK
+#if CONFIG_BACKLIGHT_TEST || CONFIG_SATELLITE_TLE || CONFIG_P25_PARROT
 // Screens from the top down to stack level `from` leave the stack: each runs its leave hook (the backlight tests give
 // the light back)
 static void left(uint8_t from)
@@ -2637,13 +2637,6 @@ __attribute__((noinline)) bool ui_app_tick(const radio_view_t *v, uint32_t now_m
 	if (signal_valid != signal_valid_seen) {
 		signal_valid_seen = signal_valid;
 		dirty = true;
-	}
-#endif
-#if CONFIG_MIC_CHECK
-	static uint32_t mic_check_draw_ms;
-	if (stack[sp].scr == SCR_MIC_CHECK && now_ms - mic_check_draw_ms >= 200u) {
-		mic_check_draw_ms = now_ms;	// its meters publish every 200 ms
-		ui_dirty();
 	}
 #endif
 #if CONFIG_P25_PARROT

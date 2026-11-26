@@ -3305,94 +3305,9 @@ msgid "AMBE+2 codec: DVSI (stock)"
 msgstr "AMBE+2 编解码器：DVSI（原厂）"
 
 #: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_STOP_PLAY"
-msgid "Stop and play"
-msgstr "停止录音，播放"
-
-#: core/ui/ui_menus.c
-msgctxt "P25_CAL_RECORD"
-msgid "Record speech"
-msgstr "录制语音"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_NEEDS_CHANNEL"
-msgid "Needs a DMR or YSF channel"
-msgstr "仅 DMR 或 YSF 信道"
-
-#: core/ui/ui_menus.c
-msgctxt "P25_PARROT_RECORDING"
-msgid "Recording"
-msgstr "正在录音"
-
-#: core/ui/ui_menus.c
-msgctxt "P25_PARROT_PLAYING"
-msgid "Playing"
-msgstr "正在播放"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_LIVE"
-msgid "Live: no RF"
-msgstr "测量中：无射频"
-
-#: core/ui/ui_menus.c
 msgctxt "P25_PARROT_OPENING"
 msgid "Opening"
 msgstr "正在打开"
-
-#: core/ui/ui_menus.c
-msgctxt "SET_LABEL_YSF_TX_LEVEL"
-msgid "YSF TX level"
-msgstr "YSF 发射电平"
-
-#: core/ui/ui_menus.c
-msgctxt "SET_LABEL_DMR_TX_LEVEL"
-msgid "DMR TX level"
-msgstr "DMR 发射电平"
-
-#: core/ui/ui_menus.c
-msgctxt "SET_LABEL_MIC_INPUT"
-msgid "Mic input"
-msgstr "麦克风输入"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_MIC_LEVEL"
-msgid "Mic dBFS"
-msgstr "麦克风 dBFS"
-
-#: core/ui/ui_menus.c
-msgctxt "P25_PARROT_RAILS"
-msgid "Mic rail samples"
-msgstr "麦克风上下限计数"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_ENC_LEVEL"
-msgid "Encoder dBFS"
-msgstr "编码器 dBFS"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_GAIN"
-msgid "Gain dB"
-msgstr "增益 dB"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_LIMITED"
-msgid "Limited blocks"
-msgstr "限制次数"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_DECODED"
-msgid "Decoded dBFS"
-msgstr "解码 dBFS"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_TITLE"
-msgid "Mic check"
-msgstr "麦克风测试"
-
-#: core/ui/ui_menus.c
-msgctxt "MIC_CHECK_HINT"
-msgid "OK: up  Hold: down"
-msgstr "OK：增加  长按：降低"
 
 #: core/ui/ui_menus.c
 msgctxt "P25_PARROT_READY"
@@ -3400,9 +3315,19 @@ msgid "Ready: no RF"
 msgstr "就绪：无射频"
 
 #: core/ui/ui_menus.c
+msgctxt "P25_PARROT_RECORDING"
+msgid "Recording"
+msgstr "正在录音"
+
+#: core/ui/ui_menus.c
 msgctxt "P25_CAL_MEASURING"
 msgid "Measuring"
 msgstr "测量中"
+
+#: core/ui/ui_menus.c
+msgctxt "P25_PARROT_PLAYING"
+msgid "Playing"
+msgstr "正在播放"
 
 #: core/ui/ui_menus.c
 msgctxt "P25_PARROT_AUDIO_FAILED"
@@ -3450,6 +3375,11 @@ msgid "Mic speech dBFS"
 msgstr "麦克风语音 dBFS"
 
 #: core/ui/ui_menus.c
+msgctxt "P25_PARROT_RAILS"
+msgid "Mic rail samples"
+msgstr "麦克风上下限计数"
+
+#: core/ui/ui_menus.c
 msgctxt "P25_CAL_STARTUP_RAILS"
 msgid "Startup rails"
 msgstr "启动过载数"
@@ -3463,6 +3393,11 @@ msgstr "麦克风 DC 均值"
 msgctxt "P25_CAL_STOP"
 msgid "Stop recording"
 msgstr "停止录音"
+
+#: core/ui/ui_menus.c
+msgctxt "P25_CAL_RECORD"
+msgid "Record speech"
+msgstr "录制语音"
 
 #: core/ui/ui_menus.c
 msgctxt "P25_CAL_GOAL"
@@ -4328,6 +4263,21 @@ msgstr "NXDN 接收 AGC"
 msgctxt "SET_LABEL_YSF_RX_AGC"
 msgid "YSF RX AGC"
 msgstr "YSF 接收 AGC"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_DMR_TX_LEVEL"
+msgid "DMR TX level"
+msgstr "DMR 发射电平"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_YSF_TX_LEVEL"
+msgid "YSF TX level"
+msgstr "YSF 发射电平"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_MIC_INPUT"
+msgid "Mic input"
+msgstr "麦克风输入"
 
 #: core/ui/ui_menus.c
 msgctxt "SET_LABEL_P25_CONTACT_LOOKUP"

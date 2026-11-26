@@ -23,9 +23,6 @@
 #include "p25/p25_codeplug.h"
 #include "p25/p25_parrot.h"
 #endif
-#if CONFIG_MIC_CHECK
-#include "dmr/ambe/ambeVoice.h"
-#endif
 #if CONFIG_NXDN
 #include "nxdn/nxdn_codeplug.h"
 #endif
@@ -597,14 +594,6 @@ uint8_t ui_svc_home_key(uint8_t action, uint8_t gesture, bool home);
 // Settings > Keys: value may go in the setting id's slot (a home key's role can't hold Monitor or Tone burst)
 bool ui_svc_key_offered(uint8_t id, int32_t value);
 
-#if CONFIG_MIC_CHECK
-// Settings > Advanced > Mic check (ambeVoice.h): on while the screen is open; record, then play back (the decoded level)
-void ui_svc_mic_check(bool on);
-void ui_svc_mic_check_record(void);
-void ui_svc_mic_check_play(void);
-void ui_svc_mic_check_view(ambe_mic_check_t *out);
-bool ui_svc_mic_input_available(void);	// the board has hal_radio_t.mic_input
-#endif
 #if CONFIG_P25_PARROT
 bool ui_svc_p25_parrot(uint8_t command, bool agc, int8_t target);
 bool ui_svc_codec_diagnostic(uint8_t command, bool agc, int8_t target, uint8_t mode, bool dc);
