@@ -30,9 +30,11 @@ Download the ZIP and checksum from the
 934c2cc8a286f3c8ce38b820963e73c89e4587779c6d3bb8e80ca177c6082c07
 ```
 
-Back up your current settings/codeplug and follow [Installing](../user/02-installing.md). Use the matching image
-and manifest. These images do not embed a stock AMBE codec; the manifests preserve the installed codec regions.
-A radio without a working codec still needs the normal supported codec installation procedure.
+Crucible updates only a radio that already runs RadioFoundry or Crucible. On a radio with the manufacturer's
+firmware, first install RadioFoundry from [radiofoundry.org](https://radiofoundry.org/flash/index.html) and get the
+radio working with it; then update with the [Crucible flasher](https://tinker.wc8mi.net/crucible/). Use Crucible
+only if you accept opinionated features that are sometimes not tested. Back up your current settings/codeplug first.
+These images do not embed a stock AMBE codec; the manifests preserve the installed codec regions.
 
 ## New display features to test
 

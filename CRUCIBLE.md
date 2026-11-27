@@ -134,7 +134,10 @@ pre-releases when a radio has no full release. The
 ## Flasher page
 
 The [Crucible flasher](https://tinker.wc8mi.net/crucible/) is one static folder: RadioFoundry's flasher page with
-Crucible's shell and look, offering only the releases above. Build it after publishing a release:
+Crucible's shell and look, offering only the releases above. It only updates: Crucible supports an upgrade from a
+RadioFoundry base, never a first install on the manufacturer's firmware (KF8S, 2026-11-27; [ADR 001](docs/crucible/adr/001-installer-two-paths.md),
+revision 1). The front page sends a first install to [RadioFoundry's flash page](https://radiofoundry.org/flash/index.html)
+as a plain link; the site never calls a RadioFoundry service. Build it after publishing a release:
 
 ```
 uv run --no-project --with-requirements site/requirements.txt python3 tools/crucible_site.py
