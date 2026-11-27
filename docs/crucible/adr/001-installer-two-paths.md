@@ -154,8 +154,42 @@ KF8S answered the open questions on 2026-11-26.
 |---|---|---|
 | 1 | Gate, terms, home, and the Update path on the shared engine (release mode already updates) | Yes, one update per radio |
 | 2 | Install from release images in the engine; the work card for the DM-1701 first | Yes |
-| 3 | The other three radios' install cards; error screens for each failure the engine reports | Yes |
+| 3 | The other radios' install cards (MD-UV380 family and DB25-D PRO added; DM-32UV and MD-9600 open); error screens for each failure the engine reports | Yes |
 | 4 | Retire the restyled upstream page | No |
+
+## Amendment 1: the card in the engine
+
+| | |
+|---|---|
+| Status | Accepted (KF8S, 2026-11-26) |
+| Changes | Decision 4 and the phase 2 plan. The rest of this record stays. |
+
+Phase 2 built the work card on the shared flasher engine (site/static/js/flasher/app.js), not as its own page. The
+card is a display mode of the engine's install steps. It reads its steps and words from `data/install-card.json`,
+which `tools/crucible_site.py` writes. The engine still does the work: release download, codec, update mode, write,
+check. One code path installs and updates, so a fix in one serves both.
+
+| No. | Change | Why |
+|---|---|---|
+| 1 | The card is a layer on the engine, not its own front end | One install path to test and fix. The engine already handles each radio and each failure. |
+| 2 | A **Version** step after Radio | The engine picks the release and the MD-UV380 power class in one view. The done line shows the release. |
+| 3 | **Update mode** and **Install** are one step, **Install** | The engine connects in update mode and writes in one view. Two steps would split one action. |
+| 4 | A **Check** step at the end | The engine reads the radio back after the write and offers the backup there (decision 5, "after the install"). |
+| 5 | The current firmware is set from the card | A radio on the Install path has the manufacturer's firmware. The user is not asked. |
+| 6 | Only radios with a card can install | A radio without a card would show the engine's old words. Phase 3 adds the others. |
+
+The DM-1701 steps are now: Radio, Version, Things you need, Save your channels, Firmware file, Install, Check.
+
+Phase 3 adds cards on the same engine. A card step can carry its own caution (`notice`), shown above the step. The
+DM-1701, the MD-UV380 family and the DB25-D PRO have cards; the DM-32UV and the MD-9600 do not yet, so they cannot
+install from this page.
+
+| Radio | Card steps | Notes |
+|---|---|---|
+| MD-UV380 family (MD-UV380, MD-UV390, RT3S, MD-UV390 Plus 10 W) | As the DM-1701 | Version shows a caution: choose 10 W by the label; the installer cannot find a wrong choice |
+| DB25-D PRO | Radio, Version, Things you need, Save your channels, Update mode, Backup, Install, Check | The HR_C7000 install steps. Update mode starts through the manufacturer's firmware with no keys; the P1 keys are the way in when that fails. Version shows a caution: tested only on 909E.DBB. Backup closes as "Checked": the update-mode route takes no backup |
+
+Not changed: the gate, the terms, the doors, decision 5's checkbox and no-CPS path, the words, the look.
 
 ## Review log
 
