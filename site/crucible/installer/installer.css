@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 /* Copyright (c) 2026 David Behnke */
 /*
- * Crucible's installer front page (ADR 001, docs/crucible/adr/): the browser gate, the terms and the two doors. The
+ * Crucible's installer front page (ADR 001, docs/crucible/adr/): the browser gate, the terms, the Update door and the
+ * way to a first install (RadioFoundry first). The
  * foundry world of DESIGN.md: hot-core band, iron or greensand ground, Barlow Condensed for h1, h2 and the wordmark
  * only. Dark is the default; light with the system setting unless the visitor picked dark, always with
  * data-theme="light".
@@ -99,7 +100,7 @@ p { margin: .6rem 0 0; text-wrap: pretty; }
 .accept { display: flex; gap: .8rem; align-items: center; margin-top: 1.4rem; font-weight: 600; cursor: pointer; }
 .accept input { flex: none; width: 1.35rem; height: 1.35rem; margin: 0; }
 
-/* Home: two equal doors */
+/* Home: the Update door beside the first-install steps, then the policy */
 .doors { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 2.2rem; }
 .door { display: flex; flex-direction: column; min-height: 17rem; padding: 1.5rem; background: var(--plate);
 	border: 1px solid var(--line); border-radius: 4px; color: var(--text); text-decoration: none; }
@@ -111,6 +112,14 @@ p { margin: .6rem 0 0; text-wrap: pretty; }
 .door h2 { margin-top: auto; padding-top: 1.2rem; font-size: 2rem; line-height: 1.05; }
 .door p { color: var(--muted); }
 .door .btn { align-self: flex-start; margin-top: 1.2rem; }
+.first { padding: 1.5rem; border: 1px solid var(--line); border-radius: 4px; }
+.first h2 { font-size: 1.6rem; line-height: 1.05; }
+.first > p:not(.label) { color: var(--muted); }
+.steps { margin: .9rem 0 0; padding-left: 1.3rem; display: grid; gap: .45rem; }
+.steps li::marker { color: var(--hot); font-weight: 700; }
+.policy { margin-top: 1.6rem; padding: .2rem 0 .2rem 1.1rem; border-left: 3px solid var(--hot); max-width: 40rem; }
+.policy p:first-child { margin-top: 0; }
+.policy p:not(:first-child) { color: var(--muted); }
 .home-links { display: flex; flex-wrap: wrap; gap: .6rem 1.6rem; margin-top: 1.4rem; font-weight: 600; }
 .fits { margin-top: 2.6rem; }
 .fits ul { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }

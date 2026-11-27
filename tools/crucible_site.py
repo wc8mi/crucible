@@ -23,12 +23,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import tomllib
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
-import boards  # noqa: E402
 import crucible  # noqa: E402
 
 FORMAT = 'release-index/1'
@@ -48,7 +46,8 @@ THEME_ICON = ('<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><ci
 WORDS = {
     'flash.release.title': 'Your radio',
     'flash.release.lead': 'The installer reads the radio and finds the correct update.',
-    'flash.release.first_install': 'Use this page for a radio with Crucible or RadioFoundry. For a radio with the manufacturer\'s firmware, use Install.',
+    'flash.release.first_install': "This page cannot install Crucible on a radio with the manufacturer's firmware. "
+                                   'Install RadioFoundry first.',
     'flash.release.running': 'On the radio now',
     'flash.release.choose': 'Select a version',
     'flash.release.installed': 'On your radio',
@@ -70,14 +69,15 @@ WORDS = {
     'flash.update.step_on': 'Set the radio to ON. Do not hold a key.',
     'flash.update.step_cable': 'Connect the programming cable to the radio and to the computer.',
     'flash.update.step_choose': 'Click Connect and select the radio in the list.',
-    'flash.update.first_install': 'Radio with the manufacturer\'s firmware?',
-    'flash.update.to_install': 'Go to Install',
-    'flash.update.not_rfoundry': 'STOP: The radio does not have Crucible or RadioFoundry. You cannot update it. Use Install.',
+    'flash.update.not_rfoundry': 'STOP: The radio does not have RadioFoundry or Crucible. You cannot update it. Install '
+                                 'RadioFoundry first.',
     'flash.update.backup': 'Make a backup first',
     'flash.update.backup_text': 'Optional. An update keeps the channels, settings, calibration and voice codec.',
     'flash.write.bootloader_title': 'Put the radio in update mode',
     'flash.write.then_connect': 'Click Connect.',
     'flash.write.found': 'The radio is in update mode.',
+    'flash.write.title': 'Update',
+    'flash.write.go': 'Update',
     'flash.write.writing': 'Do not disconnect the cable',
     'flash.write.finished': 'The update is complete. The radio starts again.',
     'flash.write.failed': 'STOP: The update stopped ({error}). Put the radio in update mode and do the update again.',
@@ -86,16 +86,13 @@ WORDS = {
     'flash.done.lead': 'When the radio shows its screen again, click Check the radio.',
     'flash.done.lead_noscreen': 'When the radio starts again, click Check the radio.',
     'flash.done.check': 'Check the radio',
-    # The Check step: the check, the backup after the install and the channel transfer. No "codeplug", "stock" or
-    # Codeplug Editor (the Crucible site has no editor)
+    # The Check step and the backup after the update. No "codeplug", "stock" or Codeplug Editor (the Crucible site has
+    # no editor)
     'flash.done.pick_port': 'The radio now has Crucible. The browser shows it as a new device. Click Check the radio '
                             'again and select {radio} in the list. If the list is empty, wait until the radio starts.',
-    'flash.done.no_codec': "STOP: The radio has no voice codec. DMR voice is not available. FM operates. Go back to "
-                           "Firmware file and select the manufacturer's firmware file.",
+    'flash.done.no_codec': 'STOP: The radio has no voice codec. DMR voice is not available. FM operates. Report the '
+                           'problem.',
     'flash.backup.title_after': 'Make a backup of the radio',
-    'flash.backup.after_lead': 'The radio has its original channels and calibration. Make a backup of them now.',
-    'flash.backup.after_channels': 'After the backup, the installer changes your channels, zones and contacts for '
-                                   'Crucible and writes them to the radio. The backup keeps the original channels.',
     'flash.backup.opt.all_text': 'Firmware, voice codec, calibration, channels and all other data in the memory chip.',
     'flash.backup.opt.firmware_text': 'The firmware, the voice codec and the factory calibration.',
     'flash.backup.opt.codeplug': 'Channels and calibration',
@@ -104,42 +101,7 @@ WORDS = {
     'flash.backup.run': 'Make the backup',
     'flash.backup.saved': 'The backup is saved as “{name}” ({size} KB). Keep it in a safe place.',
     'flash.nav.finish_no_backup': 'Finish without a backup',
-    'flash.nav.finish_no_channels': 'Finish without channels',
     'report.something_wrong': 'Is there a problem?',
-    'flash.channels.reading': 'Reading the channels',
-    'flash.channels.writing': 'Writing the channels',
-    'flash.channels.done': 'Your channels are on the radio: {counts}.',
-    'flash.channels.found': 'The radio has your channels from the manufacturer\'s firmware: {counts}. The installer can '
-                            'change them for Crucible and write them to the radio.',
-    'flash.channels.no_backup': 'CAUTION: You do not have a backup of your channels. If the write stops, you cannot '
-                                'restore them.',
-    'flash.channels.go': 'Write the channels',
-    'flash.channels.none': 'The radio has no channels to write.',
-    'flash.channels.no_storage': 'The memory chip of this radio is too small for Crucible channels. The installer did '
-                                 'not write them.',
-    'flash.channels.read_failed': 'The installer cannot read the channels. Crucible operates without them. The backup '
-                                  'has your channels.',
-    'flash.channels.convert_failed': 'The installer cannot change the channels for Crucible. Crucible operates without '
-                                     'them. The backup has your channels.',
-    'flash.channels.write_failed': 'STOP: The channel write stopped. Crucible operates without channels. The backup has '
-                                   'your channels. Report the problem.',
-    'flash.channels.check_failed': 'STOP: The radio did not accept the channels. It expected {want} and has {have}. The '
-                                   'backup has your channels. Report the problem.',
-    'flash.channels.read_failed_no_backup': 'The installer cannot read the channels. Crucible operates without them. '
-                                            'The channels are still in the radio. Make a backup to keep them.',
-    'flash.channels.convert_failed_no_backup': 'The installer cannot change the channels for Crucible. Crucible '
-                                               'operates without them. Make a backup to keep them.',
-    'flash.channels.write_failed_no_backup': 'STOP: The channel write stopped. Part of your channels can be lost. '
-                                             'Report the problem.',
-    'flash.channels.check_failed_no_backup': 'STOP: The radio did not accept the channels. It expected {want} and has '
-                                             '{have}. Report the problem.',
-    'flash.c7.channels.replace': 'The radio has Crucible channels: {have}. The original channels ({want}) replace them.',
-    'flash.c7.channels.keep': 'Keep these channels',
-    'flash.c7.channels.go': 'Write the original channels',
-    'flash.c7.channels.failed': 'STOP: The channel write stopped. The original channels are on the radio. They did not '
-                                'change.',
-    'flash.c7.channels.check_failed': 'STOP: The radio did not accept the channels. It expected {want} and has {have}. '
-                                      'The original channels are on the radio. Report the problem.',
     'flash.c7.check.title': 'Back up and check the radio',
     'flash.c7.check.run': 'Back up and check',
     'flash.done.ready': 'Crucible operates. DMR voice is available.',
@@ -168,116 +130,25 @@ WORDS = {
     'flash.codec.key_saved': 'This browser keeps the update key of the radio.',
     'flash.codec.image': 'Crucible: {what}, {size} bytes.',
     'flash.codec.why_not.unknown': "The installer cannot read the voice codec of a radio with the manufacturer's firmware.",
-    'flash.codec.or_connect': 'If the radio has Crucible or RadioFoundry, use Update.',
 }
 
-# The install card (ADR 001, decision 4 and amendment 1): the install as one numbered list on the shared install steps
-# (data-card). A radio not listed installs only after its card is written (phase 3). "now": the firmware the card
-# expects on the radio, so the shared step that asks is left out. Words as WORDS; the self-test checks the lengths
-SAVE_CPS = {
-    'id': 'save', 'title': 'Save your channels', 'kind': 'checklist', 'result': 'Saved',
-    'lead': 'Save your channels in a file before the install. Crucible changes the channel memory of the radio.',
-    'do': ['Set the radio to ON.', 'Connect the radio to the computer with the programming cable.', 'Open the CPS.',
-           'In the CPS, click Read. The CPS copies the channels from the radio.', 'Save the file on your computer.'],
-    'confirm': 'I saved my channels in a file.',
-    'alt': {'summary': 'I do not have the CPS', 'result': 'Not saved', 'confirm': 'I continue without a channel file.',
-            'caution': 'CAUTION: Without a channel file, you cannot restore your channels. You must enter them again.'},
-}
-CARD = {
-    'page': {'install': {'title': 'Install Crucible', 'lead': "Install Crucible on a radio with the manufacturer's firmware."},
-             'update': {'title': 'Update Crucible', 'lead': 'Your voice codec, channels and settings stay on the radio.'}},
-    'count': 'Step {n} of {total}',
-    'start': {'steps': [{'id': 'radio', 'title': 'Radio'}, {'id': 'build', 'title': 'Version'},
-                        {'id': 'need', 'title': 'Things you need'}, {'id': 'save', 'title': 'Save your channels'},
-                        {'id': 'codec', 'title': 'Firmware file'}, {'id': 'write', 'title': 'Install'},
-                        {'id': 'done', 'title': 'Check', 'result': 'Installed'}]},
-    'radios': {
-        'dm1701': {'now': 'stock',
-                   'mode': ['Turn the volume knob to OFF.', 'Connect the cable to the radio and to the computer.',
-                            'Push and hold PTT and SK1. SK1 is the key above PTT.', 'Turn the volume knob to ON.',
-                            'Release the keys. The screen stays dark. This is correct.'],
-                   'steps': [
-            {'id': 'radio', 'title': 'Radio'},
-            {'id': 'build', 'title': 'Version'},
-            {'id': 'need', 'title': 'Things you need', 'kind': 'checklist', 'result': 'Ready',
-             'lead': 'Get these items before you start.',
-             'items': [{'text': 'The programming cable of the radio', 'note': 'A charging cable cannot send data.'},
-                       {'text': 'A charged battery', 'note': 'Charge the battery to more than half.'},
-                       {'text': 'The Baofeng firmware file', 'note': 'Version V02.06, or Radioddity V02.01 to V02.03.'},
-                       {'text': "The manufacturer's programming software (CPS)",
-                        'note': 'Step 4 uses the CPS to save your channels. Most CPS programs operate only on Windows.'}]},
-            SAVE_CPS,
-            {'id': 'codec', 'title': 'Firmware file'},
-            {'id': 'write', 'title': 'Install', 'result': 'Installed'},
-            {'id': 'done', 'title': 'Check'}]},
-        # The DM-1701's steps on the same engine. Its two images differ by the power class, which the radio cannot
-        # check (board.toml flash.notice): the Version step says so. SK1's place as board.toml words it (issue #203)
-        'mduv380': {'now': 'stock',
-                    'mode': ['Turn the volume knob to OFF.', 'Connect the cable to the radio and to the computer.',
-                             'Push and hold PTT and SK1. SK1 is the side key just above PTT.', 'Turn the volume knob to ON.',
-                             'Release the keys. The screen stays dark. This is correct.'],
-                    'steps': [
-            {'id': 'radio', 'title': 'Radio'},
-            {'id': 'build', 'title': 'Version',
-             'notice': 'CAUTION: Select 10 W only if the label on the radio or its box shows 10 W. '
-                       'The installer cannot find an incorrect selection.'},
-            {'id': 'need', 'title': 'Things you need', 'kind': 'checklist', 'result': 'Ready',
-             'lead': 'Get these items before you start.',
-             'items': [{'text': 'The programming cable of the radio', 'note': 'A charging cable cannot send data.'},
-                       {'text': 'A charged battery', 'note': 'Charge the battery to more than half.'},
-                       {'text': 'The TYT or Retevis firmware file',
-                        'note': 'Version 18.03 to 219.74. A 5 W or a 10 W file gives the voice codec. Step 5 shows each accepted version.'},
-                       {'text': "The manufacturer's programming software (CPS)",
-                        'note': 'Step 4 uses the CPS to save your channels. Most CPS programs operate only on Windows.'}]},
-            SAVE_CPS,
-            {'id': 'codec', 'title': 'Firmware file'},
-            {'id': 'write', 'title': 'Install', 'result': 'Installed'},
-            {'id': 'done', 'title': 'Check'}]},
-        # The HR_C7000 install steps (c7000ui.js INSTALL): connect starts update mode through the manufacturer's
-        # firmware with no keys; the keys ("mode") are the factory update mode, the way in when that fails. The check
-        # step backs up the program memory and reads the voice codec from it. Tested on the DBB batch only
-        'db25d': {'now': 'stock',
-                  'mode': ['Set the radio to OFF.', 'Connect the cable to the radio and to the computer.', 'Push and hold P1.',
-                           'Push the power key.', 'Release P1. The red LED is on and the screen stays blank. This is correct.'],
-                  'steps': [
-            {'id': 'radio', 'title': 'Radio'},
-            {'id': 'build', 'title': 'Version',
-             'notice': "CAUTION: Look at the radio's Version screen. If the code after 909E. is not DBB, "
-                       'Crucible is not tested on your radio. Do not continue.'},
-            {'id': 'need', 'title': 'Things you need', 'kind': 'checklist', 'result': 'Ready',
-             'lead': 'Get these items before you start.',
-             'items': [{'text': 'The programming cable of the radio', 'note': 'The cable connects to the K1 jack of the radio.'},
-                       {'text': 'A 13.8 V power supply', 'note': 'The radio has no battery. The install stops if the supply power stops.'},
-                       {'text': 'The Radioddity firmware file',
-                        'note': 'Version 018, from 2024-05-09 or later. The installer usually reads the voice codec from the radio '
-                                'and asks for this file only if it cannot.'},
-                       {'text': "The manufacturer's programming software (CPS)",
-                        'note': 'Step 4 uses the CPS to save your channels. Most CPS programs operate only on Windows.'}]},
-            SAVE_CPS,
-            {'id': 'connect', 'title': 'Update mode'},
-            {'id': 'check', 'title': 'Backup', 'result': 'Checked'},
-            {'id': 'write', 'title': 'Install', 'result': 'Installed'},
-            {'id': 'done', 'title': 'Check'}]},
-    },
+# The update-mode steps of each radio in the words of ADR 001: they replace the shared ones (radios.json
+# flash.bootloader), shown when an update must go through update mode. The self-test checks the words and lengths
+UPDATE_MODE = {
+    'dm1701': ['Turn the volume knob to OFF.', 'Connect the cable to the radio and to the computer.',
+               'Push and hold PTT and SK1. SK1 is the key above PTT.', 'Turn the volume knob to ON.',
+               'Release the keys. The screen stays dark. This is correct.'],
+    # SK1's place as board.toml words it (issue #203)
+    'mduv380': ['Turn the volume knob to OFF.', 'Connect the cable to the radio and to the computer.',
+                'Push and hold PTT and SK1. SK1 is the side key just above PTT.', 'Turn the volume knob to ON.',
+                'Release the keys. The screen stays dark. This is correct.'],
+    # the factory update mode of the HR_C7000 radios, the way in when the update through the firmware fails
+    'db25d': ['Set the radio to OFF.', 'Connect the cable to the radio and to the computer.', 'Push and hold P1.',
+              'Push the power key.', 'Release P1. The red LED is on and the screen stays blank. This is correct.'],
 }
 
-
-def card_texts(card=CARD):
-    """Every string of the card a user reads, with whether it is an instruction (at most 20 words) or not (25)."""
-    out = []
-    def walk(v, key=''):
-        if isinstance(v, dict):
-            for k, x in v.items():
-                if k not in ('id', 'kind', 'now'):
-                    walk(x, k)
-        elif isinstance(v, list):
-            for x in v:
-                walk(x, key)
-        elif isinstance(v, str):
-            out.append((key, v))
-    walk(card)
-    return out
-
+# A first install is RadioFoundry's (ADR 001, revision 2026-11-27): a plain link to its flasher page, never a request
+RF_FLASH = 'https://radiofoundry.org/flash/index.html'
 
 # Crucible sends nothing to RadioFoundry or any other service: the browser allows requests and scripts from this
 # site only (inline scripts: the theme and terms lines in the head), whatever a shared module tries
@@ -455,7 +326,7 @@ def crucible_page(flash, project, assets, built):
     page = page[:m.start()] + head + page[m.end():]
     m = one(r'<body [^>]*>', page, 'body tag')
     page = page[:m.start()] + ('<body class="page-flash" data-root="" data-home="" data-gl-more="More" '
-                               'data-releases="releases/index.json" data-card="data/install-card.json" data-reporting="off">') + page[m.end():]
+                               'data-releases="releases/index.json" data-reporting="off">') + page[m.end():]
     band = ('<header class="cx-band">\n\t<div class="wrap">\n'
             f'\t\t<a class="cx-brand" href="./">{MARK}<span class="cx-word">{name}</span></a>\n'
             f'\t\t<button class="theme-toggle" type="button" aria-label="Switch light and dark" title="Switch light and dark">{THEME_ICON}</button>\n'
@@ -463,7 +334,9 @@ def crucible_page(flash, project, assets, built):
     m = one(r'<header class="site-header">.*?</header>', page, 'site header')
     page = page[:m.start()] + band + page[m.end():]
     m = one(r'(<section class="wrap section page-head">\s*<h1>)(.*?)(</h1>\s*<p class="lead">)(.*?)(</p>)', page, 'page head')
-    page = page[:m.start()] + m.group(1) + f'Update {name}' + m.group(3) + lead + m.group(5) + page[m.end():]
+    first = (f'\n<p class="cx-first">{name} updates only a radio with RadioFoundry or {name}. For a radio with the '
+             f'manufacturer\'s firmware, <a href="{RF_FLASH}">install RadioFoundry</a> first.</p>')
+    page = page[:m.start()] + m.group(1) + f'Update {name}' + m.group(3) + lead + m.group(5) + first + page[m.end():]
     m = one(r'<dialog id="beta-notice".*?</dialog>\s*', page, 'beta notice')
     page = page[:m.start()] + page[m.end():]
     repo, issues, upstream, community = (html.escape(project[k]) for k in ('repo', 'issues', 'upstream', 'community'))
@@ -507,7 +380,7 @@ def front_page(template, project, radios, assets, built):
         small = html.escape(maker + (f' · also {also}' if also else ''))
         items.append(f'\t\t\t<li>{html.escape(model)} <small>{small}</small></li>')
     fill = {k: html.escape(project[k]) for k in ('name', 'tagline', 'repo', 'issues', 'upstream', 'maintainer', 'community')}
-    fill.update(csp=CSP, assets=html.escape(assets), built=html.escape(built), radios='\n'.join(items),
+    fill.update(csp=CSP, rf_flash=RF_FLASH, assets=html.escape(assets), built=html.escape(built), radios='\n'.join(items),
                 repo_slug=html.escape(project['repo'].removeprefix('https://github.com/')))
     page = re.sub(r'\{\{(\w+)\}\}', lambda m: fill[m.group(1)], template)
     if not items:
@@ -535,8 +408,8 @@ def build(out, packages, github, site_out=None):
         radios = json.loads((site / 'data' / 'radios.json').read_text())
         radios['radios'] = [r for r in radios['radios'] if r.get('id') in boards or r.get('flash', {}).get('board') in boards]
         radios['planned'] = []
-        for r in radios['radios']:		# the card's update-mode steps (its words) replace the shared ones
-            mode = CARD['radios'].get(r.get('id'), {}).get('mode')
+        for r in radios['radios']:		# the update-mode steps in Crucible's words replace the shared ones
+            mode = UPDATE_MODE.get(r.get('id'))
             if mode:
                 r['flash']['bootloader'] = mode
         (out / 'data' / 'radios.json').write_text(json.dumps(radios))
@@ -546,7 +419,6 @@ def build(out, packages, github, site_out=None):
         info.update({'version': f'crucible-{commit}', 'branch': '', 'repo': project['repo'], 'community': '', 'release': '', 'beta': '', 'reports': {'sentry_dsn': ''}})
         info.pop('tool', None)
         (out / 'data' / 'site.json').write_text(json.dumps(info, indent=1))
-        (out / 'data' / 'install-card.json').write_text(json.dumps(CARD, indent=1) + '\n')
         shutil.copytree(ROOT / 'site' / 'crucible', out / 'crucible', ignore=shutil.ignore_patterns('page.html'))
         brand = ROOT / 'docs' / 'crucible' / 'brand'
         for size in (32, 180, 512):
@@ -649,40 +521,30 @@ def self_test():
             pass
         else:
             raise AssertionError('a lost key or placeholder accepted')
-    for key, v in card_texts():
-        assert not re.search(r"\b(flash|bootloader|DFU|stock|codeplug|beta)\b|n't", v, re.I), v
-        assert len(v.split()) <= (20 if key in ('do', 'mode') else 25), f'too long: {v}'
-    # every card radio: offered by crucible.toml, its board, the firmware it expects, its update-mode words, and its
-    # backend's install steps in their order (the card sets "now" itself), ending in the write and the check. The
-    # backends' lists are read from their sources: app.js STEPS.install, c7000ui.js INSTALL
-    js = ROOT / 'site' / 'static' / 'js' / 'flasher'
-    def js_list(path, pattern):
-        return re.findall(r'"([a-z]+)"', re.search(pattern, path.read_text()).group(1))
-    backend_steps = {'anyroad-dfu': js_list(js / 'app.js', r'const STEPS = \{\n\tinstall: \[([^\]]*)\]'),
-                     'c7000-stub': js_list(js / 'c7000ui.js', r'const INSTALL = \[([^\]]*)\]')}
-    assert backend_steps['c7000-stub'][-2:] == ['write', 'done'] and 'codec' in backend_steps['anyroad-dfu'], backend_steps
-    def in_order(need, ids):
-        it = iter(ids)
-        return all(x in it for x in need)
-    assert not in_order(backend_steps['c7000-stub'], ['radio', 'build', 'connect', 'write', 'check', 'done'])
+    # ADR 001's words: no banned term, at most 20 words for a step, 25 for anything else (per sentence)
+    banned = r"\b(flash|bootloader|DFU|stock|codeplug|beta|upgrade|OEM)\b|n't"
+    def sentences(text):
+        return [x for x in re.split(r'(?<=[.?!])\s+', re.sub(r'<[^>]+>|\{\{\w+\}\}', 'X', text)) if x.strip()]
     offered = crucible.board_ids(ROOT)
-    for rid, r in CARD['radios'].items():
-        toml = ROOT / 'boards' / rid / 'board.toml'
-        assert toml.is_file() and rid in offered, f'card radio {rid}: no board, or not in crucible.toml'
-        assert r.get('now') == 'stock' and r.get('mode'), f'card radio {rid}: now and mode'
-        ids = [s['id'] for s in r['steps']]
-        assert 'now' not in ids and ids[0] == 'radio' and ids[-2:] == ['write', 'done'], f'card radio {rid}: {ids}'
-        web = boards.FAMILIES[tomllib.loads(toml.read_text())['flash']['family']]['web']
-        need = [x for x in backend_steps[web] if x != 'now']
-        assert in_order(need, ids), f'card radio {rid}: {web} needs {need} in order, has {ids}'
-        # cardResult shows a shared step's fixed result whatever the step did: no result may claim an outcome the
-        # engine can skip (the HR_C7000 check step takes no backup on the factory update-mode route)
-        for st in r['steps']:
-            if st.get('kind') != 'checklist' and 'result' in st:
-                assert (st['id'], st['result']) in {('write', 'Installed'), ('check', 'Checked')}, f'card radio {rid}: {st}'
+    for rid, steps in UPDATE_MODE.items():
+        assert (ROOT / 'boards' / rid / 'board.toml').is_file() and rid in offered, f'update mode {rid}: not a Crucible board'
+        for v in steps:
+            assert not re.search(banned, v, re.I) and len(v.split()) <= 20, f'update mode {rid}: {v}'
+    # Crucible never installs on a radio with the manufacturer's firmware (ADR 001, revision 2026-11-27): the update
+    # page has no install card and names RadioFoundry's flasher page for a first install, as a plain link
+    assert 'data-card' not in page and 'install-card' not in page, 'no install card on the update page'
+    assert f'<a href="{RF_FLASH}">install RadioFoundry</a> first' in page, 'the update page sends a first install to RadioFoundry'
+    tpl_real = (ROOT / 'site' / 'crucible' / 'installer' / 'page.html').read_text()
+    assert 'update.html#install' not in tpl_real and 'data-screen="install"' not in tpl_real, 'the front page has no Install door'
+    assert '{{rf_flash}}' in tpl_real, 'the front page links RadioFoundry for a first install'
+    home = re.search(r'<section data-screen="home".*?</section>', tpl_real, re.S).group(0)
+    for para in re.findall(r'<(?:p|li|h2)[^>]*>(.*?)</(?:p|li|h2)>', home, re.S):
+        for x in sentences(para):
+            assert not re.search(banned, x, re.I) and len(x.split()) <= 25, f'front page: {x}'
     for v in WORDS.values():
-        assert not re.search(r"\b(flash|bootloader|DFU|stock|codeplug|beta)\b|n't", v, re.I), v
-    tpl = '{{csp}}<h1>{{name}}</h1><ul>\n{{radios}}\n</ul><p>{{built}}</p><a href="{{issues}}">{{repo_slug}}</a><a href="{{community}}">D</a>'
+        assert not re.search(banned, v, re.I), v
+        assert all(len(x.split()) <= 25 for x in sentences(v)), f'too long: {v}'
+    tpl = '{{csp}}<a href="{{rf_flash}}">R</a><h1>{{name}}</h1><ul>\n{{radios}}\n</ul><p>{{built}}</p><a href="{{issues}}">{{repo_slug}}</a><a href="{{community}}">D</a>'
     radios = [{'name': 'TYT X-2', 'maker': 'TYT', 'model': 'X-2', 'also': ['TYT X-3', 'Other Y'], 'order': 2},
               {'name': 'B Z-1', 'maker': 'B', 'model': 'Z-1', 'also': [], 'order': 1}]
     front = front_page(tpl, proj, radios, '1', 'v <b>')
@@ -690,6 +552,7 @@ def self_test():
     assert front.index('Z-1') < front.index('X-2'), 'radios in their order'
     assert '<li>X-2 <small>TYT · also X-3, Other Y</small></li>' in front and '>o/r</a>' in front
     assert '<a href="https://discord.gg/c">D</a>' in front, 'the front page links the Discord community'
+    assert f'<a href="{RF_FLASH}">R</a>' in front and RF_FLASH.startswith('https://radiofoundry.org/'), 'a plain link'
     print('crucible site: package checks, index, page shell, front page checks passed')
 
 

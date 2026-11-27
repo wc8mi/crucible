@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 David Behnke
-// Crucible's installer front page (ADR 001): the browser gate, the terms once per computer, the two doors. The hash
-// names the screen. Update opens the shared flasher page (update.html); Install comes in phase 2.
+// Crucible's installer front page (ADR 001): the browser gate, the terms once per computer, the Update door. The hash
+// names the screen. Update opens the shared flasher page (update.html); a first install is RadioFoundry's (a link).
 
 import { canInstall, route } from "./gate.js";
 
