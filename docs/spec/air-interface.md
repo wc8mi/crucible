@@ -180,7 +180,7 @@ nothing (P25, NXDN) gets the plain receiver, symbol for symbol.
 | | |
 |---|---|
 | Switch | `CONFIG_AIR_RX_ADAPT`, turned on by a mode that asks; needs an air-framed mode and `CONFIG_SUBTONE` (the tone and code lists, `core/radio/tones.h`) |
-| Boards | HR_C7000 only so far ([feature-matrix.md](../feature-matrix.md)) |
+| Boards | Each board whose build turns the switch on ([feature-matrix.md](../feature-matrix.md)) |
 | State | Lent by the mode's engine for its session (`air_softmodem_lend`, about 1.6 KB). The soft modem grows by a pointer |
 | Per-sample path | 32 bits, no divide (section 6). The equalizer divides once a symbol, the DCS search once a word |
 | Coefficients | Worked out in integers at open and at a pick (a series cosine). No floating point |
@@ -203,7 +203,7 @@ nothing (P25, NXDN) gets the plain receiver, symbol for symbol.
 | Input | Each symbol's slicing error, before the equalizer, counted only where its neighborhood (the symbol and the two decided around it) differs from the same place a frame (the sync spacing) earlier. The errors' slow mean comes off first; coasting gives zeros |
 | Search | A second-order CIC keeping one sample in four, then a Goertzel filter per standard CTCSS tone (`tones_ctcss`, 67.0-254.1 Hz) over blocks of six frames: 1.7 Hz bins, neighbors 2.9 Hz apart. 50 updates every 4 symbols. The CIC's droop is weighed into each tone's gain |
 | Pick | Power 10 times the mean of the others (neighbors left out) in two blocks; a block where none passes leaves the count. The first pick may take one block at 30 times, if also 4 times each neighbor. Never switches to a neighbor of the tone notched |
-| Notch | On the input samples: zeros at the tone's exact frequency, poles inside at Q 20, unity gain at DC. Run as differences from a double zero and pole at DC, 20 bits each: 49 dB off a 69.3 Hz tone |
+| Notch | On the input samples: zeros at the tone's exact frequency, poles inside at Q 20, unity gain at DC. Run as differences from a double zero and pole at DC, 20 bits each: 49 dB off a 69.3 Hz tone. The state stays linear and only the sample out is limited: clamped inside the loop, squelch-open noise between calls left it ringing at the tone into the next call |
 | Reset | The search and the notch start over only when the session opens; locks and resets keep them |
 | Limits | On a radio's recordings without a tone, no block passed 9. What a notch leaves of a tone sent through a receiver is more than of the same tone added after it |
 

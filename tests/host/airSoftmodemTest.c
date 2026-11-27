@@ -948,6 +948,67 @@ static void testAdapt(void)
 	air_softmodem_adapt_off = 0;
 	CHECK(v.opts == AIR_RX_EQ && v.tone_dhz == 0, "bench off: opts %u tone %u", v.opts, v.tone_dhz);
 }
+
+// Calls after squelch-open noise, once a tone is picked. The notch runs on every sample for the rest of the session,
+// the discriminator's near full-scale noise between calls included. Its state saturating there left it ringing at
+// the tone into the next call, whose level and offset were then tracked from the ringing: lost syncs until a retune
+// opened the session again. The next call must decode as on a session just opened
+static int16_t call_copy[24000];
+
+static void testNotchAfterNoise(void)
+{
+	air_profile_t tone = c4fm_like(AIR_RX_TONE);
+	air_softmodem_adapt_view_t v;
+	air_softmodem_t m;
+	uint32_t n, total = 0, worst = 0;
+
+	for (int round = 0; round < 8; round++) {
+		uint32_t gap = 2000u + 1500u * (uint32_t)round, start, sess = 0, fresh;
+
+		air_stream(&tone, 0, 7000, 200, 480);
+		modulate(&tone, 0);
+		sample_tap(8000, 17, 3600, 2000, 300, 300);
+		add_tone(round & 1 ? 67.0 : 127.3, 0.3 * 1800);
+		n = tap_n;
+		if (n > sizeof(call_copy) / sizeof(call_copy[0]) || 2 * n + gap > sizeof(tap) / sizeof(tap[0])) {
+			CHECK(0, "round %d: the test's buffers", round);
+			return;
+		}
+		memcpy(call_copy, tap, n * sizeof(tap[0]));
+		// One session: the call (a tone picked), the noise, the same call again
+		for (uint32_t i = 0; i < gap; i++) {
+			double x = 14000 * gauss();
+
+			tap[n + i] = (int16_t)lround(x > 32767 ? 32767 : x < -32768 ? -32768 : x);
+		}
+		start = n + gap;
+		memcpy(tap + start, call_copy, n * sizeof(tap[0]));
+		tap_n = start + n;
+		air_softmodem_lend(&adapt_mem);
+		air_softmodem_rx_open(&m, &tone, 8000, 2000, on_chunk, NULL);
+		out_reset();
+		feed(&m, 8000, 0, tap_n, 256);
+		air_softmodem_adapt_get(&v);
+		air_softmodem_lend(NULL);
+		CHECK(v.tone_dhz != 0, "round %d: a tone picked (%u)", round, v.tone_dhz);
+		for (uint8_t i = 0; i < out_nsync; i++)
+			if (out_sync[i].t_us >= start * 125.0)
+				sess++;
+		// A session opened on the second call alone
+		air_softmodem_lend(&adapt_mem);
+		air_softmodem_rx_open(&m, &tone, 8000, 2000, on_chunk, NULL);
+		out_reset();
+		feed(&m, 8000, start, tap_n, 256);
+		air_softmodem_lend(NULL);
+		fresh = out_nsync;
+		total += fresh - (sess < fresh ? sess : fresh);
+		if (fresh > sess && fresh - sess > worst)
+			worst = fresh - sess;
+		CHECK(sess + 1 >= fresh, "round %d, %u ms of noise: %u syncs after it, %u on a session just opened", round,
+		      gap / 8, sess, fresh);
+	}
+	printf("  calls after loud noise with a tone picked: %u syncs short in all, %u at most in one\n", total, worst);
+}
 #endif
 
 int main(void)
@@ -962,6 +1023,7 @@ int main(void)
 	testHole();
 #if CONFIG_AIR_RX_ADAPT
 	testAdapt();
+	testNotchAfterNoise();
 #endif
 	printf("airSoftmodemTest: %d checks, %d failed\n", checks, failures);
 	return failures ? 1 : 0;
