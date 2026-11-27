@@ -101,34 +101,57 @@ crucible.toml `upstream`, else `origin`) and requires that commit to be an ances
 radio in crucible.toml `[radios]` with every band/power option (`--board` narrows that), runs each image's stack
 check, rejects build warnings, and packages codec-free images with flasher manifests and license notices.
 
-Every image, manifest and ZIP in one batch uses:
+Every image, manifest and ZIP in one batch is named by its version (see [Versions](#versions)): `v0.1.0-beta.3`
+for a test build, `v0.1.0` for a release (`--final`). The ZIP is `crucible-<version>.zip`; its README says the build
+is Crucible's and sends help to Crucible's issues. The version is the release field the radio shows (splash, About,
+the debug link's `release=`); the Git commit, build-source metadata and crash ID keep their normal meaning, and
+`build.json` records the upstream and Crucible commits. The old `kf8sfork` and `kf8sforkysf` branches still build every
+board under their dated `kf8s-` and `kf8sysf-` labels.
 
-```
-crucible-<upstream-main-short-hash>-<main-short-hash>-<yymmdd>-<sequence>
-```
-
-The ZIP is `crucible-<label>.zip`; its README says the build is Crucible's and sends help to Crucible's issues. The
-old `kf8sfork` and `kf8sforkysf` branches still build every board under the `kf8s-` and `kf8sysf-` labels.
-
-Hashes have eight characters. Dates use America/Detroit. The sequence starts at 1 each day and increments once
-per build attempt, including failed attempts, so a label is never reused. The counter is local Git metadata shared
-by worktrees. Keep it when moving the build setup. The actual Git commit, build-source metadata and crash ID keep
-their normal meaning. The full label is the release field; the old CPS Git field stays a short commit.
-
-Output is under `build/kf8s/<label>/`. The ZIP includes every image and manifest, `SHA256SUMS`, build metadata,
+Output is under `build/kf8s/<version>/`. The ZIP includes every image and manifest, `SHA256SUMS`, build metadata,
 `LICENSE`, `AUTHORS`, `CONTRIBUTORS` and third-party licenses. Keep those notices when sharing it, as
 [FORKING.md](FORKING.md) requires. No AMBE codec is included.
 
 Host tests and firmware checks do not replace listening tests on the radios. No build command flashes or keys a radio.
 
+## Versions
+
+Crucible's versions follow [semantic versioning](https://semver.org), starting at 0.1.0. crucible.toml `[release]
+version` is the release the next builds lead to; it changes only by a commit.
+
+| Build | Tag | GitHub | Flasher |
+|---|---|---|---|
+| `tools/kf8s_build.py` | `v0.1.0-beta.N` | pre-release | under "Show test versions"; listed anyway while a radio has no release |
+| `tools/kf8s_build.py --final` | `v0.1.0` | release, marked latest | listed first |
+
+- N counts build attempts for that version, failed ones included, so a tag is never reused. It is kept in local Git
+  metadata shared by worktrees (`crucible-release-sequence.json` in the common Git directory) and always starts above
+  the highest beta tagged here or on origin.
+- After `v0.1.0` is published, raise `[release] version` before the next build (the wrapper refuses a released one):
+  the patch (0.1.1) for fixes only, the minor (0.2.0) for new features or an upstream merge that adds them. Before
+  1.0.0 a minor may also change settings or codeplugs; say so in the notes.
+- Tags are `v` and the version, nothing else: no build metadata (`+...`), because the radio shows the name.
+  Upstream's calendar tags (`v26.11`) never look like ours, and `tools/crucible.py tag` checks one.
+- The dated test releases from before 0.1.0 (`crucible-<hash>-<hash>-<yymmdd>-<n>`) were deleted once
+  `v0.1.0-beta.1` was out; their tags stay, so a report from one of those builds still finds its source.
+
 ## Publishing a release
 
-Finish building and verifying the package first, then publish it in
-[wc8mi/crucible releases](https://github.com/wc8mi/crucible/releases). Use the package label as the annotated Git tag,
-pointing to the exact firmware commit in `build.json`. Push the branch and tag without changing an existing release
-tag. Attach the ZIP and its `.zip.sha256` sidecar, keep all license notices, and include the radios, changes,
-validation limits and a link to the [usage guide](docs/kf8sfork/README.md). Mark every release a pre-release until a build is stable (YSF is still incomplete). The flasher lists
-pre-releases when a radio has no full release. The
+Finish building and verifying the package first, with `main` pushed. Then:
+
+```
+python3 tools/crucible_release.py notes build/kf8s/<version> > notes.md   # a draft: radios, commits, changes, limits
+python3 tools/crucible_release.py publish build/kf8s/<version> --notes notes.md --dry-run
+python3 tools/crucible_release.py publish build/kf8s/<version> --notes notes.md
+```
+
+Read and edit the draft first: the flasher shows the notes next to the version. `publish` refuses a package whose
+ZIP doesn't match its sidecar, whose commit is not on `origin/main`, or whose release already exists. It makes the
+annotated tag on the commit in `build.json`, pushes the tag, and creates the release in
+[wc8mi/crucible releases](https://github.com/wc8mi/crucible/releases) with the ZIP and its `.zip.sha256` attached: a
+beta as a pre-release, a final version as the latest release. Keep all license notices and the link to the
+[usage guide](docs/kf8sfork/README.md) in the notes. Release `v0.1.0` (`--final`) only once a build is stable; until
+then every build is a beta (YSF is still incomplete). The
 [Crucible flasher](https://tinker.wc8mi.net/crucible/) lists a release once its site is rebuilt.
 
 ## Flasher page

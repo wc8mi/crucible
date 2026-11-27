@@ -22,6 +22,7 @@ AGENTS.md the owner has uncommitted edits to it; fix after those land
 # Fork release records intentionally identify packaged images and model-specific tester instructions.
 docs/kf8sfork/CHANGELOG.md owner-requested fork release history, including models used for calibration
 docs/kf8sfork/README.md owner-requested package inventory and model-specific testing guide
+docs/crucible/* Crucible's design records and prototypes decide per-radio install and update steps for its radios (CRUCIBLE.md rule 4)
 
 # Owned by the workflows work in this pull request: fix there.
 tools/ci.sh usage examples and the per-board skip notes
