@@ -420,8 +420,9 @@ An NXDN channel comes from a codeplug written on a computer ([P25 and NXDN in th
 open **Channels**, **New channel from current settings** and save it), or any channel: press **OK** on its Mode until
 it says NXDN, set the RAN and rate, and save. A channel made NXDN starts with the NXDN radio default's rate and RANs
 (on a new radio 4800 bit/s, every RAN in, RAN 1 out). The channel keeps the rate, the RANs, the squelch and the group
-(when a contact has that group; else group 1). The radio default, Talk to and quick tile 8 don't change a saved NXDN
-channel: they say "NXDN: set in the channel".
+(when a contact has that group; else group 1). The NXDN radio default in Settings doesn't change a saved NXDN channel
+(it still stores the change, for the VFO). Talk to and quick tile 8 don't change one either: on a saved NXDN channel
+they say "NXDN: set in the channel".
 
 - Home shows it as in the VFO. The channel's settings show "NXDN" as the mode.
 - **OK** on Mode steps to FM, DMR, P25 (on a radio that runs it), then back to NXDN with its settings as they were.

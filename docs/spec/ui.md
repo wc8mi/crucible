@@ -243,8 +243,9 @@ instead of OK pressed once per step. The rows shown follow the copy's mode, so a
   NXDN for now); a rate the board's provider can't run says "This rate: not on this radio". On a stored NXDN channel
   the tile is dimmed and OK says "NXDN: set in the channel".
 - Settings > Talk & listen > NXDN opens a page of its own (`SCR_GROUP`, after the groups): the NXDN radio default's
-  Rate, RX RAN ("Any" at 0), TX RAN and Talkgroup (1-65519; Up past 65519 is "All", 0xFFFF; typed digits above
-  65519 are refused), under a line saying stored NXDN channels keep their own. Dimmed without `UI_FEAT_NXDN`.
+  Rate, RX RAN ("Any" at 0), TX RAN and Talkgroup (1-65519; Up past 65519 is "All", 0xFFFF, which OK stores; Down from
+  All is 65519; a digit that would type past 65519 starts the number over, so typed digits never reach All and a
+  typed value out of range is refused with the range), under a line saying stored NXDN channels keep their own. Dimmed without `UI_FEAT_NXDN`.
 - Talk to in NXDN ([nxdn.md](nxdn.md) 6.2): on the settings a target for now shows the VFO's talk target hint and
   Back undoes it; hold OK keeps a group as the talkgroup; IDs above 65519 say "NXDN IDs go up to 65519"; a stored
   NXDN channel says "NXDN: set in the channel".
