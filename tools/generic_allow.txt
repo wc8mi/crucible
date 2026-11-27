@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
-# Copyright (c) 2026 David Behnke
 #
 # Files that may name a radio outside its own places (tools/check_generic.py, AGENTS.md rule 4). One entry a line:
 # a glob (fnmatch: * also crosses /), a space, and why. An entry no file needs any more is an error, so the list only
