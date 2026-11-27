@@ -1734,6 +1734,7 @@
  "editor.call.private": "Private",
  "editor.call.all": "All Call",
  "editor.power.default": "Radio Default",
+ "editor.power.factory": "Factory: {power}",
  "editor.power.min": "Minimum",
  "editor.power.low": "Low",
  "editor.power.mid": "Medium",
@@ -2456,5 +2457,13 @@
  "screen.caller_database_dual_p25": "P25 caller identity in dual watch",
  "screen.channel_power_default": "Channel editor: inheriting the radio default power",
  "screen.power_default": "Settings: choosing the default transmit power",
- "screen.power_quick": "Quick settings: choosing any supported transmit power"
+ "screen.power_quick": "Quick settings: choosing any supported transmit power",
+ "editor.target.label": "Made for",
+ "editor.target.any": "Any radio",
+ "editor.target.all": "All {n} radios",
+ "editor.power.across": "Power on each radio",
+ "editor.problem.target_rx": "{radios}: cannot receive on this RX frequency.",
+ "editor.problem.target_rx_ext": "{radios}: receives this RX frequency only with RX past bands turned on.",
+ "editor.problem.target_tx": "{radios}: cannot transmit on this TX frequency.",
+ "editor.problem.target_mode": "{radios}: the firmware has no {mode}."
 }

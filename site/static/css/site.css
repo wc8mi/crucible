@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* Copyright (c) 2026 The RadioFoundry Authors */
+/* Copyright (c) 2026 David Behnke */
 /* Layout and components. Values come from tokens.css; this file holds structure only. */
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -575,6 +576,10 @@ dialog.beta-notice .confirm-actions { position: sticky; bottom: calc(-1 * var(--
 .ed-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); align-items: center; }
 .ed-group { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .ed-status { text-align: end; }
+/* the radios a codeplug is made for (targets.js): its label beside the picker, in the toolbar's row */
+.ed-target label { font-size: var(--text-sm); font-weight: 600; }
+.ed-target select { font: inherit; padding: var(--space-2) var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+	background: var(--surface); color: var(--text); }
 .ed-messages .notice { position: relative; padding-right: var(--space-7); margin: 0; }
 .ed-dismiss { position: absolute; top: var(--space-1); right: var(--space-1); }
 .ed-menu { position: relative; }
@@ -670,6 +675,16 @@ dialog.editor-dialog { max-width: 52rem; max-height: calc(100vh - 4rem); overflo
 .form-toggle[aria-expanded="true"]::before { content: "▾ "; }
 .form-toggle:focus-visible { outline: 2px solid var(--accent, currentColor); outline-offset: 2px; }
 .form-row input:disabled, .form-row select:disabled { opacity: 0.5; }
+/* a channel's power on each radio: the form's full width, one small cell per radio */
+.power-across { grid-column: 1 / -1; }
+.power-across-head { font-size: var(--text-sm); font-weight: 600; }
+.power-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: var(--space-1); }
+/* read-only: a filled cell without an input's border */
+.power-list li { display: grid; gap: 0 var(--space-2); grid-template-columns: auto 1fr; align-items: baseline; padding: var(--space-1) var(--space-2);
+	border-radius: var(--radius-sm); background: var(--surface-2); }
+.power-radio { grid-column: 1 / -1; font-size: var(--text-xs); color: var(--muted); }
+.power-list strong { font-variant-numeric: tabular-nums; }
+.power-note { font-size: var(--text-xs); color: var(--muted); }
 /* the searchable lists (Tom Select, editor/combo.js): its layout, the site's colors and the editor inputs' size */
 .ts-control, .ts-wrapper.single.input-active .ts-control, .ts-wrapper.single .ts-control, .full .ts-control {
 	background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: none;

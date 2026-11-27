@@ -1734,6 +1734,7 @@
  "editor.call.private": "个呼",
  "editor.call.all": "全呼",
  "editor.power.default": "电台默认",
+ "editor.power.factory": "出厂：{power}",
  "editor.power.min": "最低",
  "editor.power.low": "低",
  "editor.power.mid": "中",
@@ -2456,5 +2457,13 @@
  "screen.caller_database_dual_p25": "双守候中的 P25 呼叫者身份",
  "screen.channel_power_default": "信道编辑器：使用电台默认功率",
  "screen.power_default": "设置：选择默认发射功率",
- "screen.power_quick": "快捷设置：选择任意支持的发射功率"
+ "screen.power_quick": "快捷设置：选择任意支持的发射功率",
+ "editor.target.label": "适用于",
+ "editor.target.any": "任意电台",
+ "editor.target.all": "全部 {n} 台电台",
+ "editor.power.across": "各电台的功率",
+ "editor.problem.target_rx": "{radios}：无法在此接收频率上接收。",
+ "editor.problem.target_rx_ext": "{radios}：仅在开启超频段接收后才能接收此接收频率。",
+ "editor.problem.target_tx": "{radios}：无法在此发射频率上发射。",
+ "editor.problem.target_mode": "{radios}：固件不支持 {mode}。"
 }
