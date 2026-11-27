@@ -14,6 +14,7 @@
 #include <stddef.h>
 #include <string.h>
 #include "config.h"
+#include "hal_radio.h"
 #include "settings/settings.h"
 #include "storage/storage.h"
 
@@ -24,6 +25,11 @@
 #define PAYLOAD_MAX	STORAGE_SLOT_PAYLOAD_MAX
 #define MAGIC		STORAGE_SLOT_MAGIC
 #define RETRIES		4		// slots tried when a write doesn't read back
+// The longest record RadioFoundry (upstream) writes: settings_t up to aes_mi_res. Every Crucible release wrote more
+// (420 bytes and up), which tells a Crucible record with mic_input at 399 from upstream's aprs_cp_freq there (ADR 004).
+// If upstream grows past this, a record cross-flashed from it reads byte 399 as a clamped Mic input and the APRS
+// frequency is taken from the codeplug once more
+#define UPSTREAM_BYTES	412u
 
 _Static_assert(SETTINGS_PAGE_BYTES == PAYLOAD_MAX, "a page is a slot's payload");
 _Static_assert(SETTINGS_PAGES <= SETTINGS_PAGES_MAX, "settings_t outgrew its pages");
@@ -35,6 +41,9 @@ _Static_assert(offsetof(settings_t, aes_migration) == 416, "AES migration marker
 _Static_assert(offsetof(settings_t, agc_marker) == 424, "Digital AGC block offset (Crucible)");
 _Static_assert(offsetof(settings_t, nxdn_marker) == 428, "NXDN radio default block offset (Crucible)");
 _Static_assert(offsetof(settings_t, nxdn_tg) == 432, "NXDN talk group offset (Crucible)");
+_Static_assert(offsetof(settings_t, mic_input) == 434, "Mic input offset (Crucible)");
+_Static_assert(offsetof(settings_t, aprs_cp_freq) == 399, "upstream's APRS codeplug frequency mark offset");
+_Static_assert(offsetof(settings_t, aes_mi_res) + sizeof(uint32_t) == UPSTREAM_BYTES, "upstream's record ends after aes_mi_res");
 _Static_assert(sizeof(settings_t) == 436, "settings_t changed size: update docs/spec/settings-store.md 3 and this");
 
 static settings_t live;			// under the quick lock
@@ -168,17 +177,28 @@ static void agc_block_check(settings_t *s, size_t bytes)
 	s->tx_level_nxdn = 0;
 }
 
+static int8_t mic_input_in_range(int8_t v) { return v >= HAL_MIC_INPUT_MIN && v <= HAL_MIC_INPUT_MAX ? v : 0; }
+
 // The NXDN radio default block (settings.h): a record without this firmware's marker reads the defaults, marked in
-// RAM like the Digital AGC block; a marked one has each value out of range read as its default
+// RAM like the Digital AGC block; a marked one has each value out of range read as its default. mic_input moved here
+// from offset 399 when upstream took that byte for aprs_cp_freq (ADR 004). Upstream's records are at most
+// UPSTREAM_BYTES long and every Crucible release wrote more, so a longer record without this marker was written by a
+// Crucible release that kept mic_input at 399: it comes across and the APRS mark reads none yet
 static void nxdn_block_check(settings_t *s, size_t bytes)
 {
 	if (bytes < offsetof(settings_t, nxdn_reserved) + sizeof s->nxdn_reserved ||
 	    s->nxdn_marker != SETTINGS_NXDN_MARKER) {
+		int8_t mic = 0;
+		if (bytes > UPSTREAM_BYTES) {
+			mic = (int8_t)s->aprs_cp_freq;
+			s->aprs_cp_freq = 0;
+		}
 		s->nxdn_marker = SETTINGS_NXDN_MARKER;
 		s->nxdn_flags = 0;
 		s->nxdn_rx_ran = 0;
 		s->nxdn_tx_ran = SETTINGS_NXDN_TX_RAN;
 		s->nxdn_tg = SETTINGS_NXDN_TG;
+		s->mic_input = mic_input_in_range(mic);
 		memset(s->nxdn_reserved, 0, sizeof s->nxdn_reserved);
 		return;
 	}
@@ -189,6 +209,7 @@ static void nxdn_block_check(settings_t *s, size_t bytes)
 		s->nxdn_tx_ran = SETTINGS_NXDN_TX_RAN;
 	if (s->nxdn_tg == 0 || (s->nxdn_tg > SETTINGS_NXDN_TG_MAX && s->nxdn_tg != SETTINGS_NXDN_TG_ALL))
 		s->nxdn_tg = SETTINGS_NXDN_TG;
+	s->mic_input = mic_input_in_range(s->mic_input);
 }
 
 static void aes_migration_check(settings_t *s, size_t bytes)

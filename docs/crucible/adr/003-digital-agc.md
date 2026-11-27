@@ -59,7 +59,9 @@ good levels without setting eight values. Tinkerers still want every value.
 - **Upstream collision.** This block is Crucible's own. If RadioFoundry later appends its own field at byte 424, a
   Crucible radio reading such a record sees a wrong marker and uses the defaults. There is a 1 in 256 chance that a
   foreign byte equals 0xA6, so its other bytes are read as manual values. A user who installs RadioFoundry after
-  Crucible should reset the settings.
+  Crucible should reset the settings. The reverse happened to the Mic input: Crucible put it in a byte upstream had
+  reserved (399), and upstream later took that byte. It moved into the NXDN block
+  ([ADR 004, Revision 1](004-nxdn-radio-default.md#revision-1-mic-input-moves-into-the-block)).
 - **Existing radios.** After the update, both switches are On. Saved DMR and YSF values stay as manual values. NXDN
   starts from the DMR value and P25 from -20.
 - **Debug link.** View keys show both switches and the level in use per mode, so HIL tests can check them.
