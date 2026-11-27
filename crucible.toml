@@ -10,6 +10,7 @@ tagline = "Experimental DMR firmware by KF8S, based on RadioFoundry"
 maintainer = "KF8S (David Behnke)"
 repo = "https://github.com/wc8mi/crucible"
 issues = "https://github.com/wc8mi/crucible/issues"
+community = "https://discord.gg/y2jHahNK6h"	# Crucible Community on Discord (Apply to Join, licensed hams)
 flasher = "https://tinker.wc8mi.net/crucible/"
 upstream = "https://github.com/radiofoundry/radiofoundry"
 
