@@ -31,7 +31,8 @@ _Static_assert(offsetof(settings_t, dual_b) == SETTINGS_PAGE_BYTES, "page 1 star
 _Static_assert(offsetof(settings_t, ref_trim_ppb) % 2 == 0, "ref_trim_ppb is aligned");
 _Static_assert(offsetof(settings_t, aes_mi_res) == 408, "legacy AES reservation offset");
 _Static_assert(offsetof(settings_t, aes_migration) == 416, "AES migration marker offset");
-_Static_assert(sizeof(settings_t) == 424, "settings_t changed size: update docs/spec/settings-store.md 3 and this");
+_Static_assert(offsetof(settings_t, agc_marker) == 424, "Digital AGC block offset (Crucible)");
+_Static_assert(sizeof(settings_t) == 428, "settings_t changed size: update docs/spec/settings-store.md 3 and this");
 
 static settings_t live;			// under the quick lock
 static settings_t saved;		// what the newest record holds (or the defaults)
@@ -74,6 +75,7 @@ void settings_defaults(settings_t *s)
 	s->satellite_index = SETTINGS_UNSET8;
 	s->power_levels = board.power_count;
 	s->aes_migration = SETTINGS_AES_READY;
+	s->agc_marker = SETTINGS_AGC_MARKER;	// both switches On; marked, so a manual value saved later is kept
 }
 
 // Power levels stored against another level count (an older record, or a board whose levels changed) may name a
@@ -147,6 +149,18 @@ static uint8_t slot_buf[SLOT_SIZE];
 
 static uint16_t rec_page(const uint8_t *r) { return (uint16_t)((r[8] | (r[9] << 8)) >> SETTINGS_PAGE_SHIFT); }
 static uint16_t rec_layout(const uint8_t *r) { return (uint16_t)((r[8] | (r[9] << 8)) & 0x0FFFu); }
+
+// The Digital AGC block (settings.h) of a record without this firmware's marker: the defaults, marked in RAM so the
+// next ordinary save carries it (no save is forced)
+static void agc_block_check(settings_t *s, size_t bytes)
+{
+	if (bytes >= offsetof(settings_t, agc_marker) + 4u && s->agc_marker == SETTINGS_AGC_MARKER)
+		return;
+	s->agc_marker = SETTINGS_AGC_MARKER;
+	s->agc_manual = 0;
+	s->tx_level_p25 = 0;
+	s->tx_level_nxdn = 0;
+}
 
 static void aes_migration_check(settings_t *s, size_t bytes)
 {
@@ -266,6 +280,7 @@ settings_load_t settings_init(void)
 		stats.load = whole ? SETTINGS_LOADED : SETTINGS_UPGRADED;
 		power_levels_check(&live);
 		aes_migration_check(&live, SETTINGS_PAGE_BYTES + page1_bytes);
+		agc_block_check(&live, SETTINGS_PAGE_BYTES + page1_bytes);
 	}
 	storage_unlock();
 	saved = live;

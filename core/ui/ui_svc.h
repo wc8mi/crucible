@@ -501,9 +501,12 @@ typedef enum {
 	UI_SET_P25_ID_LOOKUP,	// optional P25 names from private contacts and the DMR ID database
 	UI_SET_MASTER_POWER,	// -1 factory default, else a board power level for default channels
 	UI_SET_RSSI_VHF, UI_SET_RSSI_UHF,
-	// Transmit audio (CONFIG_TX_MIC_LIMITER; Settings > Talk & listen): the DMR/NXDN and YSF leveling targets, a
+	// Transmit audio (CONFIG_TX_MIC_LIMITER; Settings > Talk & listen): the DMR and YSF leveling targets, a
 	// tx_level_choice each (0 Off), and the board's mic input gain for digital voice (hal_radio_t.mic_input steps)
 	UI_SET_TX_LEVEL_DMR, UI_SET_TX_LEVEL_YSF, UI_SET_MIC_INPUT,
+	// Digital AGC (radio/digital_agc.h): the two switches (1 On: the radio's defaults), then the P25
+	// (CONFIG_P25_TX_AGC) and NXDN leveling targets, a tx_level_choice each. Appended: the ids before keep their numbers
+	UI_SET_AGC_RX_AUTO, UI_SET_AGC_TX_AUTO, UI_SET_TX_LEVEL_P25, UI_SET_TX_LEVEL_NXDN,
 	UI_SET_COUNT
 } ui_setting_t;
 

@@ -213,11 +213,12 @@ void debuglink_view_dmr_tx_audio(dl_text_t *t)
 	// Blocks sent as silence while a beep played (the mic gate). Here, not in dmr: that section is at a reply's size
 	dl_text(t, "voice.tx_mic_muted=%u\n", (unsigned)a.tx_mic_muted);
 	// The TX level settings: the profile and target of the latest transmission, then each profile's (0 = manual gain)
-	dl_text(t, "voice.tx_profile=%s\nvoice.tx_target_rms=%u\n", a.tx_profile == AMBE_TX_YSF ? "ysf" : "dmr",
+	dl_text(t, "voice.tx_profile=%s\nvoice.tx_target_rms=%u\n",
+		a.tx_profile == AMBE_TX_YSF ? "ysf" : a.tx_profile == AMBE_TX_NXDN ? "nxdn" : "dmr",
 		(unsigned)a.tx_target_rms);
 #if CONFIG_TX_MIC_LIMITER
-	dl_text(t, "voice.tx_target_dmr=%u\nvoice.tx_target_ysf=%u\n", ambeVoiceTxTarget(AMBE_TX_DMR),
-		ambeVoiceTxTarget(AMBE_TX_YSF));
+	dl_text(t, "voice.tx_target_dmr=%u\nvoice.tx_target_ysf=%u\nvoice.tx_target_nxdn=%u\n",
+		ambeVoiceTxTarget(AMBE_TX_DMR), ambeVoiceTxTarget(AMBE_TX_YSF), ambeVoiceTxTarget(AMBE_TX_NXDN));
 #endif
 }
 

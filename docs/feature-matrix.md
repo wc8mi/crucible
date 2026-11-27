@@ -55,6 +55,7 @@ is `tools/bringup.py list --radio <id>`.
 | `caller_details` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `p25_id_lookup` | not recorded | not recorded | not recorded | not recorded | off | not recorded | not recorded | not recorded |
 | `tx_mic_limiter` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
+| `digital_agc` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `tx_dc_block` | not recorded | not recorded | not recorded | not recorded | off | not recorded | not recorded | not recorded |
 | `p25_tx_agc` | not recorded | not recorded | not recorded | not recorded | off | not recorded | not recorded | not recorded |
 | `p25_parrot` | off | off | off | off | off | off | off | off |
@@ -349,10 +350,10 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | Broadcast FM receiver | `BCAST_FM` | ~0* | — | Needs a second receiver chip (DM-32's RDA5807M); glue not written yet |
 | Receive past the rated bands, Settings > Advanced | `RX_EXT` | 560 | — | Receive only, FM, off by default; ranges from each receiver chip's documents. MD-380: no receiver range in its chip documents |
 | DMR Tier II voice (modem, call stack, AMBE FEC, vocoder) | `DMR` | 377,332 | 275,716 | Includes every DMR feature and everything on IP over DMR |
-| Digital microphone peak limiter and TX levels | `TX_MIC_LIMITER` | — | — | Protects microphone PCM before AMBE encoding, including NXDN, and during manual P25 gain; the DMR and YSF TX level targets. The Mic input setting (`hal_radio_t.mic_input`) is on the DM-1701, MD-UV380 and MD-9600; elsewhere it is dimmed. See [Mic gain](spec/radio-features.md#36-mic-gain). |
+| Digital microphone peak limiter and TX levels | `TX_MIC_LIMITER` | — | — | Protects microphone PCM before AMBE encoding, including NXDN, and during manual P25 gain; the DMR, NXDN and YSF TX level targets and Digital AGC TX ([defaults](#digital-agc-defaults)). The Mic input setting (`hal_radio_t.mic_input`) is on the DM-1701, MD-UV380 and MD-9600; elsewhere it is dimmed. See [Mic gain](spec/radio-features.md#36-mic-gain). |
 | P25 Phase 1 conventional: the air interface (framer, soft modem, shared FEC), the engine, the P25 channel mode and the full-rate voice decoder on the MBE core | `P25` | 40,588 | 24,640* | Needs a board with an air interface provider (`board.air`); without one nothing runs ([air-interface.md](spec/air-interface.md)). Off on the MD-380 until receive is written ([hardware-md380.md](spec/hardware-md380.md) 4.11). Receive and transmit checked on air against the SDR bench on the DM-32UV and the DM-1701, receive, zone scan and dual watch on the MD-9600; the VFO's mode tile, the debug link or a stored P25 channel sets it ([p25.md](spec/p25.md)). RAM: 6,640 B on the DM-1701, 424 B on the MD-380 |
 | Computed microphone DC removal before P25 gain | `TX_DC_BLOCK` | — | — | Shared streaming blocker, reset per transmission; enabled before the temporary P25 calibration capture. Live AMBE/FM/RX unchanged. See [Microphone input leveling](spec/p25.md#52-microphone-input-leveling). |
-| P25 transmit microphone AGC | `P25_TX_AGC` | — | — | The Mic AGC setting enables automatic PCM gain and peak protection before IMBE encoding. The setting defaults to off. See [Microphone input leveling](spec/p25.md#52-microphone-input-leveling). |
+| P25 transmit microphone AGC | `P25_TX_AGC` | — | — | The P25 TX level enables automatic PCM gain and peak protection before IMBE encoding: -20 dBFS while Digital AGC TX is On (the default). See [Microphone input leveling](spec/p25.md#52-microphone-input-leveling). |
 | Rich DMR and P25 caller identity in single and dual Home | `CALLER_DETAILS` | — | — | Needs `DMR`; preserves the numeric ID with database callsign and name. P25 labels require its opt-in lookup setting. Shares the deferred cache with `P25_ID_LOOKUP` ([p25.md](spec/p25.md) 7.3.1) |
 | Optional P25 caller names from private contacts and the DMR ID database | `P25_ID_LOOKUP` | — | — | Needs `P25`; shares the deferred label cache with `CALLER_DETAILS`. The Talk & listen option is off by default. Host tested; radio listening check pending ([p25.md](spec/p25.md) 7.3.1) |
 | Home signal meter in S units and dBm, Advanced RSSI correction | `SIGNAL_METER` | — | — | 13 S/over cells and numeric dBm on Home, power metadata in dual panes, and a display-only VHF/UHF RSSI offset under Settings > Advanced. Off keeps the earlier layouts; stored offsets stay ([ui.md](spec/ui.md)) |
@@ -360,7 +361,7 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | NXDN Scrambler (15-bit) | `NXDN_SCRAMBLER` | 448 | — | Needs `NXDN`; supports conventional voice calls. The NXDN air interface must support the requested direction. Checked on air against another radio running RadioFoundry and a commercial portable ([bring-up record](testing/dm32-bringup.md#nxdn-scrambler-interoperability)). |
 | Soft modem receive options: an equalizer, a CTCSS notch and a DCS remover, for a mode that asks for them | `AIR_RX_ADAPT` | — | — | HR_C7000 only so far (not written on these two radios). On the DM-32UV: 4,104 B flash, of which about 1.1 KB is copied to RAM (`RFOUNDRY_HOT_CODE`), and 20 B of static RAM; the options' state (about 1.6 KB) is lent by the mode's engine. Needs `SUBTONE` ([air-interface.md](spec/air-interface.md) 6.1). Measured 2026-11-25 |
 | YSF (C4FM) DN voice: the frame codec, receive, the call layer, the engine, the YSF mode in the radio core, the radio ID and rooms | `YSF` | — | — | Needs `DMR` (its voice goes through the DMR vocoder path, as NXDN's) and a board with an air interface provider (`board.air`). The VFO's mode tile, the debug link or a stored YSF channel sets it ([ysf.md](spec/ysf.md) 5, [ysf-codeplug.md](spec/ysf-codeplug.md)). The radio ID comes from the MCU's unique ID ([ysf.md](spec/ysf.md) 6). Checked on air on a DM-32UV: direct, through a repeater and a hotspot ([bring-up](testing/dm32-bringup.md#ysf-c4fm)). DM-32UV: 19,556 B flash, 3,392 B RAM with the room commands ([ysf.md](spec/ysf.md) 9) and the soft modem's equalizer and tone notch ([air-interface.md](spec/air-interface.md) 6.1, 3.1 KB and 1.2 KB of it); the engine shares NXDN's block; ARM sizes not measured yet |
-| Digital receive audio AGC with per-mode targets and recent-caller memory | `RX_AGC` | 3,892 | — | Off until a target is selected. DM-1701 figure with LTO, GCC 13.3 (2026-11-22); hardware listening and timing untested ([receive AGC](spec/rx-agc.md)) |
+| Digital receive audio AGC with per-mode targets and recent-caller memory | `RX_AGC` | 3,892 | — | Digital AGC RX (on by default) sets each radio's target ([defaults](#digital-agc-defaults)); Off, each mode's row. DM-1701 figure with LTO, GCC 13.3 (2026-11-22); hardware listening and timing untested ([receive AGC](spec/rx-agc.md)) |
 | Basic privacy, 8-bit and 16-bit keys | `DMR_PRIVACY` | 6,260 | 7,340 |  |
 | AES-256 DMR voice, PI header and late-entry signaling | `DMR_AES` | 3,484 | 4,692 | Requires `DMR_PRIVACY`. DM-1701: 480 B RAM. TX to a receiver of another make needs the modem driver's burst F field (`set_burst_f`, [dmr-voice.md](spec/dmr-voice.md) 5.1): only the HR_C7000 driver has it (DM-32UV); on the HR_C6000 and other radios our AES overs reach radios running RadioFoundry only (#864). |
 | Talker alias receive and send | `DMR_TALKER_ALIAS` | 1,088 | 1,068 |  |
@@ -389,6 +390,23 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | Signaling tone chains (Settings > Signaling tones) | `SIG_TONES` | 5,340 | 5,748* | Needs `BEEP` |
 | Vibration alerts (Settings > Sound > Vibrate) | `VIBRATE` | 520* | — | Needs a vibration motor (`hal_power_t.vibrate`): none of these radios has one RadioFoundry drives. On for the DM-1801 Pro. Measured with `CONFIG_SNMP=n`; 236 B with LTO |
 | GPS receiver: the module driver and its NMEA input (Settings > Location > GPS) | `GPS` | 9,568 | 9,556 | Needs a GPS receiver. Off, DMR GPS Info, LRRP and APRS send the fixed position when one is set ([position](spec/position.md)). The DM-1701 has none from the factory but listens for an owner-fitted one |
+
+### Digital AGC defaults
+
+The levels each radio uses while **Digital AGC RX** and **Digital AGC TX** are On (`board_t.rx_agc_default_db`,
+`tx_level_default_db`; [ADR 003](crucible/adr/003-digital-agc.md)), in dBFS.
+
+| Radio | RX: DMR, P25, NXDN, YSF | TX: DMR, NXDN, YSF | TX: P25 |
+|---|---|---|---|
+| DM-32UV | -30 | -26 | -20 |
+| DM-1701 | -30 | -30 | -20 |
+| MD-UV380 | -30 | -30 | -20 |
+| MD-9600 | -25 | -30 | -20 |
+| Other radios | -30 | -30 | -20 |
+
+The DM-32UV and DM-1701 TX values come from on-air measurements (Yaesu receiver, body mic, one voice): those
+encoder targets gave about -34 dBFS on air, 8 and 4 dB above the setting ([ADR 002](crucible/adr/002-tx-level-on-air.md)).
+The MD-UV380 and MD-9600 were not measured.
 
 ## DMR data
 

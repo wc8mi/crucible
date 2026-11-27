@@ -14,7 +14,8 @@
 //   datatx / dataend    DMR data goes out without PTT (ARS, SMS, IP): the view says TX; it ends
 //   aprstx / aprsend    an APRS RF beacon keys the transmitter / returns to the selected channel
 //   dtmf:<digits>       during TX: the radio core has sent these DTMF digits (the TX screen's DTMF line)
-//   agc:<mode>,<choice>[,<amplitude>]  feed synthetic receive levels (modes 0 DMR, 1 P25, 2 NXDN)
+//   agc:<mode>,<choice>[,<amplitude>]  feed synthetic receive levels (modes 0 DMR, 1 P25, 2 NXDN, 3 YSF), Digital
+//                                       AGC RX Off so the choice is in force
 //   wait:<ms>           time passes
 //   reboot              power off and on: the screens start over, the settings stay
 //   receivers:2         a receiver per dual watch channel; rxa:/rxb:<src>,<dst>,g|p a call on A's / B's own,
@@ -769,6 +770,8 @@ int32_t ui_svc_setting_get(uint8_t id)
 	if (id >= UI_SET_RX_AGC_DMR && id <= UI_SET_RX_AUDIO_LEVELS)
 		return ui_svc_ram_get(id);
 #endif
+	if (id >= UI_SET_AGC_RX_AUTO && id <= UI_SET_TX_LEVEL_NXDN)	// Digital AGC: the stub keeps them as settings_t does
+		return ui_svc_ram_get(id);
 	return id >= UI_SET_RAM_COUNT && id < UI_SET_COUNT ? sim_late[id - UI_SET_RAM_COUNT] : ui_svc_ram_get(id);
 }
 
@@ -780,6 +783,8 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 	if (id >= UI_SET_RX_AGC_DMR && id <= UI_SET_RX_AUDIO_LEVELS)
 		return ui_svc_ram_set(id, value);
 #endif
+	if (id >= UI_SET_AGC_RX_AUTO && id <= UI_SET_TX_LEVEL_NXDN)
+		return ui_svc_ram_set(id, value);
 	if (id < UI_SET_RAM_COUNT || id >= UI_SET_COUNT)
 		return ui_svc_ram_set(id, value);
 	if (id == UI_SET_SIG_STEP) {	// a whole step: the firmware writes one record, here its two settings
@@ -2805,6 +2810,8 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	// The TX levels and mic input start fresh each run: a flow's stepping doesn't reach the next radio
 	sim_late[UI_SET_TX_LEVEL_DMR - UI_SET_RAM_COUNT] = sim_late[UI_SET_TX_LEVEL_YSF - UI_SET_RAM_COUNT] = 0;
 	sim_late[UI_SET_MIC_INPUT - UI_SET_RAM_COUNT] = 0;
+	ui_svc_ram_set(UI_SET_AGC_RX_AUTO, 1);	// Digital AGC: both switches On, as a new radio starts
+	ui_svc_ram_set(UI_SET_AGC_TX_AUTO, 1);
 	emergency_on = false;
 	sim_foreign = sim_held = false;
 	disp.width = g->w;
@@ -3683,6 +3690,7 @@ static bool run_token(char *t, char *err, size_t len)
 			return false;
 		}
 		ui_svc_setting_set(UI_SET_RX_AUDIO_LEVELS, 1);
+		ui_svc_setting_set(UI_SET_AGC_RX_AUTO, 0);	// Digital AGC RX Off: the mode's own row is in force
 		ui_svc_setting_set((uint8_t)(UI_SET_RX_AGC_DMR + mode), (int32_t)choice);
 		rx_agc_t state;
 		rx_agc_begin(&state, (rx_agc_mode_t)mode, 9991234, 0);

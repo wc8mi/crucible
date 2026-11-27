@@ -24,6 +24,7 @@
 #include "hal_time.h"
 #include "hal_dtmf.h"
 #include "settings/settings.h"
+#include "radio/digital_agc.h"
 #include "dmr/sfr.h"
 #include "input/input.h"
 #if CONFIG_KEY_ASSIGN
@@ -35,6 +36,9 @@
 #if CONFIG_ZONE_SHARE
 #include "dmr/zone_share_api.h"
 #endif
+#endif
+#if CONFIG_P25 && CONFIG_IMBE
+#include "p25/p25Voice.h"
 #endif
 #if CONFIG_GPS
 #include "position/position.h"
@@ -69,6 +73,20 @@ void debuglink_view_audio(dl_text_t *t)
 	}
 #else
 	dl_text(t, "agc.built=0\n");
+#endif
+	// Digital AGC (radio/digital_agc.h): the switches (1 On: the radio's defaults) and the RX choice each mode uses
+	uint8_t manual = SETTINGS_FIELD(agc_manual);
+	dl_text(t, "agc.rx_auto=%u\nagc.tx_auto=%u\n", (manual & SETTINGS_AGC_RX_MANUAL) == 0,
+		(manual & SETTINGS_AGC_TX_MANUAL) == 0);
+#if CONFIG_RX_AGC
+	for (unsigned mode = 0; mode < RX_AGC_MODES; mode++) {
+		uint8_t stored = (uint8_t)settings_read_field(settings_rx_agc_offset(mode), 1);
+		dl_text(t, "agc.%u.choice=%u\n", mode,
+			dagc_rx((manual & SETTINGS_AGC_RX_MANUAL) != 0, stored, board.rx_agc_default_db));
+	}
+#endif
+#if CONFIG_P25 && CONFIG_IMBE
+	dl_text(t, "voice.tx_target_p25=%u\n", p25VoiceTxTarget());
 #endif
 #if CONFIG_BEEP
 	beep_stats_t b;

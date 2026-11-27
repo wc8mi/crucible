@@ -12,6 +12,7 @@
 #include "settings/settings.h"
 #include "config.h"
 #include "audio/rx_agc.h"
+#include "radio/digital_agc.h"
 #include "hal_dtmf.h"
 #include "codeplug/codeplug_modes.h"	// channel kinds (docs/spec/channel-modes.md): parked channels, in every build
 #include "codeplug/codeplug_tag.h"	// CODEPLUG_SYSTEM_NONE
@@ -7747,7 +7748,8 @@ static void apply_prefs(radio_sm_t *sm, const settings_t *st)
 {
 #if CONFIG_RX_AGC
 	for (unsigned mode = 0; mode < RX_AGC_MODES; mode++)
-		rx_agc_configure((rx_agc_mode_t)mode, settings_rx_agc(st, mode));
+		rx_agc_configure((rx_agc_mode_t)mode, dagc_rx((st->agc_manual & SETTINGS_AGC_RX_MANUAL) != 0,
+							      settings_rx_agc(st, mode), board.rx_agc_default_db));
 #endif
 	master_power = st->master_power;
 	sm->vol_step = radio_volume_step(st->volume);

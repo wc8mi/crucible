@@ -258,7 +258,7 @@ typedef struct {
 	uint8_t sig_dmr[3];
 	uint8_t sig_fm[3];
 	uint8_t caller_flags;		// was reserved11[0]: SETTINGS_CALLER_* (0: numeric P25 caller IDs)
-	uint8_t tx_level_dmr;		// was reserved11[0]: DMR/NXDN TX leveling, a tx_level_choice (0 Off: manual gain)
+	uint8_t tx_level_dmr;		// was reserved11[0]: DMR TX leveling, a tx_level_choice (0 Off: manual gain)
 	// DMR AES: the end of the MI positions reserved for our overs (dmrAesSeq_t, dmr-voice.md 5.1; appended: an older
 	// record reads 0, no position yet). A restart starts here, past every position sent
 	uint32_t aes_mi_res;
@@ -269,7 +269,19 @@ typedef struct {
 	int8_t rssi_correction[2];	// display-only dB offsets: VHF, UHF; older records read 0
 	uint8_t rx_agc_ysf;		// was reserved_rssi[0]: YSF's rx_agc choice (0 Off, as an older record reads)
 	uint8_t tx_level_ysf;		// was reserved_rssi[0]: YSF TX leveling, a tx_level_choice (0 Off)
+	// Digital AGC (Crucible, docs/crucible/adr/003-digital-agc.md; radio/digital_agc.h). A block of its own:
+	// agc_marker is SETTINGS_AGC_MARKER when this firmware wrote the four bytes. A record without it (shorter, or
+	// written by firmware that puts another field here) reads them as 0 at load: both switches On, P25 TX -20,
+	// NXDN TX following DMR. agc_manual: SETTINGS_AGC_*_MANUAL bits, set = the switch is Off. tx_level_p25 and
+	// tx_level_nxdn: a tx_level_choice + 1, 0 = unset (P25: the -20 choice, NXDN: tx_level_dmr's)
+	uint8_t agc_marker;
+	uint8_t agc_manual;
+	uint8_t tx_level_p25;
+	uint8_t tx_level_nxdn;
 } settings_t;
+#define SETTINGS_AGC_MARKER	0xA6u
+#define SETTINGS_AGC_RX_MANUAL	0x01u	// Digital AGC RX is Off: each mode's RX AGC row is in force
+#define SETTINGS_AGC_TX_MANUAL	0x02u	// Digital AGC TX is Off: each mode's TX level row is in force
 
 // Pages: settings_t is stored as records of SETTINGS_PAGE_BYTES each (settings-store.md 2.1). Only the pages its size
 // needs are written, each with its own length, so settings_t grows by appending fields; the record's page field

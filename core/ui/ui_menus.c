@@ -24,6 +24,7 @@
 #include "dsp/speech_meter.h"
 #endif
 #endif
+#include "radio/digital_agc.h"
 #include "dsp/tx_level.h"	// the TX level choices (CONFIG_TX_MIC_LIMITER) and the P25 calibration's
 #include "dmr/dmrDataService.h"
 #include "config.h"
@@ -7324,7 +7325,7 @@ static const tr_id_t n_rx_agc[] = {
 	TRX(AGC_VALUE_MINUS_15, "-15 dBFS"), TRX(AGC_VALUE_MINUS_12, "-12 dBFS"),
 };
 #endif
-#if CONFIG_TX_MIC_LIMITER
+#if CONFIG_TX_MIC_LIMITER || CONFIG_P25_TX_AGC
 static const int16_t v_tx_level[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 static const tr_id_t n_tx_level[] = {
 	TRN(VALUE_OFF, "Off"), TRX(AGC_VALUE_MINUS_30, "-30 dBFS"), TRX(TX_LEVEL_VALUE_MINUS_28, "-28 dBFS"),
@@ -7366,6 +7367,8 @@ static const set_item_t s_talk[] = {
 		UI_SET_SFR_CWID, v_sfrcwid, n_sfrcwid),
 #endif
 #if CONFIG_RX_AGC
+	TOGGLE(TRN(SET_LABEL_DIGITAL_AGC_RX, "Digital AGC RX"), "receive audio level automatic defaults",
+		UI_SET_AGC_RX_AUTO),
 	LIST(TRN(SET_LABEL_DMR_RX_AGC, "DMR RX AGC"), "receive audio target gain level", UI_SET_RX_AGC_DMR, v_rx_agc, n_rx_agc),
 #if CONFIG_P25
 	LIST(TRN(SET_LABEL_P25_RX_AGC, "P25 RX AGC"), "receive audio target gain level", UI_SET_RX_AGC_P25, v_rx_agc, n_rx_agc),
@@ -7377,9 +7380,23 @@ static const set_item_t s_talk[] = {
 	LIST(TRN(SET_LABEL_YSF_RX_AGC, "YSF RX AGC"), "receive audio target gain level", UI_SET_RX_AGC_YSF, v_rx_agc, n_rx_agc),
 #endif
 #endif
+#if CONFIG_TX_MIC_LIMITER || CONFIG_P25_TX_AGC
+	TOGGLE(TRN(SET_LABEL_DIGITAL_AGC_TX, "Digital AGC TX"), "transmit mic level automatic defaults",
+		UI_SET_AGC_TX_AUTO),
+#endif
 #if CONFIG_TX_MIC_LIMITER
 	LIST(TRN(SET_LABEL_DMR_TX_LEVEL, "DMR TX level"), "transmit mic AGC target leveler loud modulation",
 		UI_SET_TX_LEVEL_DMR, v_tx_level, n_tx_level),
+#endif
+#if CONFIG_P25_TX_AGC
+	LIST(TRN(SET_LABEL_P25_TX_LEVEL, "P25 TX level"), "transmit mic AGC target leveler loud modulation",
+		UI_SET_TX_LEVEL_P25, v_tx_level, n_tx_level),
+#endif
+#if CONFIG_TX_MIC_LIMITER
+#if CONFIG_NXDN
+	LIST(TRN(SET_LABEL_NXDN_TX_LEVEL, "NXDN TX level"), "transmit mic AGC target leveler loud modulation",
+		UI_SET_TX_LEVEL_NXDN, v_tx_level, n_tx_level),
+#endif
 #if CONFIG_YSF
 	LIST(TRN(SET_LABEL_YSF_TX_LEVEL, "YSF TX level"), "transmit mic AGC target leveler loud modulation fusion",
 		UI_SET_TX_LEVEL_YSF, v_tx_level, n_tx_level),
@@ -8013,11 +8030,42 @@ static bool vocoder_has(uint32_t opt)
 	return board.vocoder != NULL && board.vocoder->options != NULL && (board.vocoder->options() & opt) != 0;
 }
 
-// Mic AGC is on and in force: Mic gain doesn't apply (shown as "AGC", dimmed)
+// Digital AGC (radio/digital_agc.h): a level row whose switch is On, so the radio's default applies (the row is
+// dimmed and shows it), and the choice its mode uses now
+static bool agc_auto_row(uint8_t id)
+{
+	if (id >= UI_SET_RX_AGC_DMR && id <= UI_SET_RX_AGC_YSF)
+		return ui_svc_setting_get(UI_SET_AGC_RX_AUTO) != 0;
+	if (id == UI_SET_TX_LEVEL_DMR || id == UI_SET_TX_LEVEL_YSF || id == UI_SET_TX_LEVEL_NXDN ||
+	    id == UI_SET_TX_LEVEL_P25)
+		return ui_svc_setting_get(UI_SET_AGC_TX_AUTO) != 0;
+	return false;
+}
+
+static int32_t agc_in_force(uint8_t id)
+{
+	bool manual = !agc_auto_row(id);
+	int32_t stored = ui_svc_setting_get(id);
+	uint8_t c = (uint8_t)(stored < 0 ? 0 : stored);
+	if (id >= UI_SET_RX_AGC_DMR && id <= UI_SET_RX_AGC_YSF)
+		return dagc_rx(manual, c, board.rx_agc_default_db);
+	dagc_tx_mode_t mode = id == UI_SET_TX_LEVEL_P25 ? DAGC_TX_P25 : id == UI_SET_TX_LEVEL_NXDN ? DAGC_TX_NXDN :
+			      id == UI_SET_TX_LEVEL_YSF ? DAGC_TX_YSF : DAGC_TX_DMR;
+	return dagc_tx(mode, manual, c, board.tx_level_default_db);
+}
+
+// Mic gain doesn't apply (shown as "AGC", dimmed): in P25 while its TX level levels the mic, in the other modes while
+// Mic AGC (the vocoder's own) is on
+static bool p25_leveling(void)
+{
+	return ui_view()->ch.mode == RADIO_MODE_P25 && CONFIG_P25_TX_AGC && agc_in_force(UI_SET_TX_LEVEL_P25) != 0;
+}
+
 static bool mic_agc_on(void)
 {
-	bool available = ui_view()->ch.mode == RADIO_MODE_P25 ? CONFIG_P25_TX_AGC : vocoder_has(VOCODER_OPT_AGC);
-	return available && ui_svc_setting_get(UI_SET_MIC_AGC) != 0;
+	if (ui_view()->ch.mode == RADIO_MODE_P25)
+		return p25_leveling();
+	return vocoder_has(VOCODER_OPT_AGC) && ui_svc_setting_get(UI_SET_MIC_AGC) != 0;
 }
 
 // Why a setting can't be used on this radio or in this build (the row is dimmed and OK says it), NULL if it can
@@ -8069,21 +8117,29 @@ static const char *set_why_not(const set_item_t *s)
 	case UI_SET_MIC_GAIN:
 		if (!mic_gain_available())
 			return TR(WHY_MIC_GAIN_NOT_IN_BUILD, "Mic gain: not in this build");
+		if (p25_leveling())
+			return TR(SET_WHY_P25_TX_LEVEL_SETS_LEVEL, "P25 TX level sets the level");
 		return mic_agc_on() ? TR(SET_WHY_MIC_AGC_SETS_LEVEL, "Mic AGC sets the level") : NULL;
 	case UI_SET_NOISE_REDUCTION:
 		if (!CONFIG_DMR)
 			return TR(WHY_NOISE_REDUCTION_NOT_IN_BUILD, "Noise reduction: not in this build");
 		return vocoder_has(VOCODER_OPT_NOISE_REDUCTION) ? NULL : TR(WHY_NOT_ON_THIS_RADIO, "Not on this radio");
+	case UI_SET_RX_AGC_DMR ... UI_SET_RX_AGC_YSF:
+		return agc_auto_row(s->id) ? TR(SET_WHY_DIGITAL_AGC_ON, "Digital AGC sets the level") : NULL;
 	case UI_SET_TX_LEVEL_DMR:
 	case UI_SET_TX_LEVEL_YSF:
-		return CONFIG_TX_MIC_LIMITER ? NULL : TR(WHY_TX_LEVEL_NOT_IN_BUILD, "TX level: not in this build");
+	case UI_SET_TX_LEVEL_NXDN:
+	case UI_SET_TX_LEVEL_P25:
+		if (!(s->id == UI_SET_TX_LEVEL_P25 ? CONFIG_P25_TX_AGC : CONFIG_TX_MIC_LIMITER))
+			return TR(WHY_TX_LEVEL_NOT_IN_BUILD, "TX level: not in this build");
+		return agc_auto_row(s->id) ? TR(SET_WHY_DIGITAL_AGC_ON, "Digital AGC sets the level") : NULL;
 	case UI_SET_MIC_INPUT:
 		return board.radio != NULL && board.radio->mic_input != NULL ? NULL :
 			TR(WHY_NOT_ON_THIS_RADIO, "Not on this radio");
 	case UI_SET_MIC_AGC:
 		if (!CONFIG_DMR)
 			return TR(WHY_MIC_AGC_NOT_IN_BUILD, "Mic AGC: not in this build");
-		return (CONFIG_P25_TX_AGC || vocoder_has(VOCODER_OPT_AGC)) ? NULL : TR(WHY_NOT_ON_THIS_RADIO, "Not on this radio");
+		return vocoder_has(VOCODER_OPT_AGC) ? NULL : TR(WHY_NOT_ON_THIS_RADIO, "Not on this radio");
 	case UI_SET_HEAR_ALL_DEFAULT:
 		return feats() & UI_FEAT_HEAR_ALL ? NULL :
 			TR(WHY_DMON_NOT_IN_BUILD, "Digital monitor: not in this build");
@@ -8138,6 +8194,8 @@ static void group_item(uint16_t i, ui_item_t *it)
 		strcpy(it->value, "-");
 	if (s->type == ST_NUMBER && s->id == UI_SET_MIC_GAIN && !edit && mic_agc_on())
 		strcpy(it->value, "AGC");
+	if (s->type == ST_LIST && !edit && agc_auto_row(s->id))	// the radio's default, while Digital AGC is On
+		set_value_text(s, agc_in_force(s->id), it->value, sizeof it->value);
 	if (edit)
 		it->flags |= UI_ITEM_EDIT;
 	if (set_why_not(s) != NULL)

@@ -21,6 +21,7 @@
 #include "settings/settings.h"
 #include "radio/ref_trim.h"
 #include "dsp/tx_level.h"
+#include "radio/digital_agc.h"
 #include "storage/storage.h"
 #include "codeplug/codeplug.h"
 #include "codeplug/codeplug_kv.h"
@@ -377,6 +378,14 @@ static __attribute__((noinline)) int32_t setting_get_flash(uint8_t id)
 		return (SETTINGS_FIELD(accent) & SETTINGS_AUDIO_NO_NOISE_REDUCTION) == 0;
 	case UI_SET_MIC_AGC:
 		return (SETTINGS_FIELD(accent) & SETTINGS_AUDIO_AGC) != 0;
+	case UI_SET_AGC_RX_AUTO:
+		return (SETTINGS_FIELD(agc_manual) & SETTINGS_AGC_RX_MANUAL) == 0;
+	case UI_SET_AGC_TX_AUTO:
+		return (SETTINGS_FIELD(agc_manual) & SETTINGS_AGC_TX_MANUAL) == 0;
+	case UI_SET_TX_LEVEL_P25:
+		return dagc_tx_p25_stored(SETTINGS_FIELD(tx_level_p25));
+	case UI_SET_TX_LEVEL_NXDN:
+		return dagc_tx_nxdn_stored(SETTINGS_FIELD(tx_level_nxdn), SETTINGS_FIELD(tx_level_dmr));
 #if CONFIG_TX_MIC_LIMITER
 	case UI_SET_TX_LEVEL_DMR:
 	case UI_SET_TX_LEVEL_YSF: {
@@ -483,8 +492,21 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 		uint8_t choice = value >= 0 && value < (int32_t)RX_AGC_TARGETS ? (uint8_t)value : 0;
 		st = settings_begin();
 		settings_set_rx_agc(st, mode, choice);
+		bool manual = (st->agc_manual & SETTINGS_AGC_RX_MANUAL) != 0;
 		settings_end(hal_millis());
-		rx_agc_configure((rx_agc_mode_t)mode, choice);
+		rx_agc_configure((rx_agc_mode_t)mode, dagc_rx(manual, choice, board.rx_agc_default_db));
+		return true;
+	}
+	case UI_SET_AGC_RX_AUTO: {	// every mode's choice in force changes with it
+		uint8_t stored[RX_AGC_MODES];
+		st = settings_begin();
+		st->agc_manual = (uint8_t)(value != 0 ? st->agc_manual & ~SETTINGS_AGC_RX_MANUAL :
+					   st->agc_manual | SETTINGS_AGC_RX_MANUAL);
+		for (unsigned mode = 0; mode < RX_AGC_MODES; mode++)
+			stored[mode] = settings_rx_agc(st, mode);
+		settings_end(hal_millis());
+		for (unsigned mode = 0; mode < RX_AGC_MODES; mode++)
+			rx_agc_configure((rx_agc_mode_t)mode, dagc_rx(value == 0, stored[mode], board.rx_agc_default_db));
 		return true;
 	}
 	case UI_SET_RX_AUDIO_LEVELS:
@@ -732,6 +754,23 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 		settings_end(hal_millis());
 		return true;
 #endif
+	case UI_SET_AGC_TX_AUTO:	// ui_svc_apply hands the targets on
+		st = settings_begin();
+		st->agc_manual = (uint8_t)(value != 0 ? st->agc_manual & ~SETTINGS_AGC_TX_MANUAL :
+					   st->agc_manual | SETTINGS_AGC_TX_MANUAL);
+		settings_end(hal_millis());
+		return true;
+	case UI_SET_TX_LEVEL_P25:
+	case UI_SET_TX_LEVEL_NXDN: {
+		uint8_t raw = (uint8_t)(value >= 0 && value < (int32_t)TX_LEVEL_CHOICES ? value + 1 : 1);
+		st = settings_begin();
+		if (id == UI_SET_TX_LEVEL_P25)
+			st->tx_level_p25 = raw;
+		else
+			st->tx_level_nxdn = raw;
+		settings_end(hal_millis());
+		return true;
+	}
 	case UI_SET_NOISE_REDUCTION:	// ui_svc_apply hands them to the vocoder
 	case UI_SET_MIC_AGC: {
 		// The stored bit is set for "on" with AGC, for "off" with noise reduction (0 = the defaults)

@@ -9092,6 +9092,7 @@ static void test_p25_mic_gain(void)
 			fake_radio.tx = r_p25_keying_block;
 		}
 		ui_svc_apply(UI_SET_MIC_AGC, 1);
+		ui_svc_apply(UI_SET_AGC_TX_AUTO, 1);	// Digital AGC TX On: P25 levels to its -20 dBFS (Mic AGC no longer does)
 		CHECK(radio_mic_gain() == MIC_GAIN_UNITY && radio_mic_pcm_db() == 12);
 		p25_voice_stats_t before, after;
 		p25VoiceGetStats(&before);

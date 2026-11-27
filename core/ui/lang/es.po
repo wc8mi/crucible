@@ -4243,6 +4243,11 @@ msgid "SFR CW ID"
 msgstr "ID CW SFR"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_DIGITAL_AGC_RX"
+msgid "Digital AGC RX"
+msgstr "AGC digital RX"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_DMR_RX_AGC"
 msgid "DMR RX AGC"
 msgstr "AGC RX DMR"
@@ -4263,9 +4268,24 @@ msgid "YSF RX AGC"
 msgstr "AGC RX YSF"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_DIGITAL_AGC_TX"
+msgid "Digital AGC TX"
+msgstr "AGC digital TX"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_DMR_TX_LEVEL"
 msgid "DMR TX level"
 msgstr "Nivel TX DMR"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_P25_TX_LEVEL"
+msgid "P25 TX level"
+msgstr "Nivel TX P25"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_NXDN_TX_LEVEL"
+msgid "NXDN TX level"
+msgstr "Nivel TX NXDN"
 
 #: core/ui/ui_menus.c
 msgctxt "SET_LABEL_YSF_TX_LEVEL"
@@ -4648,6 +4668,11 @@ msgid "Mic gain: not in this build"
 msgstr "Ganancia mic: no disponible"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_WHY_P25_TX_LEVEL_SETS_LEVEL"
+msgid "P25 TX level sets the level"
+msgstr "El nivel TX P25 fija el nivel"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_WHY_MIC_AGC_SETS_LEVEL"
 msgid "Mic AGC sets the level"
 msgstr "El AGC mic fija el nivel"
@@ -4661,6 +4686,11 @@ msgstr "Reducción ruido: no disponible"
 msgctxt "WHY_NOT_ON_THIS_RADIO"
 msgid "Not on this radio"
 msgstr "No en esta radio"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_WHY_DIGITAL_AGC_ON"
+msgid "Digital AGC sets the level"
+msgstr "El AGC digital fija el nivel"
 
 #: core/ui/ui_menus.c
 msgctxt "WHY_TX_LEVEL_NOT_IN_BUILD"

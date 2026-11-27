@@ -4243,6 +4243,11 @@ msgid "SFR CW ID"
 msgstr "ID CW SFR"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_DIGITAL_AGC_RX"
+msgid "Digital AGC RX"
+msgstr "AGC digitale RX"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_DMR_RX_AGC"
 msgid "DMR RX AGC"
 msgstr "AGC RX DMR"
@@ -4263,9 +4268,24 @@ msgid "YSF RX AGC"
 msgstr "AGC RX YSF"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_DIGITAL_AGC_TX"
+msgid "Digital AGC TX"
+msgstr "AGC digitale TX"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_DMR_TX_LEVEL"
 msgid "DMR TX level"
 msgstr "Livello TX DMR"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_P25_TX_LEVEL"
+msgid "P25 TX level"
+msgstr "Livello TX P25"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_NXDN_TX_LEVEL"
+msgid "NXDN TX level"
+msgstr "Livello TX NXDN"
 
 #: core/ui/ui_menus.c
 msgctxt "SET_LABEL_YSF_TX_LEVEL"
@@ -4648,6 +4668,11 @@ msgid "Mic gain: not in this build"
 msgstr "Guadagno mic: non in questa build"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_WHY_P25_TX_LEVEL_SETS_LEVEL"
+msgid "P25 TX level sets the level"
+msgstr "Il livello TX P25 imposta il livello"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_WHY_MIC_AGC_SETS_LEVEL"
 msgid "Mic AGC sets the level"
 msgstr "L'AGC mic imposta il livello"
@@ -4661,6 +4686,11 @@ msgstr "Riduz. rumore: non in questa build"
 msgctxt "WHY_NOT_ON_THIS_RADIO"
 msgid "Not on this radio"
 msgstr "Non su questa radio"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_WHY_DIGITAL_AGC_ON"
+msgid "Digital AGC sets the level"
+msgstr "L'AGC digitale imposta il livello"
 
 #: core/ui/ui_menus.c
 msgctxt "WHY_TX_LEVEL_NOT_IN_BUILD"
