@@ -993,8 +993,12 @@ static void test_settings_layout(void)
 		{ offsetof(settings_t, aes_migration), 416 },
 		{ offsetof(settings_t, rx_agc_ysf), 422 },
 		{ offsetof(settings_t, tx_level_ysf), 423 },
+		{ offsetof(settings_t, agc_marker), 424 },
+		{ offsetof(settings_t, agc_manual), 425 },
+		{ offsetof(settings_t, tx_level_p25), 426 },
+		{ offsetof(settings_t, tx_level_nxdn), 427 },
 	};
-	CHECK(sizeof(settings_t) == 424);
+	CHECK(sizeof(settings_t) == 428);
 	for (unsigned i = 0; i < sizeof(offs) / sizeof(offs[0]); i++) {
 		if (offs[i].got != offs[i].want) {
 			printf("FAIL settings_t field %u at %zu, layout 1 has it at %zu\n", i, offs[i].got, offs[i].want);
@@ -1318,7 +1322,8 @@ enum {
 	LEGACY_SETTINGS_BYTES = 412,
 	UNMARKED_SETTINGS_BYTES = 416,
 	PRE_RSSI_SETTINGS_BYTES = 420,
-	CURRENT_SETTINGS_BYTES = 424,
+	PRE_DAGC_SETTINGS_BYTES = 424,
+	CURRENT_SETTINGS_BYTES = 428,
 };
 
 static void boot_audio_record(const settings_t *settings, uint16_t bytes)
@@ -1395,6 +1400,46 @@ static void test_settings_receive_agc(void)
 	CHECK(settings_flush());
 	boot();
 	check_audio_record(&current, SETTINGS_LOADED, 4);
+}
+
+// Digital AGC (Crucible): the block's values are kept across a save, and a record without the marker (shorter, or
+// another firmware's byte at 424) reads as both switches On, P25 and NXDN TX unset
+static void test_settings_digital_agc(void)
+{
+	settings_t d;
+	settings_defaults(&d);
+	CHECK(d.agc_marker == SETTINGS_AGC_MARKER && d.agc_manual == 0 && d.tx_level_p25 == 0 && d.tx_level_nxdn == 0);
+
+	settings_t manual = d;
+	manual.squelch = 3;
+	manual.agc_manual = SETTINGS_AGC_RX_MANUAL | SETTINGS_AGC_TX_MANUAL;
+	manual.tx_level_p25 = 5;
+	manual.tx_level_nxdn = 2;
+	boot_audio_record(&manual, CURRENT_SETTINGS_BYTES);
+	settings_t s;
+	settings_read(&s);
+	CHECK(s.agc_marker == SETTINGS_AGC_MARKER && s.agc_manual == manual.agc_manual && s.tx_level_p25 == 5 &&
+	      s.tx_level_nxdn == 2);
+	settings_begin()->squelch = 6;	// saved again: the block goes with it
+	settings_end(1);
+	CHECK(settings_flush());
+	boot();
+	settings_read(&s);
+	CHECK(s.squelch == 6 && s.agc_manual == manual.agc_manual && s.tx_level_p25 == 5 && s.tx_level_nxdn == 2);
+
+	// A record from before the block: the defaults, marked in RAM
+	boot_audio_record(&manual, PRE_DAGC_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.squelch == 3 && s.agc_marker == SETTINGS_AGC_MARKER && s.agc_manual == 0 && s.tx_level_p25 == 0 &&
+	      s.tx_level_nxdn == 0);
+
+	// A full-length record whose byte 424 is not the marker (a later upstream field): the defaults
+	settings_t foreign = manual;
+	foreign.agc_marker = 0x11;
+	boot_audio_record(&foreign, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.agc_marker == SETTINGS_AGC_MARKER && s.agc_manual == 0 && s.tx_level_p25 == 0 && s.tx_level_nxdn == 0);
+	CHECK(sim_flash_violations() == 0);
 }
 
 static void test_settings_legacy_audio_tail(void)
@@ -1545,6 +1590,7 @@ int main(void)
 	test_journal_cuts();
 	test_settings_basic();
 	test_settings_receive_agc();
+	test_settings_digital_agc();
 	test_settings_legacy_audio_tail();
 	test_settings_incomplete_aes_tail();
 	test_settings_aes_rekey_only();

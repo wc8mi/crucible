@@ -125,6 +125,9 @@ const board_t board = {
 	.power_bands = power_bands,
 	.power_band_count = sizeof(power_bands) / sizeof(power_bands[0]),
 	.power_default = 2,	// 5 W
+	// Digital AGC defaults (radio/digital_agc.h; docs/crucible/adr/003-digital-agc.md)
+	.rx_agc_default_db = -25,
+	.tx_level_default_db = -30,
 	.display = &md9600_display,
 	.input = &md9600_input,
 	.keymap = keymap,

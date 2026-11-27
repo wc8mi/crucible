@@ -86,6 +86,11 @@ typedef struct {
 	const board_power_band_t *power_bands;
 	uint8_t power_band_count;
 	uint8_t power_default;
+	// Optional: the radio's Digital AGC defaults (radio/digital_agc.h), in force while the switch is On: the receive
+	// target of every digital mode and the transmit target of DMR, NXDN and YSF, in dBFS. 0 = the core's (-30). P25
+	// transmit is the core's on every radio
+	int8_t rx_agc_default_db;
+	int8_t tx_level_default_db;
 	const hal_display_t *display;
 	const hal_input_t *input;
 	const keymap_entry_t *keymap;
