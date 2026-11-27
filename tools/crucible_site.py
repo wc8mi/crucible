@@ -23,6 +23,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -132,20 +133,11 @@ WORDS = {
     'flash.codec.why_not.unknown': "The installer cannot read the voice codec of a radio with the manufacturer's firmware.",
 }
 
-# The update-mode steps of each radio in the words of ADR 001: they replace the shared ones (radios.json
-# flash.bootloader), shown when an update must go through update mode. The self-test checks the words and lengths
-UPDATE_MODE = {
-    'dm1701': ['Turn the volume knob to OFF.', 'Connect the cable to the radio and to the computer.',
-               'Push and hold PTT and SK1. SK1 is the key above PTT.', 'Turn the volume knob to ON.',
-               'Release the keys. The screen stays dark. This is correct.'],
-    # SK1's place as board.toml words it (issue #203)
-    'mduv380': ['Turn the volume knob to OFF.', 'Connect the cable to the radio and to the computer.',
-                'Push and hold PTT and SK1. SK1 is the side key just above PTT.', 'Turn the volume knob to ON.',
-                'Release the keys. The screen stays dark. This is correct.'],
-    # the factory update mode of the HR_C7000 radios, the way in when the update through the firmware fails
-    'db25d': ['Set the radio to OFF.', 'Connect the cable to the radio and to the computer.', 'Push and hold P1.',
-              'Push the power key.', 'Release P1. The red LED is on and the screen stays blank. This is correct.'],
-}
+# The update-mode steps of a radio in the words of ADR 001 (site/crucible/radios/<id>/update-mode.toml): they replace
+# the shared ones (radios.json flash.bootloader), shown when an update must go through update mode
+def update_mode():
+    return {f.parent.name: tomllib.loads(f.read_text())['steps']
+            for f in sorted((ROOT / 'site' / 'crucible' / 'radios').glob('*/update-mode.toml'))}
 
 # A first install is RadioFoundry's (ADR 001, revision 2026-11-27): a plain link to its flasher page, never a request
 RF_FLASH = 'https://radiofoundry.org/flash/index.html'
@@ -408,8 +400,9 @@ def build(out, packages, github, site_out=None):
         radios = json.loads((site / 'data' / 'radios.json').read_text())
         radios['radios'] = [r for r in radios['radios'] if r.get('id') in boards or r.get('flash', {}).get('board') in boards]
         radios['planned'] = []
+        modes = update_mode()
         for r in radios['radios']:		# the update-mode steps in Crucible's words replace the shared ones
-            mode = UPDATE_MODE.get(r.get('id'))
+            mode = modes.get(r.get('id'))
             if mode:
                 r['flash']['bootloader'] = mode
         (out / 'data' / 'radios.json').write_text(json.dumps(radios))
@@ -419,7 +412,7 @@ def build(out, packages, github, site_out=None):
         info.update({'version': f'crucible-{commit}', 'branch': '', 'repo': project['repo'], 'community': '', 'release': '', 'beta': '', 'reports': {'sentry_dsn': ''}})
         info.pop('tool', None)
         (out / 'data' / 'site.json').write_text(json.dumps(info, indent=1))
-        shutil.copytree(ROOT / 'site' / 'crucible', out / 'crucible', ignore=shutil.ignore_patterns('page.html'))
+        shutil.copytree(ROOT / 'site' / 'crucible', out / 'crucible', ignore=shutil.ignore_patterns('page.html', 'radios'))
         brand = ROOT / 'docs' / 'crucible' / 'brand'
         for size in (32, 180, 512):
             shutil.copy2(brand / f'hot-core-icon-{size}.png', out / 'crucible' / f'icon-{size}.png')
@@ -526,7 +519,9 @@ def self_test():
     def sentences(text):
         return [x for x in re.split(r'(?<=[.?!])\s+', re.sub(r'<[^>]+>|\{\{\w+\}\}', 'X', text)) if x.strip()]
     offered = crucible.board_ids(ROOT)
-    for rid, steps in UPDATE_MODE.items():
+    modes = update_mode()
+    assert modes, 'no update-mode words'
+    for rid, steps in modes.items():
         assert (ROOT / 'boards' / rid / 'board.toml').is_file() and rid in offered, f'update mode {rid}: not a Crucible board'
         for v in steps:
             assert not re.search(banned, v, re.I) and len(v.split()) <= 20, f'update mode {rid}: {v}'
