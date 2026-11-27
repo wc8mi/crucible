@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 /* Copyright (c) 2026 David Behnke */
 /*
- * Crucible's installer front page (ADR 001, docs/crucible/adr/): the browser gate, the terms and the two doors. The
+ * Crucible's installer front page (ADR 001, docs/crucible/adr/): the browser gate, the terms, the Update door and the
+ * way to a first install (RadioFoundry first). The
  * foundry world of DESIGN.md: hot-core band, iron or greensand ground, Barlow Condensed for h1, h2 and the wordmark
  * only. Dark is the default; light with the system setting unless the visitor picked dark, always with
  * data-theme="light".
@@ -99,7 +100,7 @@ p { margin: .6rem 0 0; text-wrap: pretty; }
 .accept { display: flex; gap: .8rem; align-items: center; margin-top: 1.4rem; font-weight: 600; cursor: pointer; }
 .accept input { flex: none; width: 1.35rem; height: 1.35rem; margin: 0; }
 
-/* Home: two equal doors */
+/* Home: the Update door beside the first-install steps, the Satellites door, then the policy */
 .doors { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 2.2rem; }
 .door { display: flex; flex-direction: column; min-height: 17rem; padding: 1.5rem; background: var(--plate);
 	border: 1px solid var(--line); border-radius: 4px; color: var(--text); text-decoration: none; }
@@ -111,11 +112,47 @@ p { margin: .6rem 0 0; text-wrap: pretty; }
 .door h2 { margin-top: auto; padding-top: 1.2rem; font-size: 2rem; line-height: 1.05; }
 .door p { color: var(--muted); }
 .door .btn { align-self: flex-start; margin-top: 1.2rem; }
+/* Satellites: a lesser door across both columns, the same plate with a quiet button */
+.door.wide { grid-column: 1 / -1; min-height: 0; flex-direction: row; align-items: center; gap: 1.5rem; }
+.door.wide .text { flex: 1; max-width: 62ch; }
+.door.wide h2 { margin: 0; padding: 0; font-size: 1.6rem; }
+.door.wide .btn { flex: none; margin: 0; align-self: center; }
+.first { padding: 1.5rem; border: 1px solid var(--line); border-radius: 4px; }
+.first h2 { font-size: 1.6rem; line-height: 1.05; }
+.first > p { color: var(--muted); }
+.steps { margin: .9rem 0 0; padding-left: 1.3rem; display: grid; gap: .45rem; }
+.steps li::marker { color: var(--hot); font-weight: 700; }
+.policy { margin-top: 2rem; max-width: 40rem; }
+.policy p:first-child { margin-top: 0; font-weight: 600; }
+.policy p + p { color: var(--muted); }
 .home-links { display: flex; flex-wrap: wrap; gap: .6rem 1.6rem; margin-top: 1.4rem; font-weight: 600; }
 .fits { margin-top: 2.6rem; }
 .fits ul { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }
 .fits li { font-weight: 600; }
 .fits li small { color: var(--faint); font-weight: 400; font-size: .875rem; }
+
+/* News: always shown, under the screen; posts are prose, separated by rules, not plates */
+.btn.quiet { background: transparent; color: var(--text); border-color: var(--line-2); }
+.btn.quiet:not([disabled]):hover { border-color: var(--hot); }
+.news { margin-top: 3.5rem; padding-top: 2rem; border-top: 1px solid var(--line); }
+.news > h2 { font-size: 2rem; line-height: 1; }
+.news-feed { margin-top: .4rem; font-size: .875rem; }
+.news-list { margin-top: 1.2rem; }
+.news-post { padding-block: 1.4rem; border-top: 1px solid var(--line); scroll-margin-top: 1rem; }
+.news-post:first-child { border-top: 0; padding-top: .4rem; }
+.news-date { margin: 0; color: var(--faint); font-size: .875rem; font-variant-numeric: tabular-nums; }
+.news-post h3 { margin: .2rem 0 0; font-size: 1.25rem; line-height: 1.25; font-weight: 700; text-wrap: balance; }
+.news-post h3 a { color: var(--text); text-decoration: none; }
+.news-post h3 a:hover { color: var(--link); text-decoration: underline; }
+.news-post:target h3 a { box-shadow: inset 0 -2px 0 var(--flame); }
+.news-body { max-width: 60ch; }
+.news-body p, .news-body li { text-wrap: pretty; }
+.news-body p, .news-body ul { margin: .7rem 0 0; }
+.news-body ul { padding-left: 1.2rem; display: grid; gap: .45rem; }
+.news-body li::marker { color: var(--faint); }
+.news-body code, .news-rel code { font: .9em ui-monospace, SFMono-Regular, Menlo, monospace; }
+.news-rel { margin-top: .8rem; font-size: .875rem; color: var(--muted); overflow-wrap: anywhere; }
+#news-more { margin-top: .6rem; }
 
 /* One screen at a time */
 [data-screen] { display: none; }
@@ -126,4 +163,6 @@ p { margin: .6rem 0 0; text-wrap: pretty; }
 	.doors, .browsers { grid-template-columns: 1fr; }
 	.door { min-height: 0; }
 	.door .art { height: 4.25rem; }
+	.door.wide { flex-direction: column; align-items: stretch; gap: 1.2rem; }
+	.door.wide .btn { align-self: flex-start; }
 }

@@ -134,7 +134,10 @@ pre-releases when a radio has no full release. The
 ## Flasher page
 
 The [Crucible flasher](https://tinker.wc8mi.net/crucible/) is one static folder: RadioFoundry's flasher page with
-Crucible's shell and look, offering only the releases above. Build it after publishing a release:
+Crucible's shell and look, offering only the releases above. It only updates: Crucible supports an upgrade from a
+RadioFoundry base, never a first install on the manufacturer's firmware (KF8S, 2026-11-27; [ADR 001](docs/crucible/adr/001-installer-two-paths.md),
+revision 1). The front page sends a first install to [RadioFoundry's flash page](https://radiofoundry.org/flash/index.html)
+as a plain link; the site never calls a RadioFoundry service. Build it after publishing a release:
 
 ```
 uv run --no-project --with-requirements site/requirements.txt python3 tools/crucible_site.py
@@ -149,10 +152,54 @@ The result is `build/crucible-site/`. Copy it to `/crucible/` on the tinker host
 - sets `data-reporting="off"`: the page sends nothing to RadioFoundry's services, and a problem report is saved as a
   file for a wc8mi/crucible issue
 - says Crucible wherever the flasher's English says RadioFoundry, and credits RadioFoundry in the footer
+- builds the shared Satellite TLE page at `tools/satellite/index.html` in the same shell. The front page links it, and
+  the flasher offers it after an update, so a radio with the satellite feature gets new satellite data without new
+  firmware. Its AMSAT button reads the daily bulletin from `../../api/amsat-tle` (`data-amsat-api`), which is
+  `/crucible/api/amsat-tle` on the tinker host: a GET-only proxy in Caddy that sends no visitor headers. The page
+  allows requests to this site only. The satellite frequencies are the page's own table, not a download
+- fails the build if a page links to a local file that is not there
 
 The look lives in `site/crucible/` (`crucible.css`, the self-hosted Barlow Condensed heading face, OFL-1.1). It loads
 after the shared stylesheets and changes no markup, so upstream's flasher keeps merging. The design record is
 `DESIGN.md`; the product notes behind it are `PRODUCT.md`.
+
+### News
+
+The front page shows a list of news posts, newest first. Add one post for each release or other change that users
+see. A post is one Markdown file in `site/crucible/news/`, named `YYYY-MM-DD-slug.md` (the slug is lowercase letters,
+digits and hyphens):
+
+```
+<!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 David Behnke -->
+---
+date: 2026-11-27
+title: A fifth radio and the NXDN radio default
+release: crucible-4e24a5e1-8a658d0d-261127-2
+seq: 1
+---
+The post body, in Markdown.
+```
+
+| Key | Need | Use |
+|-----|------|-----|
+| `date` | yes | The same date as the file name. |
+| `title` | yes | 1 to 10 words. |
+| `release` | no | The release tag. The post links to that GitHub release. |
+| `seq` | no | The order of posts on the same date. The highest number shows first. |
+
+The body is CommonMark. Raw HTML is shown as text. The ADR 001 word rules apply to the title (no banned word), not to
+the body.
+
+To name a radio, write `{{boards/<id>}}` in the title or the body, with the radio's folder name under `boards/`. The
+build puts in the radio's maker and model as the front page's radio list shows them. An id that is not a Crucible radio fails the build. The title's 10 words are counted
+after the name is put in. Do not type a radio's name in a post: `tools/check_generic.py` refuses it.
+
+The build (`tools/crucible_site.py`) puts the newest five posts in `index.html`, so they show without JavaScript. It
+writes all the posts to `data/news.json` (`crucible-news/1`: `first`, then `posts` with `id`, `date`, `title`,
+`release` and `html`) and an Atom feed to `news.xml`. When there are more than five posts, a More news button loads
+five more on each press and goes away after the last one. Each post has the anchor `#news-<date>-<slug>`; a link to
+an older post loads it. `--self-test` checks the posts. Rebuild and deploy the site after you add a post.
 
 Documentation for testers: the [usage and testing guide](docs/kf8sfork/README.md) and the
 [changelog](docs/kf8sfork/CHANGELOG.md).

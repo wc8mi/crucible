@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 David Behnke
+# The radio's update-mode steps in the words of ADR 001 (docs/crucible/adr/001-installer-two-paths.md, "Words"):
+# tools/crucible_site.py puts them in place of the shared ones (radios.json flash.bootloader). The update page shows them
+# when an update must go through update mode. At most 20 words each (the self-test)
+# SK1's place as board.toml words it (issue #203)
+steps = [
+	"Turn the volume knob to OFF.",
+	"Connect the cable to the radio and to the computer.",
+	"Push and hold PTT and SK1. SK1 is the side key just above PTT.",
+	"Turn the volume knob to ON.",
+	"Release the keys. The screen stays dark. This is correct.",
+]

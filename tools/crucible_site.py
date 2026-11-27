@@ -13,6 +13,7 @@ checked against its .zip.sha256 sidecar and its SHA256SUMS before a byte is copi
 offered. Run it with site/requirements.txt available, as site/build.py says (uv run --with-requirements ...).
 """
 import argparse
+import datetime
 import hashlib
 import html
 import json
@@ -24,11 +25,11 @@ import subprocess
 import sys
 import tempfile
 import tomllib
+import urllib.parse
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
-import boards  # noqa: E402
 import crucible  # noqa: E402
 
 FORMAT = 'release-index/1'
@@ -48,7 +49,8 @@ THEME_ICON = ('<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><ci
 WORDS = {
     'flash.release.title': 'Your radio',
     'flash.release.lead': 'The installer reads the radio and finds the correct update.',
-    'flash.release.first_install': 'Use this page for a radio with Crucible or RadioFoundry. For a radio with the manufacturer\'s firmware, use Install.',
+    'flash.release.first_install': "This page cannot install Crucible on a radio with the manufacturer's firmware. "
+                                   'Install RadioFoundry first.',
     'flash.release.running': 'On the radio now',
     'flash.release.choose': 'Select a version',
     'flash.release.installed': 'On your radio',
@@ -70,14 +72,15 @@ WORDS = {
     'flash.update.step_on': 'Set the radio to ON. Do not hold a key.',
     'flash.update.step_cable': 'Connect the programming cable to the radio and to the computer.',
     'flash.update.step_choose': 'Click Connect and select the radio in the list.',
-    'flash.update.first_install': 'Radio with the manufacturer\'s firmware?',
-    'flash.update.to_install': 'Go to Install',
-    'flash.update.not_rfoundry': 'STOP: The radio does not have Crucible or RadioFoundry. You cannot update it. Use Install.',
+    'flash.update.not_rfoundry': 'STOP: The radio does not have RadioFoundry or Crucible. You cannot update it. Install '
+                                 'RadioFoundry first.',
     'flash.update.backup': 'Make a backup first',
     'flash.update.backup_text': 'Optional. An update keeps the channels, settings, calibration and voice codec.',
     'flash.write.bootloader_title': 'Put the radio in update mode',
     'flash.write.then_connect': 'Click Connect.',
     'flash.write.found': 'The radio is in update mode.',
+    'flash.write.title': 'Update',
+    'flash.write.go': 'Update',
     'flash.write.writing': 'Do not disconnect the cable',
     'flash.write.finished': 'The update is complete. The radio starts again.',
     'flash.write.failed': 'STOP: The update stopped ({error}). Put the radio in update mode and do the update again.',
@@ -86,16 +89,13 @@ WORDS = {
     'flash.done.lead': 'When the radio shows its screen again, click Check the radio.',
     'flash.done.lead_noscreen': 'When the radio starts again, click Check the radio.',
     'flash.done.check': 'Check the radio',
-    # The Check step: the check, the backup after the install and the channel transfer. No "codeplug", "stock" or
-    # Codeplug Editor (the Crucible site has no editor)
+    # The Check step and the backup after the update. No "codeplug", "stock" or Codeplug Editor (the Crucible site has
+    # no editor)
     'flash.done.pick_port': 'The radio now has Crucible. The browser shows it as a new device. Click Check the radio '
                             'again and select {radio} in the list. If the list is empty, wait until the radio starts.',
-    'flash.done.no_codec': "STOP: The radio has no voice codec. DMR voice is not available. FM operates. Go back to "
-                           "Firmware file and select the manufacturer's firmware file.",
+    'flash.done.no_codec': 'STOP: The radio has no voice codec. DMR voice is not available. FM operates. Report the '
+                           'problem.',
     'flash.backup.title_after': 'Make a backup of the radio',
-    'flash.backup.after_lead': 'The radio has its original channels and calibration. Make a backup of them now.',
-    'flash.backup.after_channels': 'After the backup, the installer changes your channels, zones and contacts for '
-                                   'Crucible and writes them to the radio. The backup keeps the original channels.',
     'flash.backup.opt.all_text': 'Firmware, voice codec, calibration, channels and all other data in the memory chip.',
     'flash.backup.opt.firmware_text': 'The firmware, the voice codec and the factory calibration.',
     'flash.backup.opt.codeplug': 'Channels and calibration',
@@ -104,42 +104,7 @@ WORDS = {
     'flash.backup.run': 'Make the backup',
     'flash.backup.saved': 'The backup is saved as “{name}” ({size} KB). Keep it in a safe place.',
     'flash.nav.finish_no_backup': 'Finish without a backup',
-    'flash.nav.finish_no_channels': 'Finish without channels',
     'report.something_wrong': 'Is there a problem?',
-    'flash.channels.reading': 'Reading the channels',
-    'flash.channels.writing': 'Writing the channels',
-    'flash.channels.done': 'Your channels are on the radio: {counts}.',
-    'flash.channels.found': 'The radio has your channels from the manufacturer\'s firmware: {counts}. The installer can '
-                            'change them for Crucible and write them to the radio.',
-    'flash.channels.no_backup': 'CAUTION: You do not have a backup of your channels. If the write stops, you cannot '
-                                'restore them.',
-    'flash.channels.go': 'Write the channels',
-    'flash.channels.none': 'The radio has no channels to write.',
-    'flash.channels.no_storage': 'The memory chip of this radio is too small for Crucible channels. The installer did '
-                                 'not write them.',
-    'flash.channels.read_failed': 'The installer cannot read the channels. Crucible operates without them. The backup '
-                                  'has your channels.',
-    'flash.channels.convert_failed': 'The installer cannot change the channels for Crucible. Crucible operates without '
-                                     'them. The backup has your channels.',
-    'flash.channels.write_failed': 'STOP: The channel write stopped. Crucible operates without channels. The backup has '
-                                   'your channels. Report the problem.',
-    'flash.channels.check_failed': 'STOP: The radio did not accept the channels. It expected {want} and has {have}. The '
-                                   'backup has your channels. Report the problem.',
-    'flash.channels.read_failed_no_backup': 'The installer cannot read the channels. Crucible operates without them. '
-                                            'The channels are still in the radio. Make a backup to keep them.',
-    'flash.channels.convert_failed_no_backup': 'The installer cannot change the channels for Crucible. Crucible '
-                                               'operates without them. Make a backup to keep them.',
-    'flash.channels.write_failed_no_backup': 'STOP: The channel write stopped. Part of your channels can be lost. '
-                                             'Report the problem.',
-    'flash.channels.check_failed_no_backup': 'STOP: The radio did not accept the channels. It expected {want} and has '
-                                             '{have}. Report the problem.',
-    'flash.c7.channels.replace': 'The radio has Crucible channels: {have}. The original channels ({want}) replace them.',
-    'flash.c7.channels.keep': 'Keep these channels',
-    'flash.c7.channels.go': 'Write the original channels',
-    'flash.c7.channels.failed': 'STOP: The channel write stopped. The original channels are on the radio. They did not '
-                                'change.',
-    'flash.c7.channels.check_failed': 'STOP: The radio did not accept the channels. It expected {want} and has {have}. '
-                                      'The original channels are on the radio. Report the problem.',
     'flash.c7.check.title': 'Back up and check the radio',
     'flash.c7.check.run': 'Back up and check',
     'flash.done.ready': 'Crucible operates. DMR voice is available.',
@@ -168,116 +133,16 @@ WORDS = {
     'flash.codec.key_saved': 'This browser keeps the update key of the radio.',
     'flash.codec.image': 'Crucible: {what}, {size} bytes.',
     'flash.codec.why_not.unknown': "The installer cannot read the voice codec of a radio with the manufacturer's firmware.",
-    'flash.codec.or_connect': 'If the radio has Crucible or RadioFoundry, use Update.',
 }
 
-# The install card (ADR 001, decision 4 and amendment 1): the install as one numbered list on the shared install steps
-# (data-card). A radio not listed installs only after its card is written (phase 3). "now": the firmware the card
-# expects on the radio, so the shared step that asks is left out. Words as WORDS; the self-test checks the lengths
-SAVE_CPS = {
-    'id': 'save', 'title': 'Save your channels', 'kind': 'checklist', 'result': 'Saved',
-    'lead': 'Save your channels in a file before the install. Crucible changes the channel memory of the radio.',
-    'do': ['Set the radio to ON.', 'Connect the radio to the computer with the programming cable.', 'Open the CPS.',
-           'In the CPS, click Read. The CPS copies the channels from the radio.', 'Save the file on your computer.'],
-    'confirm': 'I saved my channels in a file.',
-    'alt': {'summary': 'I do not have the CPS', 'result': 'Not saved', 'confirm': 'I continue without a channel file.',
-            'caution': 'CAUTION: Without a channel file, you cannot restore your channels. You must enter them again.'},
-}
-CARD = {
-    'page': {'install': {'title': 'Install Crucible', 'lead': "Install Crucible on a radio with the manufacturer's firmware."},
-             'update': {'title': 'Update Crucible', 'lead': 'Your voice codec, channels and settings stay on the radio.'}},
-    'count': 'Step {n} of {total}',
-    'start': {'steps': [{'id': 'radio', 'title': 'Radio'}, {'id': 'build', 'title': 'Version'},
-                        {'id': 'need', 'title': 'Things you need'}, {'id': 'save', 'title': 'Save your channels'},
-                        {'id': 'codec', 'title': 'Firmware file'}, {'id': 'write', 'title': 'Install'},
-                        {'id': 'done', 'title': 'Check', 'result': 'Installed'}]},
-    'radios': {
-        'dm1701': {'now': 'stock',
-                   'mode': ['Turn the volume knob to OFF.', 'Connect the cable to the radio and to the computer.',
-                            'Push and hold PTT and SK1. SK1 is the key above PTT.', 'Turn the volume knob to ON.',
-                            'Release the keys. The screen stays dark. This is correct.'],
-                   'steps': [
-            {'id': 'radio', 'title': 'Radio'},
-            {'id': 'build', 'title': 'Version'},
-            {'id': 'need', 'title': 'Things you need', 'kind': 'checklist', 'result': 'Ready',
-             'lead': 'Get these items before you start.',
-             'items': [{'text': 'The programming cable of the radio', 'note': 'A charging cable cannot send data.'},
-                       {'text': 'A charged battery', 'note': 'Charge the battery to more than half.'},
-                       {'text': 'The Baofeng firmware file', 'note': 'Version V02.06, or Radioddity V02.01 to V02.03.'},
-                       {'text': "The manufacturer's programming software (CPS)",
-                        'note': 'Step 4 uses the CPS to save your channels. Most CPS programs operate only on Windows.'}]},
-            SAVE_CPS,
-            {'id': 'codec', 'title': 'Firmware file'},
-            {'id': 'write', 'title': 'Install', 'result': 'Installed'},
-            {'id': 'done', 'title': 'Check'}]},
-        # The DM-1701's steps on the same engine. Its two images differ by the power class, which the radio cannot
-        # check (board.toml flash.notice): the Version step says so. SK1's place as board.toml words it (issue #203)
-        'mduv380': {'now': 'stock',
-                    'mode': ['Turn the volume knob to OFF.', 'Connect the cable to the radio and to the computer.',
-                             'Push and hold PTT and SK1. SK1 is the side key just above PTT.', 'Turn the volume knob to ON.',
-                             'Release the keys. The screen stays dark. This is correct.'],
-                    'steps': [
-            {'id': 'radio', 'title': 'Radio'},
-            {'id': 'build', 'title': 'Version',
-             'notice': 'CAUTION: Select 10 W only if the label on the radio or its box shows 10 W. '
-                       'The installer cannot find an incorrect selection.'},
-            {'id': 'need', 'title': 'Things you need', 'kind': 'checklist', 'result': 'Ready',
-             'lead': 'Get these items before you start.',
-             'items': [{'text': 'The programming cable of the radio', 'note': 'A charging cable cannot send data.'},
-                       {'text': 'A charged battery', 'note': 'Charge the battery to more than half.'},
-                       {'text': 'The TYT or Retevis firmware file',
-                        'note': 'Version 18.03 to 219.74. A 5 W or a 10 W file gives the voice codec. Step 5 shows each accepted version.'},
-                       {'text': "The manufacturer's programming software (CPS)",
-                        'note': 'Step 4 uses the CPS to save your channels. Most CPS programs operate only on Windows.'}]},
-            SAVE_CPS,
-            {'id': 'codec', 'title': 'Firmware file'},
-            {'id': 'write', 'title': 'Install', 'result': 'Installed'},
-            {'id': 'done', 'title': 'Check'}]},
-        # The HR_C7000 install steps (c7000ui.js INSTALL): connect starts update mode through the manufacturer's
-        # firmware with no keys; the keys ("mode") are the factory update mode, the way in when that fails. The check
-        # step backs up the program memory and reads the voice codec from it. Tested on the DBB batch only
-        'db25d': {'now': 'stock',
-                  'mode': ['Set the radio to OFF.', 'Connect the cable to the radio and to the computer.', 'Push and hold P1.',
-                           'Push the power key.', 'Release P1. The red LED is on and the screen stays blank. This is correct.'],
-                  'steps': [
-            {'id': 'radio', 'title': 'Radio'},
-            {'id': 'build', 'title': 'Version',
-             'notice': "CAUTION: Look at the radio's Version screen. If the code after 909E. is not DBB, "
-                       'Crucible is not tested on your radio. Do not continue.'},
-            {'id': 'need', 'title': 'Things you need', 'kind': 'checklist', 'result': 'Ready',
-             'lead': 'Get these items before you start.',
-             'items': [{'text': 'The programming cable of the radio', 'note': 'The cable connects to the K1 jack of the radio.'},
-                       {'text': 'A 13.8 V power supply', 'note': 'The radio has no battery. The install stops if the supply power stops.'},
-                       {'text': 'The Radioddity firmware file',
-                        'note': 'Version 018, from 2024-05-09 or later. The installer usually reads the voice codec from the radio '
-                                'and asks for this file only if it cannot.'},
-                       {'text': "The manufacturer's programming software (CPS)",
-                        'note': 'Step 4 uses the CPS to save your channels. Most CPS programs operate only on Windows.'}]},
-            SAVE_CPS,
-            {'id': 'connect', 'title': 'Update mode'},
-            {'id': 'check', 'title': 'Backup', 'result': 'Checked'},
-            {'id': 'write', 'title': 'Install', 'result': 'Installed'},
-            {'id': 'done', 'title': 'Check'}]},
-    },
-}
+# The update-mode steps of a radio in the words of ADR 001 (site/crucible/radios/<id>/update-mode.toml): they replace
+# the shared ones (radios.json flash.bootloader), shown when an update must go through update mode
+def update_mode():
+    return {f.parent.name: tomllib.loads(f.read_text())['steps']
+            for f in sorted((ROOT / 'site' / 'crucible' / 'radios').glob('*/update-mode.toml'))}
 
-
-def card_texts(card=CARD):
-    """Every string of the card a user reads, with whether it is an instruction (at most 20 words) or not (25)."""
-    out = []
-    def walk(v, key=''):
-        if isinstance(v, dict):
-            for k, x in v.items():
-                if k not in ('id', 'kind', 'now'):
-                    walk(x, k)
-        elif isinstance(v, list):
-            for x in v:
-                walk(x, key)
-        elif isinstance(v, str):
-            out.append((key, v))
-    walk(card)
-    return out
-
+# A first install is RadioFoundry's (ADR 001, revision 2026-11-27): a plain link to its flasher page, never a request
+RF_FLASH = 'https://radiofoundry.org/flash/index.html'
 
 # Crucible sends nothing to RadioFoundry or any other service: the browser allows requests and scripts from this
 # site only (inline scripts: the theme and terms lines in the head), whatever a shared module tries
@@ -426,61 +291,121 @@ def words(catalog):
     return WORDS
 
 
-def crucible_page(flash, project, assets, built):
-    """The shared flasher page with Crucible's head, shell, words and switches."""
-    page = flash
+def catalog_words(page, project, extra=None):
+    """The page's string catalog with Crucible's name, plus extra (each key checked against the catalog)."""
     i18n = one(r'(<script type="application/json" id="i18n">)(.*?)(</script>)', page, 'string catalog')
     strings = json.loads(i18n.group(2))
     strings = {k: v.replace('RadioFoundry', project['name']) for k, v in strings.items()}
-    strings.update(words(strings))
+    if extra is not None:
+        strings.update(extra(strings))
     catalog = json.dumps(strings, ensure_ascii=False).replace('</', '<\\/')
-    page = page[:i18n.start(2)] + catalog + page[i18n.end(2):]
+    return page[:i18n.start(2)] + catalog + page[i18n.end(2):]
 
+
+def shell(page, project, assets, built, root, title, body, help_more=''):
+    """A shared site page in Crucible's head, band and foot. root leads from the page to the site root ('' or
+    '../../'); body is the new body tag; help_more follows the help line in the foot."""
     name = html.escape(project['name'])
-    title = f'{name} · Update'
-    lead = 'Your voice codec, channels and settings stay on the radio.'
     head = (f'<head>\n<meta charset="utf-8">\n{CSP}\n<meta name="viewport" content="width=device-width, initial-scale=1">\n'
             f'<title>{title}</title>\n<meta name="description" content="{html.escape(project["tagline"])}">\n'
             f'<meta name="theme-color" content="#ff7738">\n<meta name="robots" content="noindex">\n'
-            f'<link rel="icon" href="crucible/icon-32.png?v={assets}" type="image/png" sizes="32x32">\n'
-            f'<link rel="apple-touch-icon" href="crucible/icon-180.png?v={assets}">\n'
-            f'<link rel="preload" href="crucible/fonts/barlow-condensed-700-latin.woff2" as="font" type="font/woff2" crossorigin>\n'
-            f'<link rel="stylesheet" href="static/css/tokens.css?v={assets}">\n'
-            f'<link rel="stylesheet" href="static/css/site.css?v={assets}">\n'
-            f'<link rel="stylesheet" href="crucible/crucible.css?v={assets}">\n'
+            f'<link rel="icon" href="{root}crucible/icon-32.png?v={assets}" type="image/png" sizes="32x32">\n'
+            f'<link rel="apple-touch-icon" href="{root}crucible/icon-180.png?v={assets}">\n'
+            f'<link rel="preload" href="{root}crucible/fonts/barlow-condensed-700-latin.woff2" as="font" type="font/woff2" crossorigin>\n'
+            f'<link rel="stylesheet" href="{root}static/css/tokens.css?v={assets}">\n'
+            f'<link rel="stylesheet" href="{root}static/css/site.css?v={assets}">\n'
+            f'<link rel="stylesheet" href="{root}crucible/crucible.css?v={assets}">\n'
             '<script>try{var t=localStorage.getItem("rfoundry-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>\n'
-            f'{TERMS_FIRST}\n'
+            f'{TERMS_FIRST.replace("./#terms", (root or "./") + "#terms")}\n'
             '</head>')
     m = one(r'<head>.*?</head>', page, 'head')
     page = page[:m.start()] + head + page[m.end():]
     m = one(r'<body [^>]*>', page, 'body tag')
-    page = page[:m.start()] + ('<body class="page-flash" data-root="" data-home="" data-gl-more="More" '
-                               'data-releases="releases/index.json" data-card="data/install-card.json" data-reporting="off">') + page[m.end():]
+    page = page[:m.start()] + body + page[m.end():]
     band = ('<header class="cx-band">\n\t<div class="wrap">\n'
-            f'\t\t<a class="cx-brand" href="./">{MARK}<span class="cx-word">{name}</span></a>\n'
+            f'\t\t<a class="cx-brand" href="{root or "./"}">{MARK}<span class="cx-word">{name}</span></a>\n'
             f'\t\t<button class="theme-toggle" type="button" aria-label="Switch light and dark" title="Switch light and dark">{THEME_ICON}</button>\n'
             '\t</div>\n</header>')
     m = one(r'<header class="site-header">.*?</header>', page, 'site header')
     page = page[:m.start()] + band + page[m.end():]
-    m = one(r'(<section class="wrap section page-head">\s*<h1>)(.*?)(</h1>\s*<p class="lead">)(.*?)(</p>)', page, 'page head')
-    page = page[:m.start()] + m.group(1) + f'Update {name}' + m.group(3) + lead + m.group(5) + page[m.end():]
-    m = one(r'<dialog id="beta-notice".*?</dialog>\s*', page, 'beta notice')
-    page = page[:m.start()] + page[m.end():]
     repo, issues, upstream, community = (html.escape(project[k]) for k in ('repo', 'issues', 'upstream', 'community'))
     foot = ('<footer class="cx-foot">\n\t<div class="wrap">\n'
             f'\t\t<p><strong>Help:</strong> ask in the <a href="{community}">Crucible Community on Discord</a>, or <a href="{issues}">open an issue on {html.escape(project["repo"].removeprefix("https://github.com/"))}</a>. '
-            'Report a Problem saves a file. Attach the file to the issue. This page sends nothing to a server.</p>\n'
+            f'{help_more}This page sends nothing to a server.</p>\n'
             f'\t\t<p>{name} is maintained by {html.escape(project["maintainer"])}. It is based on '
             f'<a href="{upstream}">RadioFoundry</a> (MIT) and is not affiliated with it. Do not ask RadioFoundry about {name}. '
             f'<a href="{repo}">Source</a>.</p>\n'
             f'\t\t<p class="build-stamp">{html.escape(built)}</p>\n'
             '\t</div>\n</footer>')
     m = one(r'<footer class="site-footer">.*?</footer>', page, 'site footer')
-    page = page[:m.start()] + foot + page[m.end():]
+    return page[:m.start()] + foot + page[m.end():]
+
+
+def crucible_page(flash, project, assets, built):
+    """The shared flasher page with Crucible's head, shell, words and switches."""
+    page = catalog_words(flash, project, words)
+    name = html.escape(project['name'])
+    page = shell(page, project, assets, built, '', f'{name} · Update',
+                 '<body class="page-flash" data-root="" data-home="" data-gl-more="More" '
+                 'data-releases="releases/index.json" data-reporting="off">',
+                 'Report a Problem saves a file. Attach the file to the issue. ')
+    lead = 'Your voice codec, channels and settings stay on the radio.'
+    m = one(r'(<section class="wrap section page-head">\s*<h1>)(.*?)(</h1>\s*<p class="lead">)(.*?)(</p>)', page, 'page head')
+    first = (f'\n<p class="notice info cx-first">{name} updates only a radio with RadioFoundry or {name}. For a radio with the '
+             f'manufacturer\'s firmware, <a href="{RF_FLASH}">install RadioFoundry</a> first.</p>')
+    page = page[:m.start()] + m.group(1) + f'Update {name}' + m.group(3) + lead + m.group(5) + first + page[m.end():]
+    m = one(r'<dialog id="beta-notice".*?</dialog>\s*', page, 'beta notice')
+    page = page[:m.start()] + page[m.end():]
     page = page.replace('"../static/', '"static/')
     if '../' in re.sub(r'<script type="application/json" id="i18n">.*?</script>', '', page, flags=re.S):
         raise SiteError('flash page: a ../ link is left')
     return page
+
+
+# The satellite page: the AMSAT bulletin comes through this site's proxy (/crucible/api/amsat-tle on the tinker host),
+# named relative to the page so the folder can move; the frequencies are the page's own table (satellite-tle.js)
+SAT_PAGE = 'tools/satellite/index.html'
+SAT_API = '../../api/amsat-tle'
+SAT_LEAD = ('Load new satellite data on a radio with RadioFoundry or {name}. A firmware update is not necessary. '
+            'The radio must have the satellite feature. Select up to 10 FM satellites. Send them to the radio over USB, '
+            'or save a bundle file.')
+
+
+def satellite_page(tle, project, assets, built):
+    """The shared Satellite TLE page (site/templates/satellite_tle.html) in Crucible's shell."""
+    page = catalog_words(tle, project)
+    name = html.escape(project['name'])
+    page = shell(page, project, assets, built, '../../', f'{name} · Satellites',
+                 '<body class="page-tools" data-root="../../" data-home="../../" data-gl-more="More">',
+                 "The AMSAT button gets AMSAT's daily bulletin through this site. ")
+    m = one(r'(<section class="wrap section page-head">)\s*<p class="eyebrow">.*?</p>(\s*<h1>)(.*?)(</h1>\s*<p class="lead">)(.*?)(</p>)',
+            page, 'satellite page head')
+    page = (page[:m.start()] + m.group(1) + m.group(2) + 'Satellites' + m.group(4) + SAT_LEAD.format(name=name)
+            + m.group(6) + page[m.end():])
+    m = one(r'<section class="wrap section satellite-tle" id="satellite-tle"', page, 'satellite form')
+    page = page[:m.end()] + f' data-amsat-api="{SAT_API}"' + page[m.end():]
+    return page
+
+
+def local_links(out):
+    """Every href and src in the served pages that names a local file names one that is there."""
+    bad = []
+    pages = [(f, re.sub(r'<script type="application/json" id="i18n">.*?</script>', '', f.read_text(), flags=re.S))
+             for f in sorted(out.rglob('*.html'))]
+    feed = out / 'data' / 'news.json'
+    if feed.exists():		# the posts More adds go into index.html
+        pages.append((out / 'index.html', '\n'.join(x['html'] for x in json.loads(feed.read_text())['posts'])))
+    for f, text in pages:
+        for ref in re.findall(r'(?:href|src)="([^"]*)"', text):
+            if not ref or re.match(r'^(?:[a-z][a-z0-9+.-]*:|//|#)', ref, re.I):
+                continue
+            target = (f.parent / ref.split('#')[0].split('?')[0])
+            if target.is_dir():
+                target = target / 'index.html'
+            if not target.resolve().is_relative_to(out.resolve()) or not target.exists():
+                bad.append(f'{f.relative_to(out)}: {ref}')
+    if bad:
+        raise SiteError('a page links to a missing local file: ' + ', '.join(bad))
 
 
 def no_upstream_api(out):
@@ -498,8 +423,123 @@ def no_upstream_api(out):
             raise SiteError(f'{f.relative_to(out)}: names a RadioFoundry service')
 
 
-def front_page(template, project, radios, assets, built):
-    """Crucible's front page (site/crucible/installer/page.html): the browser gate, the terms and the two doors."""
+# News: one Markdown post per update in site/crucible/news/ (CRUCIBLE.md, "News"), newest first on the front page
+NEWS_FORMAT = 'crucible-news/1'
+NEWS_FIRST = 5			# posts in the page itself; More loads the next NEWS_FIRST from data/news.json
+NEWS_NAME = re.compile(r'^(\d{4}-\d{2}-\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)\.md$')
+# {{boards/<id>}} in a post is that radio's name (radio_names): a post names a radio without a radio id in its text
+NEWS_BOARD = re.compile(r'\{\{boards/([a-z0-9_]+)\}\}')
+# ADR 001's words: no banned term (titles, the front page, the update page)
+BANNED = r"\b(flash|bootloader|DFU|stock|codeplug|beta|upgrade|OEM)\b|n't"
+
+
+def radio_names(radios):
+    """{board id: 'Maker Model'} for the offered radios, as the front page's radio list names them."""
+    out = {}
+    for r in radios:
+        maker = r.get('maker', '')
+        model = r.get('model') or r['name'].removeprefix(maker + ' ')
+        out.setdefault(r.get('flash', {}).get('board') or r['id'], f'{maker} {model}'.strip())
+    return out
+
+
+def parse_post(name, text, names=None):
+    """One post file: the SPDX comment, a front matter (date, title, optional release and seq) and a Markdown body.
+    {id, date, title, release, seq, body}; seq orders posts of one day (higher is newer). names (radio_names) fills
+    {{boards/<id>}}; an id not in it fails."""
+    m = NEWS_NAME.match(name)
+    if not m:
+        raise SiteError(f'news/{name}: name it YYYY-MM-DD-slug.md (lowercase, digits, hyphens)')
+    rest = re.sub(r'^(\s*<!--.*?-->)*\s*', '', text, flags=re.S)
+    fm = re.match(r'---\n(.*?)\n---\n', rest, re.S)
+    if not fm:
+        raise SiteError(f'news/{name}: no front matter between --- lines')
+    meta = {}
+    for line in fm.group(1).splitlines():
+        if line.strip():
+            k, sep, v = line.partition(':')
+            if not sep or k.strip() not in ('date', 'title', 'release', 'seq'):
+                raise SiteError(f'news/{name}: front matter line {line!r} (date, title, release, seq)')
+            meta[k.strip()] = v.strip()
+    date, slug = m.groups()
+    def radio(t):
+        if (names or {}).get(t.group(1)) is None:
+            raise SiteError(f'news/{name}: {t.group(0)} is not a Crucible radio')
+        return names[t.group(1)]
+    meta = {k: NEWS_BOARD.sub(radio, v) for k, v in meta.items()}
+    if meta.get('date') != date:
+        raise SiteError(f'news/{name}: date {meta.get("date")!r} differs from the file name')
+    try:
+        datetime.date.fromisoformat(date)
+    except ValueError:
+        raise SiteError(f'news/{name}: {date} is not a date')
+    title, release = meta.get('title', ''), meta.get('release', '')
+    if not title or len(title.split()) > 10:
+        raise SiteError(f'news/{name}: a title of 1 to 10 words')
+    if re.search(BANNED, title, re.I):
+        raise SiteError(f'news/{name}: the title uses a word ADR 001 does not allow')
+    if release and not SAFE.match(release):
+        raise SiteError(f'news/{name}: unsafe release tag {release!r}')
+    body = NEWS_BOARD.sub(radio, rest[fm.end():]).strip()
+    if not body:
+        raise SiteError(f'news/{name}: no text')
+    return {'id': f'news-{date}-{slug}', 'date': date, 'title': title, 'release': release,
+            'seq': int(meta.get('seq') or 0), 'body': body}
+
+
+def read_news(folder, names=None):
+    """Every post in folder, newest first; ids unique."""
+    posts = [parse_post(f.name, f.read_text(), names) for f in sorted(Path(folder).glob('*.md'))]
+    ids = [x['id'] for x in posts]
+    if len(set(ids)) != len(ids):
+        raise SiteError('news: two posts with one name')
+    return sorted(posts, key=lambda x: (x['date'], x['seq'], x['id']), reverse=True)
+
+
+def news_date(date):
+    d = datetime.date.fromisoformat(date)
+    return f'{d.day} {d.strftime("%B")} {d.year}'
+
+
+def news_html(posts, repo, render):
+    """Each post as an <article>: render(markdown) gives the body's HTML (raw HTML in a post is escaped)."""
+    out = []
+    for x in posts:
+        rel = (f'\n\t<p class="news-rel">Release <a href="{html.escape(repo)}/releases/tag/{x["release"]}">'
+               f'<code>{x["release"]}</code></a></p>') if x['release'] else ''
+        out.append(f'<article class="news-post" id="{x["id"]}">\n\t<p class="news-date"><time datetime="{x["date"]}">'
+                   f'{news_date(x["date"])}</time></p>\n\t<h3><a href="#{x["id"]}">{html.escape(x["title"])}</a></h3>\n'
+                   f'\t<div class="news-body">{render(x["body"])}</div>{rel}\n</article>')
+    return out
+
+
+def markdown_renderer():
+    from markdown_it import MarkdownIt		# site/requirements.txt
+    md = MarkdownIt('commonmark', {'html': False, 'linkify': False})
+    return md.render
+
+
+def news_atom(posts, items, project):
+    """An Atom feed of the posts (news.xml), their HTML as content."""
+    base = project['flasher'].rstrip('/') + '/'
+    esc = lambda v: html.escape(v, quote=True)
+    updated = (posts[0]['date'] if posts else '2026-01-01') + 'T00:00:00Z'
+    def absolute(item):		# a feed reader has no page to be relative to: every link in a post is made absolute
+        return re.sub(r'((?:href|src)=")([^"]*)"',
+                      lambda m: m.group(1) + html.escape(urllib.parse.urljoin(base, html.unescape(m.group(2)))) + '"', item)
+    entries = ''.join(
+        f'<entry><id>{esc(base)}#{x["id"]}</id><title>{esc(x["title"])}</title><updated>{x["date"]}T00:00:00Z</updated>'
+        f'<link href="{esc(base)}#{x["id"]}"/><content type="html">{esc(absolute(item))}</content></entry>\n'
+        for x, item in zip(posts, items))
+    return (f'<?xml version="1.0" encoding="utf-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom">\n'
+            f'<id>{esc(base)}news.xml</id><title>{esc(project["name"])} news</title><updated>{updated}</updated>\n'
+            f'<link href="{esc(base)}"/><link rel="self" href="{esc(base)}news.xml"/>'
+            f'<author><name>{esc(project["maintainer"])}</name></author>\n{entries}</feed>\n')
+
+
+def front_page(template, project, radios, assets, built, news='', news_more=''):
+    """Crucible's front page (site/crucible/installer/page.html): the browser gate, the terms, the Update door and the
+    news (the newest posts as HTML; news_more the More button's markup, or empty when every post is shown)."""
     items = []
     for r in sorted(radios, key=lambda r: r.get('order', 0)):
         maker, model = r.get('maker', ''), r.get('model') or r['name'].removeprefix(r.get('maker', '') + ' ')
@@ -507,7 +547,7 @@ def front_page(template, project, radios, assets, built):
         small = html.escape(maker + (f' · also {also}' if also else ''))
         items.append(f'\t\t\t<li>{html.escape(model)} <small>{small}</small></li>')
     fill = {k: html.escape(project[k]) for k in ('name', 'tagline', 'repo', 'issues', 'upstream', 'maintainer', 'community')}
-    fill.update(csp=CSP, assets=html.escape(assets), built=html.escape(built), radios='\n'.join(items),
+    fill.update(csp=CSP, rf_flash=RF_FLASH, news=news, news_more=news_more, assets=html.escape(assets), built=html.escape(built), radios='\n'.join(items),
                 repo_slug=html.escape(project['repo'].removeprefix('https://github.com/')))
     page = re.sub(r'\{\{(\w+)\}\}', lambda m: fill[m.group(1)], template)
     if not items:
@@ -535,8 +575,9 @@ def build(out, packages, github, site_out=None):
         radios = json.loads((site / 'data' / 'radios.json').read_text())
         radios['radios'] = [r for r in radios['radios'] if r.get('id') in boards or r.get('flash', {}).get('board') in boards]
         radios['planned'] = []
-        for r in radios['radios']:		# the card's update-mode steps (its words) replace the shared ones
-            mode = CARD['radios'].get(r.get('id'), {}).get('mode')
+        modes = update_mode()
+        for r in radios['radios']:		# the update-mode steps in Crucible's words replace the shared ones
+            mode = modes.get(r.get('id'))
             if mode:
                 r['flash']['bootloader'] = mode
         (out / 'data' / 'radios.json').write_text(json.dumps(radios))
@@ -546,8 +587,7 @@ def build(out, packages, github, site_out=None):
         info.update({'version': f'crucible-{commit}', 'branch': '', 'repo': project['repo'], 'community': '', 'release': '', 'beta': '', 'reports': {'sentry_dsn': ''}})
         info.pop('tool', None)
         (out / 'data' / 'site.json').write_text(json.dumps(info, indent=1))
-        (out / 'data' / 'install-card.json').write_text(json.dumps(CARD, indent=1) + '\n')
-        shutil.copytree(ROOT / 'site' / 'crucible', out / 'crucible', ignore=shutil.ignore_patterns('page.html'))
+        shutil.copytree(ROOT / 'site' / 'crucible', out / 'crucible', ignore=shutil.ignore_patterns('page.html', 'radios', 'news'))
         brand = ROOT / 'docs' / 'crucible' / 'brand'
         for size in (32, 180, 512):
             shutil.copy2(brand / f'hot-core-icon-{size}.png', out / 'crucible' / f'icon-{size}.png')
@@ -555,14 +595,38 @@ def build(out, packages, github, site_out=None):
         assets = re.search(r'\?v=([0-9a-f]+)', flash).group(1)
         built = f'{project["name"]} {commit} · page built {info.get("built", "")}'
         (out / 'update.html').write_text(crucible_page(flash, project, assets, built))
+        (out / SAT_PAGE).parent.mkdir(parents=True)
+        (out / SAT_PAGE).write_text(satellite_page((site / SAT_PAGE).read_text(), project, assets, built))
         no_upstream_api(out)
         template = (ROOT / 'site' / 'crucible' / 'installer' / 'page.html').read_text()
-        (out / 'index.html').write_text(front_page(template, project, radios['radios'], assets, built))
+        posts = read_news(ROOT / 'site' / 'crucible' / 'news', radio_names(radios['radios']))
+        items = news_html(posts, project['repo'], markdown_renderer())
+        feed = {'format': NEWS_FORMAT, 'first': NEWS_FIRST,
+                'posts': [{k: x[k] for k in ('id', 'date', 'title', 'release')} | {'html': item}
+                          for x, item in zip(posts, items)]}
+        (out / 'data' / 'news.json').write_text(json.dumps(feed, ensure_ascii=False, indent=1) + '\n')
+        (out / 'news.xml').write_text(news_atom(posts, items, project))
+        more = ('<button class="btn quiet" type="button" id="news-more" data-feed="data/news.json">More news</button>'
+                if len(items) > NEWS_FIRST else '')
+        (out / 'index.html').write_text(front_page(template, project, radios['radios'], assets, built,
+                                                   '\n'.join(items[:NEWS_FIRST]), more))
     releases = [local_release(p) for p in packages]
     if github:
         releases += github_releases(repo_slug, ROOT / 'build' / 'crucible-releases')
     index = write_releases(releases, out, set(boards), repo_slug)
+    after_update(out)
+    local_links(out)
     return index
+
+
+def after_update(out):
+    """The flasher's offer after a satellite-capable install (`${HOME}tools/satellite/index.html`, from update.html
+    with data-home="") lands on the page this build made."""
+    for js in ('app.js', 'c7000ui.js'):
+        if '`${HOME}' + SAT_PAGE + '`' not in (out / 'static' / 'js' / 'flasher' / js).read_text():
+            raise SiteError(f'{js}: the satellite offer changed (the shared page changed?)')
+    if 'data-home=""' not in (out / 'update.html').read_text() or not (out / SAT_PAGE).is_file():
+        raise SiteError(f'update.html: the satellite offer does not reach {SAT_PAGE}')
 
 
 def self_test():
@@ -640,6 +704,64 @@ def self_test():
         else:
             raise AssertionError('a RadioFoundry service left in the output')
     assert 'location.replace("./#terms")' in page, 'the update page asks for the terms first'
+    # the satellite page: the shared template in Crucible's shell; the AMSAT button uses this site's proxy only
+    tle = ('<html><head><title>x</title></head><body class="page-tools" data-root="../../" data-home="../../">'
+           '<header class="site-header">nav</header><main><section class="wrap section page-head">\n'
+           '<p class="eyebrow"><a href="../../tools/index.html">Tools</a></p>\n<h1>Satellite TLE Update</h1>\n<p class="lead">l</p>'
+           '</section><section class="wrap section satellite-tle" id="satellite-tle"><button id="tle-amsat">a</button></section>'
+           '</main><footer class="site-footer">f</footer><script type="application/json" id="i18n">{"b": "RadioFoundry"}</script>'
+           '<script type="module" src="../../static/js/tletool.js?v=1"></script></body></html>')
+    sat = satellite_page(tle, proj, '1', 'v')
+    assert '<h1>Satellites</h1>' in sat and 'eyebrow' not in sat and 'tools/index.html' not in sat and 'site-header' not in sat
+    assert f'id="satellite-tle" data-amsat-api="{SAT_API}"' in sat and not SAT_API.startswith(('/', 'http'))
+    assert CSP in sat and 'amsat.org' not in CSP and 'location.replace("../../#terms")' in sat and '"Crucible"' in sat
+    assert 'href="../../crucible/crucible.css?v=1"' in sat and 'class="cx-brand" href="../../"' in sat
+    assert all(len(x.split()) <= 25 for x in re.split(r'(?<=\.) ', SAT_LEAD))
+    with tempfile.TemporaryDirectory() as d:
+        out = Path(d)
+        (out / 'a').mkdir()
+        (out / 'a' / 'x.css').write_text('')
+        (out / 'index.html').write_text('<a href="a/x.css?v=1">x</a><a href="#n">n</a><a href="https://e/">e</a><a href="a/">d</a>'
+                                        '<script type="application/json" id="i18n">{"k": "<a href=\\"gone.html\\">"}</script>')
+        try:
+            local_links(out)
+        except SiteError as e:
+            assert 'a/' in str(e) and 'x.css' not in str(e) and 'gone' not in str(e)
+        else:
+            raise AssertionError('a link to a folder without index.html passed')
+        (out / 'a' / 'index.html').write_text('<a href="../index.html">up</a>')
+        local_links(out)
+        (out / 'data').mkdir()
+        (out / 'data' / 'news.json').write_text(json.dumps({'posts': [{'html': '<a href="gone.html">g</a>'}]}))
+        try:
+            local_links(out)
+        except SiteError as e:
+            assert 'gone.html' in str(e)
+        else:
+            raise AssertionError('a missing link in a post only in news.json passed')
+        (out / 'data' / 'news.json').write_text(json.dumps({'posts': [{'html': '<a href="a/">a</a>'}]}))
+        local_links(out)
+        js = out / 'static' / 'js' / 'flasher'
+        js.mkdir(parents=True)
+        for f in ('app.js', 'c7000ui.js'):
+            (js / f).write_text('location.assign(`${HOME}' + SAT_PAGE + '`);')
+        (out / 'update.html').write_text('<body data-home="">')
+        try:
+            after_update(out)
+        except SiteError:
+            pass
+        else:
+            raise AssertionError('the satellite offer passed without its page')
+        (out / SAT_PAGE).parent.mkdir(parents=True)
+        (out / SAT_PAGE).write_text('')
+        after_update(out)
+        (out / 'b.html').write_text('<a href="../outside.html">o</a>')
+        try:
+            local_links(out)
+        except SiteError:
+            pass
+        else:
+            raise AssertionError('a link out of the site passed')
     shared = json.loads((ROOT / 'site' / 'i18n' / 'en.json').read_text())
     assert words(shared) is WORDS, 'every Crucible word replaces a shared key with the same placeholders'
     for bad in ({'flash.release.go': 'x'}, {}):
@@ -649,40 +771,34 @@ def self_test():
             pass
         else:
             raise AssertionError('a lost key or placeholder accepted')
-    for key, v in card_texts():
-        assert not re.search(r"\b(flash|bootloader|DFU|stock|codeplug|beta)\b|n't", v, re.I), v
-        assert len(v.split()) <= (20 if key in ('do', 'mode') else 25), f'too long: {v}'
-    # every card radio: offered by crucible.toml, its board, the firmware it expects, its update-mode words, and its
-    # backend's install steps in their order (the card sets "now" itself), ending in the write and the check. The
-    # backends' lists are read from their sources: app.js STEPS.install, c7000ui.js INSTALL
-    js = ROOT / 'site' / 'static' / 'js' / 'flasher'
-    def js_list(path, pattern):
-        return re.findall(r'"([a-z]+)"', re.search(pattern, path.read_text()).group(1))
-    backend_steps = {'anyroad-dfu': js_list(js / 'app.js', r'const STEPS = \{\n\tinstall: \[([^\]]*)\]'),
-                     'c7000-stub': js_list(js / 'c7000ui.js', r'const INSTALL = \[([^\]]*)\]')}
-    assert backend_steps['c7000-stub'][-2:] == ['write', 'done'] and 'codec' in backend_steps['anyroad-dfu'], backend_steps
-    def in_order(need, ids):
-        it = iter(ids)
-        return all(x in it for x in need)
-    assert not in_order(backend_steps['c7000-stub'], ['radio', 'build', 'connect', 'write', 'check', 'done'])
+    # ADR 001's words: no banned term, at most 20 words for a step, 25 for anything else (per sentence)
+    banned = BANNED
+    def sentences(text):
+        return [x for x in re.split(r'(?<=[.?!])\s+', re.sub(r'<[^>]+>|\{\{\w+\}\}', 'X', text)) if x.strip()]
     offered = crucible.board_ids(ROOT)
-    for rid, r in CARD['radios'].items():
-        toml = ROOT / 'boards' / rid / 'board.toml'
-        assert toml.is_file() and rid in offered, f'card radio {rid}: no board, or not in crucible.toml'
-        assert r.get('now') == 'stock' and r.get('mode'), f'card radio {rid}: now and mode'
-        ids = [s['id'] for s in r['steps']]
-        assert 'now' not in ids and ids[0] == 'radio' and ids[-2:] == ['write', 'done'], f'card radio {rid}: {ids}'
-        web = boards.FAMILIES[tomllib.loads(toml.read_text())['flash']['family']]['web']
-        need = [x for x in backend_steps[web] if x != 'now']
-        assert in_order(need, ids), f'card radio {rid}: {web} needs {need} in order, has {ids}'
-        # cardResult shows a shared step's fixed result whatever the step did: no result may claim an outcome the
-        # engine can skip (the HR_C7000 check step takes no backup on the factory update-mode route)
-        for st in r['steps']:
-            if st.get('kind') != 'checklist' and 'result' in st:
-                assert (st['id'], st['result']) in {('write', 'Installed'), ('check', 'Checked')}, f'card radio {rid}: {st}'
+    modes = update_mode()
+    assert modes, 'no update-mode words'
+    for rid, steps in modes.items():
+        assert (ROOT / 'boards' / rid / 'board.toml').is_file() and rid in offered, f'update mode {rid}: not a Crucible board'
+        for v in steps:
+            assert not re.search(banned, v, re.I) and len(v.split()) <= 20, f'update mode {rid}: {v}'
+    # Crucible never installs on a radio with the manufacturer's firmware (ADR 001, revision 2026-11-27): the update
+    # page has no install card and names RadioFoundry's flasher page for a first install, as a plain link
+    assert 'data-card' not in page and 'install-card' not in page, 'no install card on the update page'
+    assert f'<a href="{RF_FLASH}">install RadioFoundry</a> first' in page, 'the update page sends a first install to RadioFoundry'
+    tpl_real = (ROOT / 'site' / 'crucible' / 'installer' / 'page.html').read_text()
+    assert 'update.html#install' not in tpl_real and 'data-screen="install"' not in tpl_real, 'the front page has no Install door'
+    assert '{{rf_flash}}' in tpl_real, 'the front page links RadioFoundry for a first install'
+    home = re.search(r'<section data-screen="home".*?</section>', tpl_real, re.S).group(0)
+    for para in re.findall(r'<(?:p|li|h2)[^>]*>(.*?)</(?:p|li|h2)>', home, re.S):
+        for x in sentences(para):
+            assert not re.search(banned, x, re.I) and len(x.split()) <= 25, f'front page: {x}'
+    assert f'href="{SAT_PAGE}"' in home, 'the front page links the satellite page'
+    assert not re.search(banned, SAT_LEAD, re.I)
     for v in WORDS.values():
-        assert not re.search(r"\b(flash|bootloader|DFU|stock|codeplug|beta)\b|n't", v, re.I), v
-    tpl = '{{csp}}<h1>{{name}}</h1><ul>\n{{radios}}\n</ul><p>{{built}}</p><a href="{{issues}}">{{repo_slug}}</a><a href="{{community}}">D</a>'
+        assert not re.search(banned, v, re.I), v
+        assert all(len(x.split()) <= 25 for x in sentences(v)), f'too long: {v}'
+    tpl = '{{csp}}<a href="{{rf_flash}}">R</a><h1>{{name}}</h1><ul>\n{{radios}}\n</ul><p>{{built}}</p><a href="{{issues}}">{{repo_slug}}</a><a href="{{community}}">D</a>'
     radios = [{'name': 'TYT X-2', 'maker': 'TYT', 'model': 'X-2', 'also': ['TYT X-3', 'Other Y'], 'order': 2},
               {'name': 'B Z-1', 'maker': 'B', 'model': 'Z-1', 'also': [], 'order': 1}]
     front = front_page(tpl, proj, radios, '1', 'v <b>')
@@ -690,7 +806,56 @@ def self_test():
     assert front.index('Z-1') < front.index('X-2'), 'radios in their order'
     assert '<li>X-2 <small>TYT · also X-3, Other Y</small></li>' in front and '>o/r</a>' in front
     assert '<a href="https://discord.gg/c">D</a>' in front, 'the front page links the Discord community'
-    print('crucible site: package checks, index, page shell, front page checks passed')
+    assert f'<a href="{RF_FLASH}">R</a>' in front and RF_FLASH.startswith('https://radiofoundry.org/'), 'a plain link'
+    # news: the repository's posts parse, newest first with unique anchors; a bad file is refused; raw HTML is escaped
+    posts = read_news(ROOT / 'site' / 'crucible' / 'news', {b: b for b in crucible.board_ids(ROOT)})
+    assert posts and [(x['date'], x['seq']) for x in posts] == sorted(((x['date'], x['seq']) for x in posts), reverse=True)
+    assert len({x['id'] for x in posts}) == len(posts)
+    head = '<!-- SPDX-License-Identifier: MIT -->\n<!-- c -->\n'
+    good = parse_post('2026-01-02-a-b.md', head + '---\ndate: 2026-01-02\ntitle: Hello\nrelease: crucible-x-1\n---\nText.\n')
+    assert good['id'] == 'news-2026-01-02-a-b' and good['release'] == 'crucible-x-1' and good['body'] == 'Text.'
+    for name, text in (('2026-01-02-A.md', '---\ndate: 2026-01-02\ntitle: T\n---\nx'),
+                       ('2026-02-30-a.md', '---\ndate: 2026-02-30\ntitle: T\n---\nx'),
+                       ('2026-01-02-a.md', '---\ndate: 2026-01-03\ntitle: T\n---\nx'),
+                       ('2026-01-02-a.md', '---\ndate: 2026-01-02\ntitle: ' + 'w ' * 11 + '\n---\nx'),
+                       ('2026-01-02-a.md', '---\ndate: 2026-01-02\ntitle: T\nrelease: a/b\n---\nx'),
+                       ('2026-01-02-a.md', '---\ndate: 2026-01-02\ntitle: T\nauthor: x\n---\nx'),
+                       ('2026-01-02-a.md', 'date: 2026-01-02\ntitle: T\nx'),
+                       ('2026-01-02-a.md', '---\ndate: 2026-01-02\ntitle: A beta build\n---\nx'),
+                       ('2026-01-02-a.md', '---\ndate: 2026-01-02\ntitle: T\n---\nThe {{boards/nope}} radio.')):
+        try:
+            parse_post(name, text)
+        except SiteError:
+            pass
+        else:
+            raise AssertionError(f'bad post accepted: {name} {text!r}')
+    item = news_html([good], 'https://github.com/o/r', lambda b: '<p>' + html.escape(b) + '</p>')[0]
+    assert 'id="news-2026-01-02-a-b"' in item and 'href="#news-2026-01-02-a-b"' in item and '2 January 2026' in item
+    assert 'href="https://github.com/o/r/releases/tag/crucible-x-1"' in item
+    try:
+        render = markdown_renderer()
+    except ImportError:
+        render = None			# rendering is checked where site/requirements.txt is installed
+    if render:
+        assert '&lt;script' in render('<script>x</script>') and 'href="javascript' not in render('[a](javascript:alert(1))')
+    feed = news_atom([good], [item], {**proj, 'flasher': 'https://h/c/'})
+    assert '<id>https://h/c/#news-2026-01-02-a-b</id>' in feed and '&lt;article' in feed
+    assert 'href=&quot;https://h/c/#news-2026-01-02-a-b&quot;' in feed and 'href=&quot;#' not in feed, 'feed links are absolute'
+    # {{boards/<id>}}: the radio's name, in the title (words counted after) and the body
+    names = radio_names([{'id': 'r1', 'maker': 'Acme', 'model': 'X-1', 'name': 'Acme X-1'},
+                         {'id': 'r2x', 'flash': {'board': 'r2'}, 'maker': 'Acme', 'name': 'Acme Y 2'}])
+    assert names == {'r1': 'Acme X-1', 'r2': 'Acme Y 2'}
+    named = parse_post('2026-01-02-n.md', '---\ndate: 2026-01-02\ntitle: The {{boards/r2}} joins\n---\nOn the {{boards/r1}}.', names)
+    assert named['title'] == 'The Acme Y 2 joins' and named['body'] == 'On the Acme X-1.'
+    try:
+        parse_post('2026-01-02-n.md', '---\ndate: 2026-01-02\ntitle: {{boards/r2}} ' + 'w ' * 8 + '\n---\nx', names)
+    except SiteError:
+        pass
+    else:
+        raise AssertionError('a title over 10 words after the radio name passed')
+    front = front_page('{{news}}|{{news_more}}', proj, radios, '1', 'v', item, '<button>')
+    assert front == item + '|<button>'
+    print('crucible site: package checks, index, page shell, front page, news checks passed')
 
 
 def main():

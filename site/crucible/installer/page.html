@@ -1,13 +1,13 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 David Behnke -->
-<!-- Crucible's front page (ADR 001, phase 1): tools/crucible_site.py fills {{...}} and writes it as index.html -->
+<!-- Crucible's front page (ADR 001; updates only, revision 2026-11-27): tools/crucible_site.py fills {{...}} and writes it as index.html -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 {{csp}}
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{name}} · Install and update</title>
+<title>{{name}} · Update</title>
 <meta name="description" content="{{tagline}}">
 <meta name="theme-color" content="#ff7738">
 <meta name="robots" content="noindex">
@@ -51,7 +51,7 @@
 			<a href="https://www.google.com/chrome/"><b>Chrome</b><span>Windows, Mac or Linux computer</span></a>
 			<a href="https://www.microsoft.com/edge"><b>Edge</b><span>Windows, Mac or Linux computer</span></a>
 		</div>
-		<p class="note">Safari, Firefox and phone browsers cannot install {{name}}. Opera on a computer can also connect.</p>
+		<p class="note">Safari, Firefox and phone browsers cannot update a radio. Opera on a computer can also connect.</p>
 	</div>
 </section>
 
@@ -62,7 +62,7 @@
 		<ol class="terms">
 			<li>{{name}} is experimental firmware. It is for tinkerers.</li>
 			<li>{{name}} has no warranty. You accept all risk.</li>
-			<li>An install can cause damage to your radio. Keep your backup files.</li>
+			<li>An update can cause damage to your radio. Keep your backup files.</li>
 			<li>You are responsible for your radio and for its transmissions.</li>
 		</ol>
 		<label class="accept"><input type="checkbox" id="terms-ok"> I understand these items and I accept the risk.</label>
@@ -72,20 +72,35 @@
 </section>
 
 <section data-screen="home" class="home">
-	<h1>What do you want to do?</h1>
+	<h1>Update {{name}}</h1>
 	<div class="doors">
-		<a class="door" href="update.html#install">
-			<span class="art"><svg viewBox="0 0 60 120" aria-hidden="true"><use href="#handheld"/></svg><svg class="lit" viewBox="0 0 70 80" aria-hidden="true"><use href="#mark"/></svg></span>
-			<h2>Install {{name}}</h2>
-			<p>My radio has the manufacturer's firmware.</p>
-			<span class="btn hot">Install</span>
-		</a>
 		<a class="door" href="update.html">
 			<span class="art"><svg viewBox="0 0 60 120" aria-hidden="true"><use href="#handheld"/></svg><svg class="arrow" viewBox="0 0 40 40" aria-hidden="true"><use href="#arrow"/></svg></span>
-			<h2>Update {{name}}</h2>
-			<p>My radio has {{name}} or RadioFoundry.</p>
+			<h2>Update to {{name}}</h2>
+			<p>My radio has RadioFoundry or {{name}}.</p>
 			<span class="btn hot">Update</span>
 		</a>
+		<div class="first">
+			<h2>Start with RadioFoundry</h2>
+			<p>{{name}} does not install on a radio with the manufacturer's firmware.</p>
+			<ol class="steps">
+				<li>Install RadioFoundry from <a href="{{rf_flash}}">radiofoundry.org</a>.</li>
+				<li>Make sure that the radio operates correctly with RadioFoundry.</li>
+				<li>Update the radio to {{name}} on this page.</li>
+			</ol>
+		</div>
+		<a class="door wide" href="tools/satellite/index.html">
+			<span class="text">
+				<h2>Satellites</h2>
+				<p>Load new satellite data on a radio with RadioFoundry or {{name}}. A firmware update is not necessary. The radio must have the satellite feature.</p>
+			</span>
+			<span class="btn quiet">Load satellites</span>
+		</a>
+	</div>
+	<div class="policy">
+		<p><b>Use {{name}} only if you accept opinionated features. Some features are not tested.</b></p>
+		<p>{{name}} adds the changes from RadioFoundry. If a {{name}} feature conflicts with RadioFoundry, or RadioFoundry does it better, {{name}} removes its feature.</p>
+		<p>{{name}} updates only radios with RadioFoundry or {{name}}. To return to RadioFoundry, install RadioFoundry again. Then reset the settings of the radio.</p>
 	</div>
 	<div class="home-links"><a href="{{community}}">Discord community</a><a href="{{repo}}">GitHub</a><a href="{{issues}}">Report a problem</a></div>
 	<div class="fits">
@@ -94,6 +109,15 @@
 {{radios}}
 		</ul>
 	</div>
+</section>
+
+<section class="news" aria-labelledby="news-title">
+	<h2 id="news-title">News</h2>
+	<p class="news-feed"><a href="news.xml">Atom feed</a></p>
+	<div class="news-list" id="news-list">
+{{news}}
+	</div>
+	{{news_more}}
 </section>
 
 </main>

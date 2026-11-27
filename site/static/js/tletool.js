@@ -2,7 +2,7 @@
 // Copyright (c) 2026 The RadioFoundry Authors
 
 import {
-	AMSAT_BULLETIN, buildTleBundle, DEFAULT_SELECTED_IDS, MAX_SELECTED_PROFILES, filterFmSatellites,
+	AMSAT_BULLETIN, amsatEndpoint, buildTleBundle, DEFAULT_SELECTED_IDS, MAX_SELECTED_PROFILES, filterFmSatellites,
 	parseTleCatalog, SATELLITES,
 } from "./satellite-tle.js";
 import { pushSatelliteBundle } from "./satellite-radio.js";
@@ -20,6 +20,7 @@ const pushButton = document.getElementById("satellite-tle-push");
 const status = document.getElementById("satellite-tle-status");
 const providerInput = document.getElementById("tle-provider");
 const searchInput = document.getElementById("satellite-tle-search");
+const amsatApi = amsatEndpoint(document.getElementById("satellite-tle")?.dataset.amsatApi);
 const profileById = new Map(SATELLITES.map((satellite) => [satellite.id, satellite]));
 const RADIO_PORT_FILTERS = [RFOUNDRY_USB, ...CABLES];
 let catalog = null;
@@ -130,7 +131,7 @@ function loadText(text, provider, fromAmsat) {
 async function fetchAmsatText() {
 	let response;
 	try {
-		response = await fetch("/api/amsat-tle", { cache: "no-store", headers: { Accept: "text/plain" } });
+		response = await fetch(amsatApi, { cache: "no-store", headers: { Accept: "text/plain" } });
 	} catch (error) {
 		throw new Error(t("tools.satellite.status.fetch_failed", { status: error.message }));
 	}

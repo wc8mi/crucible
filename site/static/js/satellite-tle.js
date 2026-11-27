@@ -24,6 +24,21 @@ export const SATELLITES = Object.freeze([
 export const DEFAULT_SELECTED_IDS = Object.freeze([25544, 27607, 43017]);
 export const AMSAT_BULLETIN = "https://www.amsat.org/tle/daily-bulletin.txt";
 export const MAX_SELECTED_PROFILES = 10;
+// The same-origin proxy for AMSAT_BULLETIN (functions/api/amsat-tle.js). A page served from another path names its
+// own in data-amsat-api; only a same-origin path is taken, so a page cannot point the button at another site.
+export const AMSAT_API = "/api/amsat-tle";
+
+export function amsatEndpoint(value, base = globalThis.location?.href) {
+	const v = typeof value === "string" ? value.trim() : "";
+	if (!v || !base) return AMSAT_API;
+	try {
+		// the browser's own parse of the very string returned, so a tab, newline, backslash or a space that trim()
+		// strips cannot turn the path into another host
+		return new URL(v, base).origin === new URL(base).origin ? v : AMSAT_API;
+	} catch {
+		return AMSAT_API;
+	}
+}
 
 export function filterFmSatellites(records) {
 	const fmIds = new Set(SATELLITES.map((satellite) => satellite.id));

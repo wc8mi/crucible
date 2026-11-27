@@ -40,9 +40,18 @@ The table is RadioFoundry's status. Crucible's own features have not run on ever
 
 ## Install and update
 
-**[Crucible flasher](https://tinker.wc8mi.net/crucible/)**, in Chrome or Edge: connect the radio, pick a release,
-flash. It updates a radio that already runs Crucible or RadioFoundry, keeps the codec and settings, and backs up
-and restores.
+Crucible updates only a radio that already runs RadioFoundry or Crucible. It does not install on the manufacturer's
+firmware.
+
+1. Install RadioFoundry from [radiofoundry.org](https://radiofoundry.org/flash/index.html) and get the radio working
+   with it.
+2. Use Crucible only if you accept opinionated features that are sometimes not tested. Crucible takes in
+   RadioFoundry's changes and drops its own feature when it conflicts with RadioFoundry or RadioFoundry does it better.
+3. Open the **[Crucible flasher](https://tinker.wc8mi.net/crucible/)** in Chrome or Edge: connect the radio, pick a
+   release, update. It keeps the codec, channels and settings, and can make a backup first.
+
+To go back, install RadioFoundry again and reset the settings: Crucible keeps a few settings RadioFoundry may later
+use for something else ([ADR 003](docs/crucible/adr/003-digital-agc.md), [ADR 004](docs/crucible/adr/004-nxdn-radio-default.md)).
 
 Releases are on the [releases page](https://github.com/wc8mi/crucible/releases). Each zip holds every radio's image
 and its manifest, with the license notices.

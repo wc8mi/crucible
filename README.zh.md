@@ -36,8 +36,16 @@ DB25-D PRO 是 Crucible 新加入的电台：Crucible 自己的功能（数字 A
 
 ## 安装与升级
 
-在 Chrome 或 Edge 中打开 **[Crucible 刷机工具](https://tinker.wc8mi.net/crucible/)**：连接电台，选择版本，刷入。
-它可以升级已运行 Crucible 或 RadioFoundry 的电台，保留语音编解码器和设置，也能备份和恢复。
+Crucible 只升级已运行 RadioFoundry 或 Crucible 的电台，不能安装到厂家原版固件上。
+
+1. 先从 [radiofoundry.org](https://radiofoundry.org/flash/index.html) 安装 RadioFoundry，并确认电台在 RadioFoundry 下工作正常。
+2. 只有在你接受带有个人取向、有时未经测试的功能时才使用 Crucible。Crucible 会合并 RadioFoundry 的更改；如果自己的功能与
+   RadioFoundry 冲突，或 RadioFoundry 做得更好，Crucible 会移除自己的功能。
+3. 在 Chrome 或 Edge 中打开 **[Crucible 刷机工具](https://tinker.wc8mi.net/crucible/)**：连接电台，选择版本，升级。
+   它保留语音编解码器、信道和设置，也可以先做备份。
+
+要回到 RadioFoundry，请重新安装 RadioFoundry 并重置设置：Crucible 有几项自己的设置，RadioFoundry 以后可能把同一位置用于别的用途
+（[ADR 003](docs/crucible/adr/003-digital-agc.md)、[ADR 004](docs/crucible/adr/004-nxdn-radio-default.md)）。
 
 版本发布在[发布页面](https://github.com/wc8mi/crucible/releases)。每个 zip 包含所有电台的固件、清单和许可声明。
 

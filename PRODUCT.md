@@ -22,8 +22,9 @@ desktop with Chrome or Edge, the radio on a USB programming cable, and want to u
 
 Crucible is firmware for DMR radios, downstream of RadioFoundry (MIT): a subset of its radios with the maintainer's
 own choices (DMR, P25, NXDN and an incomplete YSF; trunking off). Its flasher page updates a connected radio to a
-Crucible release that matches it: connect, pick a release made for the radio and its band/power option, install.
-Backup and restore stay available, secondary. Success: the radio runs the release the user picked, with its codec,
+Crucible release that matches it: connect, pick a release made for the radio and its band/power option, update.
+A first install is RadioFoundry's: the page links its flash page and
+updates only radios that run RadioFoundry or Crucible (ADR 001, revision 1). Backup and restore stay available, secondary. Success: the radio runs the release the user picked, with its codec,
 channels and settings kept.
 
 ## Positioning

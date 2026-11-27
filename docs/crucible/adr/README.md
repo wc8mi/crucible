@@ -8,7 +8,7 @@ record's supporting material (prototypes, screens) goes in a folder with the sam
 
 | No. | Decision | Status |
 |---|---|---|
-| [001](001-installer-two-paths.md) | The installer page: two paths, a work card, plain words | Accepted (with amendment 1) |
+| [001](001-installer-two-paths.md) | The installer page: two paths, a work card, plain words | Accepted (amendment 1; revision 1: first install removed) |
 | [002](002-tx-level-on-air.md) | TX level: one on-air target, a trim per radio | Superseded by 003 |
 | [003](003-digital-agc.md) | Digital AGC: two switches, defaults per radio | Accepted |
 | [004](004-nxdn-radio-default.md) | NXDN radio default: stored, 4800 bit/s, a quick rate switch | Proposed |

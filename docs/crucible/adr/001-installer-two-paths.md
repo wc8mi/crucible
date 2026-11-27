@@ -5,7 +5,7 @@
 
 | | |
 |---|---|
-| Status | Accepted (KF8S, 2026-11-26) |
+| Status | Accepted (KF8S, 2026-11-26); revised 2026-11-27: first install removed ([Revision 1](#revision-1-update-only)) |
 | Date | 2026-11-26 |
 | Decides | The page at tinker.wc8mi.net/crucible/ |
 | Material | [001/prototype.html](001/prototype.html) (open with a local web server from the repository root), [001/screens/](001/screens/) |
@@ -190,6 +190,31 @@ install from this page.
 | DB25-D PRO | Radio, Version, Things you need, Save your channels, Update mode, Backup, Install, Check | The HR_C7000 install steps. Update mode starts through the manufacturer's firmware with no keys; the P1 keys are the way in when that fails. Version shows a caution: tested only on 909E.DBB. Backup closes as "Checked": the update-mode route takes no backup |
 
 Not changed: the gate, the terms, the doors, decision 5's checkbox and no-CPS path, the words, the look.
+
+## Revision 1: update only
+
+| | |
+|---|---|
+| Status | Accepted (KF8S, 2026-11-27) |
+| Changes | Decisions 3, 4 and 5, amendment 1 and phases 2 and 3: the Install path is removed. The rest of this record stays. |
+
+KF8S decided that Crucible supports only an upgrade from a RadioFoundry base. In their words: "disable the install
+new radio option on our website and recommend folks get their radio working with radio foundry's firmware first and
+only use ours if they are willing to accept opinionated and sometimes untested features. We will always try to bring
+in upstream features and remove ours if there is a conflict or they solve things a better way. We only are going to
+support upgrading from a RadioFoundry base."
+
+| No. | Change | Why |
+|---|---|---|
+| 1 | The home screen has one door, **Update**. Beside it, three steps send a first install to RadioFoundry's flash page (`https://radiofoundry.org/flash/index.html`, a plain link) | A first install from the manufacturer's firmware is RadioFoundry's job. A radio that works on RadioFoundry is a known base for Crucible. |
+| 2 | A policy note on the home screen: Crucible's features are opinionated and some are not tested; Crucible takes in RadioFoundry's changes and removes its own feature on a conflict or when RadioFoundry does it better; to return, install RadioFoundry and reset the settings (ADR 003, ADR 004) | The user decides with the facts in front of them. |
+| 3 | The work card, `data/install-card.json` and the release page's `#install` route are removed. The shared flasher (`app.js`) and its tests are back to their state before phase 2 (only Crucible's release-page additions are taken out). On a release page, Troubleshooting offers no reinstall, only the restores; the update task keeps its update-mode retry | A release page builds no image, so a reinstall there stops at an empty step. Other changes to the shared flasher stay as they were. |
+| 4 | The update page names RadioFoundry for a first install, and its "not RadioFoundry" stop says to install RadioFoundry first | The words had said "Use Install". |
+| 5 | Under Update, a Satellites door opens the shared Satellite TLE page. It loads new satellite data on a radio with RadioFoundry or Crucible, without a firmware update | The flasher offers that page after an update, and it was not built. |
+
+The Update path does not change. It reads the radio over the debug link and accepts any firmware that answers with a
+board name of a Crucible radio, RadioFoundry's or Crucible's. The screens of the Install path above (4 to 17) are kept
+as a record. The phase plan's phases 2 and 3 are closed without the Install path.
 
 ## Review log
 

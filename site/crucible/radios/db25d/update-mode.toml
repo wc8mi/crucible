@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 David Behnke
+# The radio's update-mode steps in the words of ADR 001 (docs/crucible/adr/001-installer-two-paths.md, "Words"):
+# tools/crucible_site.py puts them in place of the shared ones (radios.json flash.bootloader). The update page shows them
+# when an update must go through update mode. At most 20 words each (the self-test)
+# The factory update mode of the HR_C7000 radios: the way in when the update through the firmware fails
+steps = [
+	"Set the radio to OFF.",
+	"Connect the cable to the radio and to the computer.",
+	"Push and hold P1.",
+	"Push the power key.",
+	"Release P1. The red LED is on and the screen stays blank. This is correct.",
+]

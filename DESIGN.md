@@ -284,7 +284,7 @@ glyph.
 
 ### Buttons
 - **Shape:** square shoulders (3px).
-- **Primary:** hot-core fill and border, iron text, 600 weight. One per step: Connect, then Install.
+- **Primary:** hot-core fill and border, iron text, 600 weight. One per step: Connect, then Update.
 - **Hover / Active:** hot-core-lift, then hot-core-press. No brightness filter.
 - **Quiet:** transparent, muted text; hover fills raised plate with full-strength text.
 - **Focus:** 2px outline in focus color (flame dark, rust light), 3px offset. Inside the band the outline is iron.
