@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The ui_svc.h calls the radio core answers: the talk target and the one-shot target of the focused row
 // (docs/spec/dmr-voice.md), the temporary channel changes (timeslot, color code, mode), the hear all, monitor and VOX
 // latches, privacy with the stored key, scan, key beeps and the radio's settings (docs/spec/radio-features.md).
@@ -289,9 +290,43 @@ uint32_t ui_svc_feat_radio(void)
 	       0;
 }
 
+#if CONFIG_NXDN
+// The talk target in NXDN on the radio's settings (ui_nxdn_on_settings): the RAM settings' call. TEMPORARY sets it
+// (the UI counts it temporary while it isn't the stored talk group); PERMANENT makes a group the stored talk group (a
+// unit stays a call for now: the radio default holds a group); DEFAULT goes back to the stored talk group
+static bool nxdn_talk_to(uint32_t id, bool private_call, uint8_t life)
+{
+	radio_nxdn_settings_t n;
+	uint16_t dst;
+
+	radio_nxdn_settings(&n);
+	if (life == UI_TALK_DEFAULT) {
+		n.tx_dst = (uint16_t)ui_svc_setting_get(UI_SET_NXDN_TG);
+		n.unit_call = false;
+		radio_req_nxdn_settings(&n);
+		return true;
+	}
+	if ((life != UI_TALK_TEMPORARY && life != UI_TALK_PERMANENT) || !ui_nxdn_talk_id(id, &dst))
+		return false;
+	if (life == UI_TALK_PERMANENT && !private_call)
+		return ui_svc_setting_set(UI_SET_NXDN_TG, dst);	// stored, and in force at once
+	n.tx_dst = dst;
+	n.unit_call = private_call;
+	radio_req_nxdn_settings(&n);
+	return true;
+}
+#endif
+
 #if CONFIG_DMR
 bool ui_svc_talk_to(uint32_t id, bool private_call, uint8_t life)
 {
+#if CONFIG_NXDN
+	radio_get_view(&ui_svc_view);
+	if (ui_nxdn_on_settings(&ui_svc_view))
+		return nxdn_talk_to(id, private_call, life);
+	if (ui_nxdn_stored_channel(&ui_svc_view))
+		return false;	// its own record's target (the UI says so)
+#endif
 	switch (life) {
 	case UI_TALK_TEMPORARY:
 		radio_req_dmr_target(id, private_call);

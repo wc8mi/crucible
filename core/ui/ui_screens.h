@@ -163,6 +163,7 @@ enum {
 	QT_SPLIT,		// in the VFO, in place of QT_MONITOR (FM) / QT_PRIVACY (DMR): the TX frequency or offset
 	QT_YSF_ROOMS,		// YSF, in place of FM's Tone: the Rooms page
 	QT_DGID,		// YSF, in place of FM's Width: the DG-ID, both ways
+	QT_NXDN_RATE,		// NXDN, in place of FM's Width: the radio default's rate, 4800 or 9600 bit/s
 
 };
 // The tile kind at position 0..8 (keys 1..9) for this channel or the VFO

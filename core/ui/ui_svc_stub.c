@@ -258,6 +258,8 @@ static int8_t tx_audio_preferences[UI_SET_MIC_INPUT - UI_SET_TX_LEVEL_DMR + 1];	
 // Digital AGC (radio/digital_agc.h), past the table too, held as settings_t holds them: the switches as manual bits
 // (0 = both On, as the store starts), P25 and NXDN as a choice + 1 (0 = unset)
 static uint8_t agc_manual, agc_tx_p25, agc_tx_nxdn;
+// The NXDN radio default, past the table too: the store's defaults (4800 bit/s, RX any RAN, TX RAN 1, group 1)
+static int32_t nxdn_default[UI_SET_NXDN_TG - UI_SET_NXDN_RATE + 1] = { 0, 0, 1, 1 };
 #if CONFIG_RX_AGC
 // The RX choice in force for every mode, after a row or the switch changed
 static void agc_rx_configure(void)
@@ -277,6 +279,8 @@ int32_t ui_svc_ram_get(uint8_t id)
 		return dagc_tx_p25_stored(agc_tx_p25);
 	if (id == UI_SET_TX_LEVEL_NXDN)
 		return dagc_tx_nxdn_stored(agc_tx_nxdn, (uint8_t)tx_audio_preferences[0]);
+	if (id >= UI_SET_NXDN_RATE && id <= UI_SET_NXDN_TG)
+		return nxdn_default[id - UI_SET_NXDN_RATE];
 #if CONFIG_RX_AGC
 	if (id >= UI_SET_RX_AGC_DMR && id <= UI_SET_RX_AUDIO_LEVELS)
 		return rx_audio_preferences[id - UI_SET_RX_AGC_DMR];
@@ -311,6 +315,10 @@ bool ui_svc_ram_set(uint8_t id, int32_t value)
 	}
 	if (id >= UI_SET_TX_LEVEL_DMR && id <= UI_SET_MIC_INPUT) {
 		tx_audio_preferences[id - UI_SET_TX_LEVEL_DMR] = (int8_t)value;
+		return true;
+	}
+	if (id >= UI_SET_NXDN_RATE && id <= UI_SET_NXDN_TG) {
+		nxdn_default[id - UI_SET_NXDN_RATE] = value;
 		return true;
 	}
 	if (id >= UI_SET_RAM_COUNT)

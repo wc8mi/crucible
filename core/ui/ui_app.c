@@ -531,10 +531,33 @@ void ui_sb_age(char *buf, size_t len, uint32_t ms)
 
 // --- talking to a target ---
 
+#if CONFIG_NXDN
+// Why NXDN can't call t now, NULL if it can: a stored NXDN channel calls its own record's target, and NXDN has no call
+// to 0 or past 65519
+static const char *nxdn_talk_refused(const ui_target_t *t)
+{
+	uint16_t dst;
+	if (ui_nxdn_stored_channel(view))
+		return TR(TALK_TOAST_NXDN_SET_IN_CHANNEL, "NXDN: set in the channel");
+	if (ui_nxdn_on_settings(view) && !ui_nxdn_talk_id(t->id, &dst))
+		return TR(CHAN_TOAST_NXDN_ID_MAX, "NXDN IDs go up to 65519");
+	return NULL;
+}
+#endif
+
 void ui_talk(const ui_target_t *t, bool permanent)
 {
 	static char msg[48];
 	char name[32];
+#if CONFIG_NXDN
+	const char *why = nxdn_talk_refused(t);
+	if (why != NULL) {
+		ui_toast(why);
+		return;
+	}
+	if (ui_nxdn_on_settings(view) && !t->group)
+		permanent = false;	// the NXDN radio default holds a talk group: a unit is a call for now
+#endif
 	ui_sb_target(name, sizeof name, t);
 	if (permanent && !ui_svc_talk_to(t->id, !t->group, UI_TALK_PERMANENT)) {
 		// No codeplug writer yet: use it for now and say so
@@ -1034,6 +1057,10 @@ bool ui_try_save_channel(void)
 
 static bool target_manual(void)
 {
+#if CONFIG_NXDN
+	if (view->ch.mode == RADIO_MODE_NXDN)
+		return ui_nxdn_talk_temporary(view);
+#endif
 #if CONFIG_DMR
 	return view->dmr.target_manual;
 #else
@@ -1475,6 +1502,12 @@ static void quick_unavailable(uint8_t kind)
 	case QT_MODE: ui_toast(TR(WHY_VFO_ONE_MODE_IN_BUILD, "VFO: one mode in this build")); break;
 	case QT_TO_VFO: ui_toast(TR(WHY_VFO_NOT_IN_BUILD, "VFO: not in this build")); break;
 	case QT_VOX: ui_toast(TR(WHY_VOX_NOT_ON_RADIO_YET, "VOX: not on this radio yet")); break;
+#if CONFIG_NXDN
+	case QT_NXDN_RATE:
+		ui_toast(ui_nxdn_stored_channel(view) ? TR(TALK_TOAST_NXDN_SET_IN_CHANNEL, "NXDN: set in the channel") :
+			 TR(QUICK_WHY_NXDN_RATE_NOT_ON_RADIO, "This rate: not on this radio"));
+		break;
+#endif
 	default: ui_toast(TR(WHY_NOT_IN_BUILD, "Not in this build")); break;
 	}
 }
@@ -1609,6 +1642,18 @@ static void quick_activate(int tile)
 		ui_st.dgid_edit = view->ysf.tx_dgid;
 		ui_st.quick_edit = true;
 		break;
+#endif
+#if CONFIG_NXDN
+	case QT_NXDN_RATE: {
+		// The radio default's rate, stored: the VFO and channels in NXDN for now run on it (ui_quick_tile refused
+		// a stored NXDN channel and a rate the board can't run)
+		bool fast = (view->nxdn.flags & RADIO_NXDN_9600) == 0;
+		if (ui_svc_setting_set(UI_SET_NXDN_RATE, fast))
+			ui_toast(fast ? TR(QUICK_TOAST_NXDN_9600, "NXDN 9600 bit/s") : TR(QUICK_TOAST_NXDN_4800, "NXDN 4800 bit/s"));
+		else
+			quick_unavailable(kind);
+		break;
+	}
 #endif
 	case QT_HEAR_ALL:
 		quick_monitor(kind);

@@ -777,10 +777,41 @@ int32_t ui_svc_setting_get(uint8_t id)
 	return id >= UI_SET_RAM_COUNT && id < UI_SET_COUNT ? sim_late[id - UI_SET_RAM_COUNT] : ui_svc_ram_get(id);
 }
 
+#if CONFIG_NXDN
+static radio_view_t view;	// (defined again below: one object)
+static void changed(void);
+// The NXDN radio default (ui_svc_storage.c's nxdn_default_set): checked, stored, and in force at once where the radio
+// runs on the settings (the VFO, a channel in NXDN for now)
+static bool sim_nxdn_default(uint8_t id, int32_t value)
+{
+	if (id == UI_SET_NXDN_RATE ? value < 0 || value > 1 :
+	    id == UI_SET_NXDN_TG ? value < 1 || (value > (int32_t)RADIO_NXDN_UNIT_MAX && value != (int32_t)UI_NXDN_ID_ALL) :
+	    value < 0 || value > RADIO_NXDN_RAN_MAX)
+		return false;
+	sim_late[id - UI_SET_RAM_COUNT] = value;
+	if (id == UI_SET_NXDN_RATE)
+		view.nxdn.flags = (uint8_t)((view.nxdn.flags & ~RADIO_NXDN_9600) | (value ? RADIO_NXDN_9600 : 0));
+	else if (id == UI_SET_NXDN_RX_RAN)
+		view.nxdn.rx_ran = (uint8_t)value;
+	else if (id == UI_SET_NXDN_TX_RAN)
+		view.nxdn.tx_ran = (uint8_t)value;
+	else {
+		view.nxdn.talk = (uint16_t)value;
+		view.nxdn.flags &= (uint8_t)~RADIO_NXDN_TALK_UNIT;
+	}
+	changed();
+	return true;
+}
+#endif
+
 bool ui_svc_setting_set(uint8_t id, int32_t value)
 {
 	if ((id == UI_SET_RSSI_VHF || id == UI_SET_RSSI_UHF) && (value < -20 || value > 20))
 		return false;
+#if CONFIG_NXDN
+	if (id >= UI_SET_NXDN_RATE && id <= UI_SET_NXDN_TG)
+		return sim_nxdn_default(id, value);
+#endif
 #if CONFIG_RX_AGC
 	if (id >= UI_SET_RX_AGC_DMR && id <= UI_SET_RX_AUDIO_LEVELS)
 		return ui_svc_ram_set(id, value);
@@ -2021,6 +2052,24 @@ bool ui_svc_zone_event(uint8_t kind, uint32_t id, ui_event_t *ev) { (void)kind; 
 
 bool ui_svc_talk_to(uint32_t id, bool private_call, uint8_t life)
 {
+#if CONFIG_NXDN
+	// NXDN (ui_svc_radio.c's nxdn_talk_to): on the radio default a group kept is the stored talk group, the rest for
+	// now; a stored NXDN channel keeps its record's target
+	if (ui_nxdn_stored_channel(&view))
+		return false;
+	if (ui_nxdn_on_settings(&view)) {
+		uint16_t dst = (uint16_t)ui_svc_setting_get(UI_SET_NXDN_TG);
+		if (life != UI_TALK_DEFAULT && !ui_nxdn_talk_id(id, &dst))
+			return false;
+		if (life == UI_TALK_PERMANENT && !private_call)
+			return ui_svc_setting_set(UI_SET_NXDN_TG, dst);
+		view.nxdn.talk = dst;
+		view.nxdn.flags = (uint8_t)((view.nxdn.flags & ~RADIO_NXDN_TALK_UNIT) |
+			(life != UI_TALK_DEFAULT && private_call ? RADIO_NXDN_TALK_UNIT : 0));
+		changed();
+		return true;
+	}
+#endif
 	to_selected();
 	if (view.vfo && life != UI_TALK_DEFAULT) {
 		vfo_talk = id;		// the VFO's own target, kept with it: nothing to write
@@ -2814,6 +2863,11 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	// The TX levels and mic input start fresh each run: a flow's stepping doesn't reach the next radio
 	sim_late[UI_SET_TX_LEVEL_DMR - UI_SET_RAM_COUNT] = sim_late[UI_SET_TX_LEVEL_YSF - UI_SET_RAM_COUNT] = 0;
 	sim_late[UI_SET_MIC_INPUT - UI_SET_RAM_COUNT] = 0;
+#if CONFIG_NXDN
+	// The NXDN radio default as a new radio starts (settings_defaults): 4800 bit/s, any RAN in, RAN 1 out, group 1
+	sim_late[UI_SET_NXDN_RATE - UI_SET_RAM_COUNT] = sim_late[UI_SET_NXDN_RX_RAN - UI_SET_RAM_COUNT] = 0;
+	sim_late[UI_SET_NXDN_TX_RAN - UI_SET_RAM_COUNT] = sim_late[UI_SET_NXDN_TG - UI_SET_RAM_COUNT] = 1;
+#endif
 	ui_svc_ram_set(UI_SET_AGC_RX_AUTO, 1);	// Digital AGC: both switches On, as a new radio starts
 	ui_svc_ram_set(UI_SET_AGC_TX_AUTO, 1);
 	emergency_on = false;
@@ -2929,7 +2983,7 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 #endif
 #if CONFIG_NXDN
 	memset(&view.nxdn, 0, sizeof view.nxdn);
-	view.nxdn.flags = RADIO_NXDN_9600;	// the NXDN settings' defaults (radio_nxdn.c): 9600 bit/s, RAN 1, group 1
+	view.nxdn.flags = 0;	// the NXDN radio default's (settings_defaults): 4800 bit/s, any RAN in, RAN 1 out, group 1
 	view.nxdn.tx_ran = 1;
 	view.nxdn.talk = 1;
 #endif
