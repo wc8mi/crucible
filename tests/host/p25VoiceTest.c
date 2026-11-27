@@ -408,7 +408,7 @@ static void testTxManualCeiling(void)
 	int16_t mic[AUDIO_BLOCK_SAMPLES], out[AUDIO_BLOCK_SAMPLES];
 	p25_voice_stats_t s;
 	begin();
-	p25VoiceSetAgc(false);
+	p25VoiceSetTxTarget(0);
 	for (uint8_t step = 5; step <= 10; step += 5) {
 		p25VoiceSetMicGain(step);
 		p25VoiceTx(true);
@@ -630,7 +630,7 @@ static void testParrotMatchesTx(void)
 	p25_voice_stats_t s;
 	p25_parrot_view_t v;
 	begin();
-	p25VoiceSetAgc(false);
+	p25VoiceSetTxTarget(0);
 	p25VoiceSetMicGain(10);
 	p25VoiceTx(true);
 	feed_tone(12000, 1);
@@ -657,7 +657,7 @@ static void testParrotAgcMatchesTx(void)
 	static uint8_t frames[500][IMBE_BYTES], transmitted[60][IMBE_BYTES];
 	int16_t mic[160], out[160];
 	begin();
-	p25VoiceSetAgc(true);
+	p25VoiceSetTxTarget(3277);
 	p25VoiceTx(true);
 	for (unsigned b = 0; b < 60; b++) {
 		for (unsigned i = 0; i < 160; i++) mic[i] = (int16_t)((i % 40 < 20 ? 700 : -700) + (b < 30 ? 2500 : -2500));
@@ -849,7 +849,7 @@ static void testTxAgc(void)
 	for (unsigned i = 0; i < 160; i++)
 		mic[i] = (int16_t)(500 * sin(2 * M_PI * i / 40));
 	begin();
-	p25VoiceSetAgc(true);
+	p25VoiceSetTxTarget(3277);
 	p25VoiceTx(true);
 	for (unsigned f = 0; f < 150; f++) {
 		p25VoiceAudioBlock(mic, out, NULL);
@@ -862,7 +862,7 @@ static void testTxAgc(void)
 	CHECK(s.tx_mic_peak > 4500 && s.tx_mic_peak < 4800, "AGC did not reach -20 dBFS for the reference tone: peak %u", (unsigned)s.tx_mic_peak);
 	CHECK(s.tx_gain_q16 > TX_LEVEL_UNITY && s.tx_limited_blocks == 0, "AGC did not report quiet speech boost");
 	p25VoiceTx(false);
-	p25VoiceSetAgc(false);
+	p25VoiceSetTxTarget(0);
 	p25VoiceEnd();
 }
 #endif
@@ -876,7 +876,7 @@ static void gate_run(int gated, p25_voice_stats_t *s)
 	int16_t mic[AUDIO_BLOCK_SAMPLES], spk[AUDIO_BLOCK_SAMPLES];
 	uint8_t f[P25_IMBE_BYTES];
 	begin();
-	p25VoiceSetAgc(true);
+	p25VoiceSetTxTarget(3277);
 	p25VoiceTx(true);
 	mic_n = 0;
 	for (int b = 0; b < 10 + gated + 4; b++) {
@@ -896,7 +896,7 @@ static void gate_run(int gated, p25_voice_stats_t *s)
 	p25VoiceSetMicGate(NULL);
 	p25VoiceGetStats(s);
 	p25VoiceTx(false);
-	p25VoiceSetAgc(false);
+	p25VoiceSetTxTarget(0);
 	p25VoiceEnd();
 }
 

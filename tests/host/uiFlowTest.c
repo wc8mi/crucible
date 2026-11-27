@@ -34,6 +34,36 @@
 #define ADV_BELOW_DIAG_N	0
 #endif
 
+// Talk & listen's Digital AGC rows, reached with up from its first row (the list wraps to its end). The rows a build
+// lacks are not there. Mic input is three up; below it the rows after the TX levels
+#if CONFIG_YSF
+#define TL_YSF " up"
+#else
+#define TL_YSF ""
+#endif
+#if CONFIG_NXDN
+#define TL_NXDN " up"
+#else
+#define TL_NXDN ""
+#endif
+#if CONFIG_P25
+#define TL_P25 " up"
+#else
+#define TL_P25 ""
+#endif
+#if CONFIG_P25_TX_AGC
+#define TL_P25TX " up"
+#else
+#define TL_P25TX ""
+#endif
+#define TL_MIC		"ok 7 3 up up up"
+#define TL_YSF_TX	TL_MIC TL_YSF
+#define TL_P25_TX	TL_MIC TL_YSF TL_NXDN " up"
+#define TL_DMR_TX	TL_MIC TL_YSF TL_NXDN TL_P25TX " up"
+#define TL_AGC_TX	TL_DMR_TX " up"
+#define TL_DMR_RX	TL_AGC_TX TL_YSF TL_NXDN TL_P25 " up"
+#define TL_AGC_RX	TL_DMR_RX " up"
+
 static int fails, flows_run;
 
 typedef struct {
@@ -1081,22 +1111,33 @@ static const flow_t flows[] = {
 	{ "S hear all by default: BACK", "ok 7 3 down down down down down down down ok long:back up up", "back", "hearall=0", 1, false },
 	{ "S mic noise reduction off", "", "ok 7 3 down down down down down down ok", "set70=0", 10, false },
 #if CONFIG_TX_MIC_LIMITER
-	// The TX level rows sit just above the end of Talk & listen: set on one radio, read on another's RX audio levels
+	// The Digital AGC rows sit near the end of Talk & listen (TL_* above): with a switch On its rows are dimmed and
+	// show the radio's default; Off, the user's value. Set on one radio, read on another's RX audio levels
+	{ "S DMR TX level row", TL_AGC_TX " ok", "down", "screen=group focus=DMR_TX_level shows=Off",
+	  1, false },
 #if CONFIG_YSF
-	{ "S DMR TX level row", "", "ok 7 3 up up up up up", "screen=group focus=DMR_TX_level shows=Off", 8, false },
-	{ "S YSF TX level row", "", "ok 7 3 up up up up", "screen=group focus=YSF_TX_level", 7, false },
-#else
-	{ "S DMR TX level row", "", "ok 7 3 up up up up", "screen=group focus=DMR_TX_level shows=Off", 7, false },
+	{ "S YSF TX level row", "", TL_YSF_TX, "screen=group focus=YSF_TX_level", 14, false },
 #endif
 	{ "S Mic input row", "", "ok 7 3 up up up", "screen=group focus=Mic_input", 6, false },
+	{ "S Digital AGC TX on: DMR TX level dimmed", "", TL_DMR_TX " ok",
+	  "screen=group focus=DMR_TX_level shows=-30_dBFS toast=Digital_AGC_sets", 16, false },
+#if CONFIG_P25_TX_AGC
+	{ "S Digital AGC TX on: P25 TX level -20", "", TL_P25_TX, "screen=group focus=P25_TX_level shows=-20_dBFS", 16,
+	  false },
+#endif
+	{ "S Digital AGC RX on: DMR RX AGC dimmed", "", TL_DMR_RX " ok",
+	  "screen=group focus=DMR_RX_AGC shows=-30_dBFS toast=Digital_AGC_sets", 22, false },
+	{ "S Digital AGC RX off: DMR RX AGC editable", TL_AGC_RX " ok", "down",
+	  "screen=group focus=DMR_RX_AGC shows=Off", 1, false },
 #endif
 	// Mic AGC on: Mic gain (the row above) shows "AGC", is dimmed and says why
 	{ "S mic AGC on", "", "ok 7 3 down down down down down ok", "set71=1 shows=AGC", 9, false },
 	{ "S mic gain while AGC is on", "ok 7 3 down down down down down ok", "up ok", "toast=Mic_AGC_sets set13=5", 2, false },
 #if CONFIG_P25
 #if CONFIG_P25_TX_AGC
-	{ "S P25 mic gain is dimmed by P25 AGC", "dlmode:p25 ok 7 3 down down down down down ok", "up ok",
-	  "toast=Mic_AGC_sets set13=5", 2, false },
+	// P25 levels the mic itself while its TX level is in force (Digital AGC TX On: -20 dBFS)
+	{ "S P25 mic gain is dimmed by P25 TX level", "dlmode:p25 ok 7 3 down down down down", "ok",
+	  "focus=Mic_gain toast=P25_TX_level_sets set13=5", 1, false },
 #else
 	{ "S P25 mic gain is editable with AMBE AGC on", "dlmode:p25 ok 7 3 down down down down down ok",
 	  "up ok up up up ok", "set71=1 set13=8", 6, false },

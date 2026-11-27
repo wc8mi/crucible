@@ -32,7 +32,7 @@ RXSEEN  := $(CORE)/fec/rx_seen.c
 
 TSHARK  ?= $(firstword $(wildcard /Applications/Wireshark*.app/Contents/MacOS/tshark) $(shell command -v tshark))
 
-TESTS   := dmrFecTest dmrSoftBptcTest dmrSoftCombTest sfrTest dmrDataTest dmrDataServiceTest hotspotDataTest hotspotUplinkTest dmrPrivacyTest \
+TESTS   := digitalAgcTest dmrFecTest dmrSoftBptcTest dmrSoftCombTest sfrTest dmrDataTest dmrDataServiceTest hotspotDataTest hotspotUplinkTest dmrPrivacyTest \
            ipGatewayTest ipGatewayTest16 ipGatewayTestShared ipGatewayTestAir440
 
 all: run
@@ -180,6 +180,8 @@ p25VoiceLevelTest: $(CORE)/audio/rx_agc.c $(CORE)/audio/rx_agc.h $(CORE)/dsp/spe
 # Diagnostic leveling remains available with transmit AGC and DC removal compiled out.
 p25VoiceParrotTest: $(CORE)/audio/rx_agc.c $(CORE)/audio/rx_agc.h $(CORE)/dsp/speech_meter.h $(CORE)/dsp/mic_gain.h $(CORE)/dsp/dc_block.h p25VoiceTest.c $(CORE)/p25/p25Voice.c $(CORE)/p25/p25Voice.h $(CORE)/p25/p25_parrot.h $(CORE)/dsp/tx_level.h $(MBE)
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -DCONFIG_P25=1 -DCONFIG_P25_TX_AGC=0 -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_TX_DC_BLOCK=0 -DCONFIG_P25_PARROT=1 -o $@ $(CORE)/audio/rx_agc.c p25VoiceTest.c $(CORE)/p25/p25Voice.c $(MBE) -lm
+digitalAgcTest: digitalAgcTest.c $(CORE)/radio/digital_agc.h $(CORE)/audio/rx_agc.c $(CORE)/audio/rx_agc.h $(CORE)/dsp/tx_level.h
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -DCONFIG_RX_AGC=1 '-DBOARDS_DIR="$(ROOT)/boards"' -o $@ digitalAgcTest.c $(CORE)/audio/rx_agc.c -lm
 txLevelTest: txLevelTest.c $(CORE)/dsp/dc_block.h $(CORE)/dsp/tx_level.h $(CORE)/dsp/mic_gain.h
 	$(CC) $(CFLAGS) -Wshadow -o $@ txLevelTest.c -lm
 p25VoiceTest: $(CORE)/audio/rx_agc.c $(CORE)/audio/rx_agc.h $(CORE)/dsp/speech_meter.h $(CORE)/dsp/mic_gain.h $(CORE)/dsp/tx_level.h $(CORE)/dsp/dc_block.h p25VoiceTest.c $(CORE)/p25/p25Voice.c $(CORE)/p25/p25Voice.h $(MBE) $(wildcard $(CORE)/mbe/*.h)
@@ -1530,8 +1532,9 @@ settingsTest: settingsTest.c $(STORE) $(wildcard $(CORE)/storage/*.h $(CORE)/set
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -I. -Wshadow -DCONFIG_RADIO_DETOUR=1 -o $@ settingsTest.c $(STORE)
 
 run: run-settings
-run-settings: settingsTest spiNorTest spiNandTest nandSectorsTest
+run-settings: settingsTest digitalAgcTest spiNorTest spiNandTest nandSectorsTest
 	./settingsTest
+	./digitalAgcTest
 	./spiNorTest
 	./spiNandTest
 	./nandSectorsTest
