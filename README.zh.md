@@ -27,10 +27,10 @@
 | Baofeng DM-32UV |
 | Baofeng DM-1701、Retevis RT84 |
 | Radioddity DB25-D PRO、Kydera CDR-300UV（车载） |
-
-DB25-D PRO 是 Crucible 新加入的电台：Crucible 自己的功能（数字 AGC、NXDN 电台默认设置）尚未在它上面测试。该电台没有模拟麦克风输入档位，因此“麦克风输入”显示为灰色。
 | TYT MD-UV380、MD-UV390、Retevis RT3S |
 | TYT MD-9600、Retevis RT90（车载） |
+
+DB25-D PRO 是 Crucible 新加入的电台：Crucible 自己的功能（数字 AGC、NXDN 电台默认设置）尚未在它上面测试。该电台没有模拟麦克风输入档位，因此“麦克风输入”显示为灰色。
 
 各电台的详细状态见[英文 README](README.md#radios)。
 

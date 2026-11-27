@@ -13,7 +13,7 @@ web
 
 ## Users
 
-Amateur radio operators who own one of Crucible's four radios (crucible.toml `[radios]`) and want the maintainer's
+Amateur radio operators who own one of Crucible's five radios (crucible.toml `[radios]`) and want the maintainer's
 build on it: mostly people the maintainer (KF8S) knows or who find the page through tinker.wc8mi.net. They sit at a
 desktop with Chrome or Edge, the radio on a USB programming cable, and want to update and get back on the air.
 *(inferred: the audience is small and already knows what DMR, P25 and NXDN are)*
