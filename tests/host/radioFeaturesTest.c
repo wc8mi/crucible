@@ -1245,7 +1245,7 @@ static void test_zone_scan(void)
 	CHECK(sm.view.zone_pos == 4 && sm.view.scan_phase == SCAN_PH_HOLD);	// carrier mode: stays while it lasts
 	// The signal ends: the resume delay, then on
 	hw.sig[0].hz = 0;
-	run(1500);
+	run(RADIO_SCAN_DELAY_MS - 500);
 	CHECK(sm.view.zone_pos == 4 && sm.view.scan_phase == SCAN_PH_RESUME);
 	run(700);
 	CHECK(sm.view.zone_pos != 4);
@@ -1294,6 +1294,66 @@ static void test_zone_scan(void)
 	req(RREQ_SCAN, RSCAN_ZONE);
 	req(RREQ_CH_STEP, 1);
 	CHECK(sm.view.scan == SCAN_OFF);
+}
+
+static uint16_t scan_delay_set;
+static void set_scan_delay(radio_settings_t *s) { s->scan_delay_ms = scan_delay_set; }
+
+// The scan delay (Settings > Talk & listen > Scan delay; radio-features.md 1): RADIO_SCAN_DELAY_MS by default, a change
+// in force at once (in a scan already running too), stored with the radio core's settings and read back at start-up
+static void test_scan_delay(void)
+{
+	start();
+	CHECK(sm.set.scan_delay_ms == RADIO_SCAN_DELAY_MS && RADIO_SCAN_DELAY_MS == 5000);
+	settings_t st;
+	settings_read(&st);
+	CHECK(st.rs_stored != 1);	// a new radio: nothing stored, the default applies
+	// A signal on "Other" holds the scan; the delay goes to 1 s meanwhile: the wait after the signal is the new one
+	req(RREQ_SCAN, RSCAN_ZONE);
+	signal_on(0, 145500000, 30, no_tone);
+	for (int i = 0; i < 200 && !(sm.view.zone_pos == 4 && sm.view.scan_phase == SCAN_PH_HOLD); i++) {
+		run(25);
+	}
+	CHECK(sm.view.zone_pos == 4 && sm.view.scan_phase == SCAN_PH_HOLD);
+	scan_delay_set = 1000;
+	settings(set_scan_delay);
+	CHECK(sm.set.scan_delay_ms == 1000 && sm.scan.cfg.delay_ms == 1000);
+	hw.sig[0].hz = 0;
+	run(600);
+	CHECK(sm.view.zone_pos == 4 && sm.view.scan_phase == SCAN_PH_RESUME);
+	run(700);
+	CHECK(sm.view.zone_pos != 4 && sm.view.scan == SCAN_ZONE);
+	// 15 s, the longest choice: still waiting after 10 s
+	scan_delay_set = 15000;
+	settings(set_scan_delay);
+	hw.sig[0].hz = 145500000;
+	for (int i = 0; i < 400 && !(sm.view.zone_pos == 4 && sm.view.scan_phase == SCAN_PH_HOLD); i++) {
+		run(25);
+	}
+	CHECK(sm.view.zone_pos == 4 && sm.view.scan_phase == SCAN_PH_HOLD);
+	hw.sig[0].hz = 0;
+	run(10000);
+	CHECK(sm.view.zone_pos == 4 && sm.view.scan_phase == SCAN_PH_RESUME);
+	run(5500);
+	CHECK(sm.view.zone_pos != 4);
+	req(RREQ_SCAN, RSCAN_STOP);
+	// Stored, and read back at start-up
+	settings_read(&st);
+	CHECK(st.rs_stored == 1 && st.rs_scan_delay_ms == 15000);
+	radio_sm_init(&sm, now);
+	CHECK(sm.set.scan_delay_ms == 15000);
+	// A record that already holds the radio core's settings keeps its delay (an update from 2 s keeps 2 s); one
+	// that never held them gets the default
+	settings_t *w = settings_begin();
+	w->rs_scan_delay_ms = 2000;
+	settings_end(now);
+	radio_sm_init(&sm, now);
+	CHECK(sm.set.scan_delay_ms == 2000);
+	w = settings_begin();
+	w->rs_stored = 0;
+	settings_end(now);
+	radio_sm_init(&sm, now);
+	CHECK(sm.set.scan_delay_ms == RADIO_SCAN_DELAY_MS);
 }
 
 static void test_scan_ptt_and_modes(void)
@@ -1542,7 +1602,7 @@ static void test_mixed_scan(void)
 	CHECK(sm.view.zone_pos == 5);
 	run(1000);
 	CHECK(sm.view.scan_phase == SCAN_PH_RESUME);
-	run(1500);
+	run(RADIO_SCAN_DELAY_MS - 500);
 	CHECK(sm.view.zone_pos != 5);
 	req(RREQ_SCAN, RSCAN_STOP);
 	hw.sig[0].hz = 0;
@@ -2318,6 +2378,10 @@ static void test_dual_wait(void)
 
 	// A call on far (B) ends while home (A, selected) has a signal: the looks find it, show it, don't play it
 	dual(home, far, 0);
+	// The scan delay is not dual watch's: a change leaves the watch's wait as it is
+	scan_delay_set = 500;
+	settings(set_scan_delay);
+	CHECK(sm.scan.kind == SCAN_DUAL && sm.scan.cfg.delay_ms == RADIO_DUAL_DELAY_MS && sm.set.scan_delay_ms == 500);
 	signal_on(0, 445900000, 30, no_tone);
 	CHECK(wait_on(far, 500));
 	run(300);
@@ -4919,6 +4983,7 @@ int main(void)
 	test_beep_custom();
 	test_vibe_module();
 	test_zone_scan();
+	test_scan_delay();
 	test_scan_ptt_and_modes();
 	test_vfo_scan();
 	test_mixed_scan();

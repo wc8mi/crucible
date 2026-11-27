@@ -690,6 +690,15 @@ static void test_settings_power_levels(void)
 	CHECK(s.master_power == 1 && s.vfo_power == SETTINGS_UNSET8 && s.power_levels == 5);
 }
 
+// A new record holds none of the radio core's settings (rs_stored 0): the radio core's defaults apply, the scan delay's
+// RADIO_SCAN_DELAY_MS among them (radio-features.md 1). A record with rs_stored 1 keeps what it holds
+static void test_settings_radio_defaults(void)
+{
+	settings_t s;
+	settings_defaults(&s);
+	CHECK(s.rs_stored == 0 && s.rs_scan_delay_ms == 0);
+}
+
 // The opt-in caller policy uses a reserved byte without changing the stored layout.
 static void test_settings_caller_lookup(void)
 {
@@ -1812,6 +1821,7 @@ int main(void)
 	test_settings_pages();
 	test_settings_gateway_upgrade();
 	test_settings_power_levels();
+	test_settings_radio_defaults();
 	test_settings_caller_lookup();
 	test_settings_bad_records();
 	test_settings_worn_sector();

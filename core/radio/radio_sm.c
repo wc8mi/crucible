@@ -8235,6 +8235,11 @@ static void use_settings(radio_sm_t *sm, const radio_settings_t *s, uint32_t now
 	sm->set = *s;
 	clamp_settings(&sm->set);
 	apply_tot(sm);
+#if CONFIG_SCAN
+	if (scan_on(&sm->scan) && sm->scan.kind != SCAN_DUAL) {
+		sm->scan.cfg.delay_ms = sm->set.scan_delay_ms;	// a scan running now waits the new delay (dual watch has its own)
+	}
+#endif
 #if CONFIG_DMR_ROAMING
 	roam_cfg_t rc;
 	roam_cfg_of(&sm->set, &rc);
