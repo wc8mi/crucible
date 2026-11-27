@@ -157,6 +157,31 @@ KF8S answered the open questions on 2026-11-26.
 | 3 | The other three radios' install cards; error screens for each failure the engine reports | Yes |
 | 4 | Retire the restyled upstream page | No |
 
+## Amendment 1: the card in the engine
+
+| | |
+|---|---|
+| Status | Proposed (2026-11-26). KF8S accepts. |
+| Changes | Decision 4 and the phase 2 plan. The rest of this record stays. |
+
+Phase 2 built the work card on the shared flasher engine (site/static/js/flasher/app.js), not as its own page. The
+card is a display mode of the engine's install steps. It reads its steps and words from `data/install-card.json`,
+which `tools/crucible_site.py` writes. The engine still does the work: release download, codec, update mode, write,
+check. One code path installs and updates, so a fix in one serves both.
+
+| No. | Change | Why |
+|---|---|---|
+| 1 | The card is a layer on the engine, not its own front end | One install path to test and fix. The engine already handles each radio and each failure. |
+| 2 | A **Version** step after Radio | The engine picks the release and the MD-UV380 power class in one view. The done line shows the release. |
+| 3 | **Update mode** and **Install** are one step, **Install** | The engine connects in update mode and writes in one view. Two steps would split one action. |
+| 4 | A **Check** step at the end | The engine reads the radio back after the write and offers the backup there (decision 5, "after the install"). |
+| 5 | The current firmware is set from the card | A radio on the Install path has the manufacturer's firmware. The user is not asked. |
+| 6 | Only radios with a card can install | A radio without a card would show the engine's old words. Phase 3 adds the other three. |
+
+The DM-1701 steps are now: Radio, Version, Things you need, Save your channels, Firmware file, Install, Check.
+
+Not changed: the gate, the terms, the doors, decision 5's checkbox and no-CPS path, the words, the look.
+
 ## Review log
 
 | Round | Reviewer | Result |

@@ -8,7 +8,7 @@ record's supporting material (prototypes, screens) goes in a folder with the sam
 
 | No. | Decision | Status |
 |---|---|---|
-| [001](001-installer-two-paths.md) | The installer page: two paths, a work card, plain words | Accepted |
+| [001](001-installer-two-paths.md) | The installer page: two paths, a work card, plain words | Accepted; amendment 1 Proposed |
 
 ## How to add one
 
