@@ -157,5 +157,39 @@ The look lives in `site/crucible/` (`crucible.css`, the self-hosted Barlow Conde
 after the shared stylesheets and changes no markup, so upstream's flasher keeps merging. The design record is
 `DESIGN.md`; the product notes behind it are `PRODUCT.md`.
 
+### News
+
+The front page shows a list of news posts, newest first. Add one post for each release or other change that users
+see. A post is one Markdown file in `site/crucible/news/`, named `YYYY-MM-DD-slug.md` (the slug is lowercase letters,
+digits and hyphens):
+
+```
+<!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 David Behnke -->
+---
+date: 2026-11-27
+title: A fifth radio and the NXDN radio default
+release: crucible-4e24a5e1-8a658d0d-261127-2
+seq: 1
+---
+The post body, in Markdown.
+```
+
+| Key | Need | Use |
+|-----|------|-----|
+| `date` | yes | The same date as the file name. |
+| `title` | yes | 1 to 10 words. |
+| `release` | no | The release tag. The post links to that GitHub release. |
+| `seq` | no | The order of posts on the same date. The highest number shows first. |
+
+The body is CommonMark. Raw HTML is shown as text. The ADR 001 word rules apply to the title, not to the body. Keep
+radio model names out of the body (`tools/check_generic.py`); the radio list on the page names the radios.
+
+The build (`tools/crucible_site.py`) puts the newest five posts in `index.html`, so they show without JavaScript. It
+writes all the posts to `data/news.json` (`crucible-news/1`: `first`, then `posts` with `id`, `date`, `title`,
+`release` and `html`) and an Atom feed to `news.xml`. When there are more than five posts, a More news button loads
+five more on each press and goes away after the last one. Each post has the anchor `#news-<date>-<slug>`; a link to
+an older post loads it. `--self-test` checks the posts. Rebuild and deploy the site after you add a post.
+
 Documentation for testers: the [usage and testing guide](docs/kf8sfork/README.md) and the
 [changelog](docs/kf8sfork/CHANGELOG.md).

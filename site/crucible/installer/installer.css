@@ -126,6 +126,29 @@ p { margin: .6rem 0 0; text-wrap: pretty; }
 .fits li { font-weight: 600; }
 .fits li small { color: var(--faint); font-weight: 400; font-size: .875rem; }
 
+/* News: always shown, under the screen; posts are prose, separated by rules, not plates */
+.btn.quiet { background: transparent; color: var(--text); border-color: var(--line-2); }
+.btn.quiet:not([disabled]):hover { border-color: var(--hot); }
+.news { margin-top: 3.5rem; padding-top: 2rem; border-top: 1px solid var(--line); }
+.news > h2 { font-size: 2rem; line-height: 1; }
+.news-feed { margin-top: .4rem; font-size: .875rem; }
+.news-list { margin-top: 1.2rem; }
+.news-post { padding-block: 1.4rem; border-top: 1px solid var(--line); scroll-margin-top: 1rem; }
+.news-post:first-child { border-top: 0; padding-top: .4rem; }
+.news-date { margin: 0; color: var(--faint); font-size: .875rem; font-variant-numeric: tabular-nums; }
+.news-post h3 { margin: .2rem 0 0; font-size: 1.25rem; line-height: 1.25; font-weight: 700; text-wrap: balance; }
+.news-post h3 a { color: var(--text); text-decoration: none; }
+.news-post h3 a:hover { color: var(--link); text-decoration: underline; }
+.news-post:target h3 a { box-shadow: inset 0 -2px 0 var(--flame); }
+.news-body { max-width: 60ch; }
+.news-body p, .news-body li { text-wrap: pretty; }
+.news-body p, .news-body ul { margin: .7rem 0 0; }
+.news-body ul { padding-left: 1.2rem; display: grid; gap: .45rem; }
+.news-body li::marker { color: var(--faint); }
+.news-body code, .news-rel code { font: .9em ui-monospace, SFMono-Regular, Menlo, monospace; }
+.news-rel { margin-top: .8rem; font-size: .875rem; color: var(--muted); overflow-wrap: anywhere; }
+#news-more { margin-top: .6rem; }
+
 /* One screen at a time */
 [data-screen] { display: none; }
 [data-screen].show { display: block; }

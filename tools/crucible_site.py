@@ -13,6 +13,7 @@ checked against its .zip.sha256 sidecar and its SHA256SUMS before a byte is copi
 offered. Run it with site/requirements.txt available, as site/build.py says (uv run --with-requirements ...).
 """
 import argparse
+import datetime
 import hashlib
 import html
 import json
@@ -363,8 +364,98 @@ def no_upstream_api(out):
             raise SiteError(f'{f.relative_to(out)}: names a RadioFoundry service')
 
 
-def front_page(template, project, radios, assets, built):
-    """Crucible's front page (site/crucible/installer/page.html): the browser gate, the terms and the two doors."""
+# News: one Markdown post per update in site/crucible/news/ (CRUCIBLE.md, "News"), newest first on the front page
+NEWS_FORMAT = 'crucible-news/1'
+NEWS_FIRST = 5			# posts in the page itself; More loads the next NEWS_FIRST from data/news.json
+NEWS_NAME = re.compile(r'^(\d{4}-\d{2}-\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)\.md$')
+
+
+def parse_post(name, text):
+    """One post file: the SPDX comment, a front matter (date, title, optional release and seq) and a Markdown body.
+    {id, date, title, release, seq, body}; seq orders posts of one day (higher is newer)."""
+    m = NEWS_NAME.match(name)
+    if not m:
+        raise SiteError(f'news/{name}: name it YYYY-MM-DD-slug.md (lowercase, digits, hyphens)')
+    rest = re.sub(r'^(\s*<!--.*?-->)*\s*', '', text, flags=re.S)
+    fm = re.match(r'---\n(.*?)\n---\n', rest, re.S)
+    if not fm:
+        raise SiteError(f'news/{name}: no front matter between --- lines')
+    meta = {}
+    for line in fm.group(1).splitlines():
+        if line.strip():
+            k, sep, v = line.partition(':')
+            if not sep or k.strip() not in ('date', 'title', 'release', 'seq'):
+                raise SiteError(f'news/{name}: front matter line {line!r} (date, title, release, seq)')
+            meta[k.strip()] = v.strip()
+    date, slug = m.groups()
+    if meta.get('date') != date:
+        raise SiteError(f'news/{name}: date {meta.get("date")!r} differs from the file name')
+    try:
+        datetime.date.fromisoformat(date)
+    except ValueError:
+        raise SiteError(f'news/{name}: {date} is not a date')
+    title, release = meta.get('title', ''), meta.get('release', '')
+    if not title or len(title.split()) > 10:
+        raise SiteError(f'news/{name}: a title of 1 to 10 words')
+    if release and not SAFE.match(release):
+        raise SiteError(f'news/{name}: unsafe release tag {release!r}')
+    body = rest[fm.end():].strip()
+    if not body:
+        raise SiteError(f'news/{name}: no text')
+    return {'id': f'news-{date}-{slug}', 'date': date, 'title': title, 'release': release,
+            'seq': int(meta.get('seq') or 0), 'body': body}
+
+
+def read_news(folder):
+    """Every post in folder, newest first; ids unique."""
+    posts = [parse_post(f.name, f.read_text()) for f in sorted(Path(folder).glob('*.md'))]
+    ids = [x['id'] for x in posts]
+    if len(set(ids)) != len(ids):
+        raise SiteError('news: two posts with one name')
+    return sorted(posts, key=lambda x: (x['date'], x['seq'], x['id']), reverse=True)
+
+
+def news_date(date):
+    d = datetime.date.fromisoformat(date)
+    return f'{d.day} {d.strftime("%B")} {d.year}'
+
+
+def news_html(posts, repo, render):
+    """Each post as an <article>: render(markdown) gives the body's HTML (raw HTML in a post is escaped)."""
+    out = []
+    for x in posts:
+        rel = (f'\n\t<p class="news-rel">Release <a href="{html.escape(repo)}/releases/tag/{x["release"]}">'
+               f'<code>{x["release"]}</code></a></p>') if x['release'] else ''
+        out.append(f'<article class="news-post" id="{x["id"]}">\n\t<p class="news-date"><time datetime="{x["date"]}">'
+                   f'{news_date(x["date"])}</time></p>\n\t<h3><a href="#{x["id"]}">{html.escape(x["title"])}</a></h3>\n'
+                   f'\t<div class="news-body">{render(x["body"])}</div>{rel}\n</article>')
+    return out
+
+
+def markdown_renderer():
+    from markdown_it import MarkdownIt		# site/requirements.txt
+    md = MarkdownIt('commonmark', {'html': False, 'linkify': False})
+    return md.render
+
+
+def news_atom(posts, items, project):
+    """An Atom feed of the posts (news.xml), their HTML as content."""
+    base = project['flasher'].rstrip('/') + '/'
+    esc = lambda v: html.escape(v, quote=True)
+    updated = (posts[0]['date'] if posts else '2026-01-01') + 'T00:00:00Z'
+    entries = ''.join(
+        f'<entry><id>{esc(base)}#{x["id"]}</id><title>{esc(x["title"])}</title><updated>{x["date"]}T00:00:00Z</updated>'
+        f'<link href="{esc(base)}#{x["id"]}"/><content type="html">{esc(item)}</content></entry>\n'
+        for x, item in zip(posts, items))
+    return (f'<?xml version="1.0" encoding="utf-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom">\n'
+            f'<id>{esc(base)}news.xml</id><title>{esc(project["name"])} news</title><updated>{updated}</updated>\n'
+            f'<link href="{esc(base)}"/><link rel="self" href="{esc(base)}news.xml"/>'
+            f'<author><name>{esc(project["maintainer"])}</name></author>\n{entries}</feed>\n')
+
+
+def front_page(template, project, radios, assets, built, news='', news_more=''):
+    """Crucible's front page (site/crucible/installer/page.html): the browser gate, the terms, the Update door and the
+    news (the newest posts as HTML; news_more the More button's markup, or empty when every post is shown)."""
     items = []
     for r in sorted(radios, key=lambda r: r.get('order', 0)):
         maker, model = r.get('maker', ''), r.get('model') or r['name'].removeprefix(r.get('maker', '') + ' ')
@@ -372,7 +463,7 @@ def front_page(template, project, radios, assets, built):
         small = html.escape(maker + (f' · also {also}' if also else ''))
         items.append(f'\t\t\t<li>{html.escape(model)} <small>{small}</small></li>')
     fill = {k: html.escape(project[k]) for k in ('name', 'tagline', 'repo', 'issues', 'upstream', 'maintainer', 'community')}
-    fill.update(csp=CSP, rf_flash=RF_FLASH, assets=html.escape(assets), built=html.escape(built), radios='\n'.join(items),
+    fill.update(csp=CSP, rf_flash=RF_FLASH, news=news, news_more=news_more, assets=html.escape(assets), built=html.escape(built), radios='\n'.join(items),
                 repo_slug=html.escape(project['repo'].removeprefix('https://github.com/')))
     page = re.sub(r'\{\{(\w+)\}\}', lambda m: fill[m.group(1)], template)
     if not items:
@@ -412,7 +503,7 @@ def build(out, packages, github, site_out=None):
         info.update({'version': f'crucible-{commit}', 'branch': '', 'repo': project['repo'], 'community': '', 'release': '', 'beta': '', 'reports': {'sentry_dsn': ''}})
         info.pop('tool', None)
         (out / 'data' / 'site.json').write_text(json.dumps(info, indent=1))
-        shutil.copytree(ROOT / 'site' / 'crucible', out / 'crucible', ignore=shutil.ignore_patterns('page.html', 'radios'))
+        shutil.copytree(ROOT / 'site' / 'crucible', out / 'crucible', ignore=shutil.ignore_patterns('page.html', 'radios', 'news'))
         brand = ROOT / 'docs' / 'crucible' / 'brand'
         for size in (32, 180, 512):
             shutil.copy2(brand / f'hot-core-icon-{size}.png', out / 'crucible' / f'icon-{size}.png')
@@ -422,7 +513,17 @@ def build(out, packages, github, site_out=None):
         (out / 'update.html').write_text(crucible_page(flash, project, assets, built))
         no_upstream_api(out)
         template = (ROOT / 'site' / 'crucible' / 'installer' / 'page.html').read_text()
-        (out / 'index.html').write_text(front_page(template, project, radios['radios'], assets, built))
+        posts = read_news(ROOT / 'site' / 'crucible' / 'news')
+        items = news_html(posts, project['repo'], markdown_renderer())
+        feed = {'format': NEWS_FORMAT, 'first': NEWS_FIRST,
+                'posts': [{k: x[k] for k in ('id', 'date', 'title', 'release')} | {'html': item}
+                          for x, item in zip(posts, items)]}
+        (out / 'data' / 'news.json').write_text(json.dumps(feed, ensure_ascii=False, indent=1) + '\n')
+        (out / 'news.xml').write_text(news_atom(posts, items, project))
+        more = ('<button class="btn quiet" type="button" id="news-more" data-feed="data/news.json">More news</button>'
+                if len(items) > NEWS_FIRST else '')
+        (out / 'index.html').write_text(front_page(template, project, radios['radios'], assets, built,
+                                                   '\n'.join(items[:NEWS_FIRST]), more))
     releases = [local_release(p) for p in packages]
     if github:
         releases += github_releases(repo_slug, ROOT / 'build' / 'crucible-releases')
@@ -548,7 +649,40 @@ def self_test():
     assert '<li>X-2 <small>TYT · also X-3, Other Y</small></li>' in front and '>o/r</a>' in front
     assert '<a href="https://discord.gg/c">D</a>' in front, 'the front page links the Discord community'
     assert f'<a href="{RF_FLASH}">R</a>' in front and RF_FLASH.startswith('https://radiofoundry.org/'), 'a plain link'
-    print('crucible site: package checks, index, page shell, front page checks passed')
+    # news: the repository's posts parse, newest first with unique anchors; a bad file is refused; raw HTML is escaped
+    posts = read_news(ROOT / 'site' / 'crucible' / 'news')
+    assert posts and [(x['date'], x['seq']) for x in posts] == sorted(((x['date'], x['seq']) for x in posts), reverse=True)
+    assert len({x['id'] for x in posts}) == len(posts)
+    head = '<!-- SPDX-License-Identifier: MIT -->\n<!-- c -->\n'
+    good = parse_post('2026-01-02-a-b.md', head + '---\ndate: 2026-01-02\ntitle: Hello\nrelease: crucible-x-1\n---\nText.\n')
+    assert good['id'] == 'news-2026-01-02-a-b' and good['release'] == 'crucible-x-1' and good['body'] == 'Text.'
+    for name, text in (('2026-01-02-A.md', '---\ndate: 2026-01-02\ntitle: T\n---\nx'),
+                       ('2026-02-30-a.md', '---\ndate: 2026-02-30\ntitle: T\n---\nx'),
+                       ('2026-01-02-a.md', '---\ndate: 2026-01-03\ntitle: T\n---\nx'),
+                       ('2026-01-02-a.md', '---\ndate: 2026-01-02\ntitle: ' + 'w ' * 11 + '\n---\nx'),
+                       ('2026-01-02-a.md', '---\ndate: 2026-01-02\ntitle: T\nrelease: a/b\n---\nx'),
+                       ('2026-01-02-a.md', '---\ndate: 2026-01-02\ntitle: T\nauthor: x\n---\nx'),
+                       ('2026-01-02-a.md', 'date: 2026-01-02\ntitle: T\nx')):
+        try:
+            parse_post(name, text)
+        except SiteError:
+            pass
+        else:
+            raise AssertionError(f'bad post accepted: {name} {text!r}')
+    item = news_html([good], 'https://github.com/o/r', lambda b: '<p>' + html.escape(b) + '</p>')[0]
+    assert 'id="news-2026-01-02-a-b"' in item and 'href="#news-2026-01-02-a-b"' in item and '2 January 2026' in item
+    assert 'href="https://github.com/o/r/releases/tag/crucible-x-1"' in item
+    try:
+        render = markdown_renderer()
+    except ImportError:
+        render = None			# rendering is checked where site/requirements.txt is installed
+    if render:
+        assert '&lt;script' in render('<script>x</script>') and 'href="javascript' not in render('[a](javascript:alert(1))')
+    feed = news_atom([good], [item], {**proj, 'flasher': 'https://h/c/'})
+    assert '<id>https://h/c/#news-2026-01-02-a-b</id>' in feed and '&lt;article' in feed
+    front = front_page('{{news}}|{{news_more}}', proj, radios, '1', 'v', item, '<button>')
+    assert front == item + '|<button>'
+    print('crucible site: package checks, index, page shell, front page, news checks passed')
 
 
 def main():
