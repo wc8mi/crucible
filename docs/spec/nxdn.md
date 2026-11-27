@@ -201,22 +201,40 @@ Refused in the listen-only bands, and where the board's air interface carries ne
 
 ### 6.2 Settings
 
-RAM only, one set for the VFO and for channels in NXDN for now (`radio_req_nxdn_settings`, debug link op 43,
-`rfoundry_debug.py radio nxdn`). A stored NXDN channel runs on its own: the rate, both RANs, the squelch and the talk
-target come from its record. The unit ID comes from the channel, its system, or the radio-wide setting, in that
-order ([nxdn-codeplug.md](nxdn-codeplug.md)). The debug settings apply to the VFO. The debug link view shows what is in force (`nxdn.run.*`).
+One set for the VFO and for channels in NXDN for now (`radio_req_nxdn_settings`, debug link op 43,
+`rfoundry_debug.py radio nxdn`). It is RAM; at start-up the stored NXDN radio default seeds the rate, both RANs and
+the talkgroup ([ADR 004](../crucible/adr/004-nxdn-radio-default.md); Settings > Talk & listen > NXDN). A change there
+is stored and applies at once. A reload or the end of a detour does not seed it again, so a target set for now and
+debug link values stay until a restart.
 
-| Setting | Values | Default | Notes |
-|---|---|---|---|
-| Rate | 4800 bit/s, 9600 bit/s | 9600 | the engine's `rate9600`; a rate change is a new session |
-| RAN, receive | 0 to 63 | 0 | 0 takes every RAN (TS 1-B 4.1.7.1) |
-| RAN, transmit | 0 to 63 | 1 | |
-| Unit ID | 1 to 65519 (9) | 1 | the source of what the radio sends |
-| Call | group or unit, ID | group 1 | `tx_call_type`, `tx_dst` |
-| Group squelch | 0 (RAN only) or a group ID | 0 | `rx_gid`: group calls to it or to all, unit calls to the unit (TS 1-B 4.1.7) |
-| Emergency | on, off | off | the control option's bit |
-| Bandwidth | 12.5 kHz | | radios set 12.5 kHz at both rates (9) |
-| Talk-around | | | not a setting: the frames are inbound either way (table 5.2-2) |
+A stored NXDN channel runs on its own: the rate, both RANs, the squelch and the talk target come from its record. The
+unit ID comes from the channel, its system, or the radio-wide setting, in that order
+([nxdn-codeplug.md](nxdn-codeplug.md)). A channel of kind 4 whose tag can't be read runs on the settings; the UI still
+counts it as a stored channel (Talk to and the rate tile refuse). The debug link view shows what is in force
+(`nxdn.run.*`) and the stored default (`nxdn.default.*`).
+
+| Setting | Values | Default | Stored | Notes |
+|---|---|---|---|---|
+| Rate | 4800 bit/s, 9600 bit/s | 4800 | yes | the engine's `rate9600`; a rate change is a new session. Quick tile 8 flips it |
+| RAN, receive | 0 to 63 | 0 | yes | 0 takes every RAN (TS 1-B 4.1.7.1) |
+| RAN, transmit | 0 to 63 | 1 | yes | |
+| Call | group or unit, ID | group 1 | the group | `tx_call_type`, `tx_dst`. The stored talkgroup is 1 to 65519 or 0xFFFF (all); a unit is RAM only. A `tx_dst` of 0 is taken as group 1 |
+| Unit ID | 1 to 65519 (9) | 1 | no | the source of what the radio sends |
+| Group squelch | 0 (RAN only) or a group ID | 0 | no | `rx_gid`: group calls to it or to all, unit calls to the unit (TS 1-B 4.1.7) |
+| Emergency | on, off | off | no | the control option's bit |
+| Bandwidth | 12.5 kHz | | | radios set 12.5 kHz at both rates (9) |
+| Talk-around | | | | not a setting: the frames are inbound either way (table 5.2-2) |
+
+Talk to (Contacts, Find, a typed ID) on the settings:
+
+| Action | Result |
+|---|---|
+| OK (for now) | `tx_dst` and the call type in RAM; Home shows Back, which goes back to the stored talkgroup |
+| Hold OK (keep), a group | stored as the talkgroup |
+| Hold OK, a unit | for now, as OK |
+| DMR's all call (0xFFFFFF) | All (0xFFFF) |
+| ID 0, or above 65519 | refused: "NXDN IDs go up to 65519" |
+| A stored NXDN channel | refused: "NXDN: set in the channel" |
 
 ### 6.3 What it shows
 

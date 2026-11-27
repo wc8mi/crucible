@@ -399,11 +399,18 @@ On a radio that runs NXDN, NXDN is one of the VFO's modes, after P25 ("VFO: NXDN
 is NXDN conventional voice at 9600 bit/s (12.5 kHz) or 4800 bit/s (6.25 kHz), through the radio's DMR voice codec.
 
 - It hears clear voice calls on every radio access number (RAN), to every group. Encrypted calls stay silent.
-- PTT sends a voice call to group 1 with RAN 1 at 9600 bit/s, as unit 1 until a computer sets another ID.
-- Home shows "NXDN", what PTT calls ("TG 1"), the RAN sent and the rate ("RAN 1 9600"). During a call it shows who
-  calls and where, or why the call isn't played. FM's tone and width tiles say "FM only: this is NXDN".
-- The rate, the RANs, the unit ID and the group can be changed only from a computer for now
-  (`rfoundry_debug.py radio nxdn`), and the change lasts until the radio is switched off.
+- PTT sends a voice call to the NXDN radio default's talkgroup, with its TX RAN and rate: on a new radio group 1,
+  RAN 1, 4800 bit/s. It sends as unit 1 until a computer sets another ID.
+- Home shows "NXDN", what PTT calls ("TG 1", or "All"), the RAN sent and the rate ("RAN 1 4800"). During a call it
+  shows who calls and where, or why the call isn't played. FM's tone tile says "FM only: this is NXDN".
+- Quick settings tile **8** is the rate: **OK** changes it between 4800 and 9600 bit/s and keeps it.
+- **Settings > Talk & listen > NXDN** sets the radio default: the rate, the RX RAN (0 receives every RAN), the TX RAN
+  and the talkgroup (1 to 65519; **Up** past 65519 is All). The radio keeps them when switched off
+  ([Settings](17-settings.md#nxdn-radio-default)).
+- To call another group or a unit for now, pick it in **Contacts** or type its ID on Home and press **OK**. **Back** on
+  Home goes back to the radio default's talkgroup. Hold **OK** on a group to keep it as the talkgroup. NXDN IDs go up
+  to 65519.
+- The unit ID can be changed only from a computer for now (`rfoundry_debug.py radio nxdn`).
 - Some radios only transmit NXDN or only receive it ([feature matrix](../feature-matrix.md)). One that only receives
   says "This mode: receive only" on PTT.
 
@@ -411,8 +418,10 @@ is NXDN conventional voice at 9600 bit/s (12.5 kHz) or 4800 bit/s (6.25 kHz), th
 
 An NXDN channel comes from a codeplug written on a computer ([P25 and NXDN in the editor](04-programming.md#p25-and-nxdn)), a zone shared by another radio, the VFO (in NXDN,
 open **Channels**, **New channel from current settings** and save it), or any channel: press **OK** on its Mode until
-it says NXDN, set the RAN and rate, and save. A channel made NXDN starts with RAN 1 at 9600 bit/s. The channel keeps the rate, the RANs, the
-squelch and the group (when a contact has that group; else group 1).
+it says NXDN, set the RAN and rate, and save. A channel made NXDN starts with the NXDN radio default's rate and RANs
+(on a new radio 4800 bit/s, every RAN in, RAN 1 out). The channel keeps the rate, the RANs, the squelch and the group
+(when a contact has that group; else group 1). The radio default, Talk to and quick tile 8 don't change a saved NXDN
+channel: they say "NXDN: set in the channel".
 
 - Home shows it as in the VFO. The channel's settings show "NXDN" as the mode.
 - **OK** on Mode steps to FM, DMR, P25 (on a radio that runs it), then back to NXDN with its settings as they were.
