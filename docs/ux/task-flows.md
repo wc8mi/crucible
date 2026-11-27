@@ -199,7 +199,7 @@ While it runs (Home keys): `PTT` talks on the selected channel and the watch goe
 | Start, B in another zone | 7 | 7 | 7 | 7 | 7 |
 | Talk on B | 2 (`#`,`1`; 1 with an A/B key) | 2 | 2 | 2 | 2 |
 | Stop | 1 (`BACK`) | 1 | 1 | 1 | 1 |
-| Talk back on (Settings > Talk) | 10 | 10 | 10 | 10 | 10 |
+| Talk back on (Settings > Talk) | 14 | 14 | 14 | 14 | 14 |
 
 The budgets are the ones `tests/host/uiFlowTest.c` checks ("11 dual watch ..."). Zone scan starts in 3 (Tools > Scan: `SELECT`, `6`, `1`).
 
