@@ -673,18 +673,23 @@ RFOUNDRY_HOT_CODE static int32_t dcs_sample(air_softmodem_adapt_t *a, int32_t x)
 // put the zero of a 69.3 Hz notch 0.7 Hz off the tone, a fifth of its width, and it took the tone down by 14 dB
 // only. The small terms are under 0.06 for the highest tone (x 2^20: 63,000).
 // The state stays linear: only the sample returned is limited. Clamped at half scale inside the loop, the poles a
-// Q of 20 from the unit circle turned squelch-open noise into a full-scale ringing at the tone that took half a
-// second to die, and a call starting in it was tracked from the ringing (airSoftmodemTest, testNotchAfterNoise).
-// Linear on samples under 2^14, the state stays within a few times that; the two pole products are 64 bits so
-// nothing can overflow, and NOTCH_STATE_MAX, far above what the filter reaches, only guards the 32-bit state
+// Q of 20 from the unit circle turned squelch-open noise or a clipping call into a ringing at the tone that took up to
+// half a second to die (the lowest tones), and a call starting in it was tracked from the ringing
+// (airSoftmodemTest, testNotchAfterNoise). Linear, |y| stays under 2.27 x 2^14 (the impulse response's L1 norm), about
+// 56,000 with the rounding, so a pole product would pass 2^31: notch_q20 takes it in two 32-bit halves.
+// NOTCH_STATE_MAX, 19 times what the filter reaches, only guards the state
 #define NOTCH_STATE_MAX	(1 << 20)
+// (c y) >> 20 exactly (nested floors), for 0 <= c < 2^20 and |y| <= 2^20, no product past 2^30
+static inline int32_t notch_q20(int32_t c, int32_t y)
+{
+	return ((c >> 10) * y + (((c & 1023) * y) >> 10)) >> 10;
+}
 RFOUNDRY_HOT_CODE static int32_t notch(air_softmodem_adapt_t *a, int32_t x)
 {
 	int32_t xs = x / 2, u, y;
 
 	u = xs - 2 * a->x1 + a->x2 + ((a->ndc * a->x1) >> 20);
-	y = ((a->ng * u) >> 14) + 2 * a->y1 - a->y2 - (int32_t)(((int64_t)a->nda * a->y1) >> 20) +
-	    (int32_t)(((int64_t)a->ne * a->y2) >> 20);
+	y = ((a->ng * u) >> 14) + 2 * a->y1 - a->y2 - notch_q20(a->nda, a->y1) + notch_q20(a->ne, a->y2);
 	y = y > NOTCH_STATE_MAX ? NOTCH_STATE_MAX : y < -NOTCH_STATE_MAX ? -NOTCH_STATE_MAX : y;
 	a->x2 = a->x1;
 	a->x1 = xs;
