@@ -7205,6 +7205,11 @@ static const int16_t v_dual_wait[] = { 500, 1000, 1500, 2000, 3000, 5000 };	// m
 static const tr_id_t n_dual_wait[] = { TRX(VALUE_0_5_S, "0.5 s"), TRX(VALUE_1_S, "1 s"), TRX(VALUE_1_5_S, "1.5 s"),
 	TRX(VALUE_2_S, "2 s"), TRX(VALUE_3_S, "3 s"), TRX(VALUE_5_S, "5 s") };
 #endif
+#if CONFIG_SCAN
+static const int16_t v_scan_wait[] = { 1000, 2000, 3000, 5000, 10000, 15000 };	// ms
+static const tr_id_t n_scan_wait[] = { TRX(VALUE_1_S, "1 s"), TRX(VALUE_2_S, "2 s"), TRX(VALUE_3_S, "3 s"),
+	TRX(VALUE_5_S, "5 s"), TRX(VALUE_10_S, "10 s"), TRX(VALUE_15_S, "15 s") };
+#endif
 static const int16_t v_autooff[] = { 0, 30, 60, 120 };
 static const tr_id_t n_autooff[] = { TRN(VALUE_OFF, "Off"), TRN(VALUE_30_MIN, "30 min"), TRX(VALUE_1_H, "1 h"),
 	TRX(VALUE_2_H, "2 h") };
@@ -7366,6 +7371,10 @@ static const set_item_t s_talk[] = {
 	TOGGLE(TRN(SET_LABEL_MONITOR_BY_DEFAULT, "Monitor by default"), "digital monitor promiscuous hear all",
 		UI_SET_HEAR_ALL_DEFAULT),
 	TOGGLE(TRN(SET_LABEL_SHOW_TALKER_ALIAS, "Show talker alias"), NULL, UI_SET_ALIAS_SHOW),
+#if CONFIG_SCAN
+	LIST(TRN(SET_LABEL_SCAN_DELAY, "Scan delay"), "resume wait hold signal ends carrier", UI_SET_SCAN_DELAY_MS,
+		v_scan_wait, n_scan_wait),
+#endif
 #if CONFIG_DUAL_WATCH
 	TOGGLE(TRN(SET_LABEL_DUAL_TALK_BACK, "Dual watch talk back"), "reply other channel A B", UI_SET_DUAL_TALK_BACK),
 	LIST(TRN(SET_LABEL_DUAL_DELAY, "Dual watch delay"), "resume wait reply A B", UI_SET_DUAL_DELAY_MS, v_dual_wait,
@@ -8043,6 +8052,16 @@ static void set_value_text(const set_item_t *s, int32_t v, char *out, size_t len
 				sb_str(&b, tr(s->names[k]));
 				return;
 			}
+		}
+		if ((s->id == UI_SET_SCAN_DELAY_MS || s->id == UI_SET_DUAL_DELAY_MS) && v >= 0) {
+			// A wait set elsewhere (the debug link) that no choice has: shown in seconds, kept until a choice is made
+			sb_u32(&b, (uint32_t)v / 1000u, 1);
+			if (v % 1000 != 0) {
+				sb_chr(&b, '.');
+				sb_u32(&b, (uint32_t)v % 1000u / 100u, 1);
+			}
+			sb_str(&b, " s");
+			break;
 		}
 		sb_i32(&b, v);
 		break;

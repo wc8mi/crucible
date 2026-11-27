@@ -539,6 +539,9 @@ typedef enum {
 	// NXDN for now run on. The rate (1: 9600 bit/s, 0: 4800), the RX RAN (0: any) and TX RAN (0 to 63), the talk group
 	// (1 to 65519, or 0xFFFF: all). A change is stored and goes to the radio at once. Appended like the ones above
 	UI_SET_NXDN_RATE, UI_SET_NXDN_RX_RAN, UI_SET_NXDN_TX_RAN, UI_SET_NXDN_TG,
+	// Scan: the wait after a signal ends before the scan moves on, ms (Settings > Talk & listen, CONFIG_SCAN;
+	// radio_settings_t.scan_delay_ms, 0 to RADIO_SCAN_DELAY_MAX_MS). Appended like the ones above
+	UI_SET_SCAN_DELAY_MS,
 	UI_SET_COUNT
 } ui_setting_t;
 

@@ -636,6 +636,11 @@ void ui_svc_apply(uint8_t id, int32_t value)
 		rs.dual_delay_ms = v16;
 		break;
 #endif
+#if CONFIG_SCAN
+	case UI_SET_SCAN_DELAY_MS:	// checked by ui_svc_setting_set; a running scan takes it at once
+		rs.scan_delay_ms = v16;
+		break;
+#endif
 	case UI_SET_BACKLIGHT_S:		// dims after this, goes off after four times as long (0 = always on; < 0: dims
 		if (value < 0) {		// after -value, never goes off)
 			rs.backlight_dim_s = (uint16_t)(value < -0xFFFF ? 0xFFFF : -value);

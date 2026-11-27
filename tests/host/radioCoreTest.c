@@ -5524,6 +5524,19 @@ static void test_ui_glue(void)
 	ui_svc_apply(UI_SET_SCAN_TONE, 0);
 	run(20);
 	CHECK(!sm.set.scan_beep);
+	// The scan delay is the radio core's too (rs_scan_delay_ms): 5 s by default, 0 to RADIO_SCAN_DELAY_MAX_MS
+	CHECK(ui_svc_setting_get(UI_SET_SCAN_DELAY_MS) == RADIO_SCAN_DELAY_MS);
+	CHECK(!ui_svc_setting_set(UI_SET_SCAN_DELAY_MS, -1));
+	CHECK(!ui_svc_setting_set(UI_SET_SCAN_DELAY_MS, (int32_t)RADIO_SCAN_DELAY_MAX_MS + 1));
+	CHECK(ui_svc_setting_set(UI_SET_SCAN_DELAY_MS, 10000));
+	ui_svc_apply(UI_SET_SCAN_DELAY_MS, 10000);
+	run(20);
+	CHECK(sm.set.scan_delay_ms == 10000 && ui_svc_setting_get(UI_SET_SCAN_DELAY_MS) == 10000);
+	settings_read(&sv);
+	CHECK(sv.rs_stored == 1 && sv.rs_scan_delay_ms == 10000);
+	ui_svc_apply(UI_SET_SCAN_DELAY_MS, RADIO_SCAN_DELAY_MS);
+	run(20);
+	CHECK(sm.set.scan_delay_ms == RADIO_SCAN_DELAY_MS);
 	CHECK(ui_svc_setting_get(UI_SET_EMERGENCY_TONE) == 1);
 	CHECK(ui_svc_setting_set(UI_SET_EMERGENCY_TONE, 0));
 	run(20);

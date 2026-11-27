@@ -4250,6 +4250,11 @@ msgid "Show talker alias"
 msgstr "显示主叫别名"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_SCAN_DELAY"
+msgid "Scan delay"
+msgstr "扫描延时"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_DUAL_TALK_BACK"
 msgid "Dual watch talk back"
 msgstr "双守候回话"

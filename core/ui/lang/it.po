@@ -4248,6 +4248,11 @@ msgid "Show talker alias"
 msgstr "Mostra alias"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_SCAN_DELAY"
+msgid "Scan delay"
+msgstr "Ritardo scansione"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_DUAL_TALK_BACK"
 msgid "Dual watch talk back"
 msgstr "Risp. doppio asc."

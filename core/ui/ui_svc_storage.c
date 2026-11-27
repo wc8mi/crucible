@@ -199,6 +199,11 @@ static __attribute__((noinline)) int32_t setting_get_radio(uint8_t id)
 		radio_get_settings(&rs);
 		return rs.dual_delay_ms;
 #endif
+#if CONFIG_SCAN
+	case UI_SET_SCAN_DELAY_MS:
+		radio_get_settings(&rs);
+		return rs.scan_delay_ms;
+#endif
 #if CONFIG_BCAST_FM
 	case UI_SET_BCAST_STEP:
 		radio_get_settings(&rs);
@@ -596,6 +601,10 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 	case UI_SET_ROAM_PROBE:
 #endif
 		return true;	// ui_svc_apply hands it to the radio core, which saves it
+#if CONFIG_SCAN
+	case UI_SET_SCAN_DELAY_MS:	// as those, in range only: the menu offers 1 to 15 s, a value past the most is refused
+		return value >= 0 && value <= (int32_t)RADIO_SCAN_DELAY_MAX_MS;
+#endif
 	case UI_SET_LARGE_TEXT:
 	case UI_SET_HINTS:
 	case UI_SET_MESSAGE_TONE:

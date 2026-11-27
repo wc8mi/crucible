@@ -4248,6 +4248,11 @@ msgid "Show talker alias"
 msgstr "Ver alias del emisor"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_SCAN_DELAY"
+msgid "Scan delay"
+msgstr "Retardo escaneo"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_DUAL_TALK_BACK"
 msgid "Dual watch talk back"
 msgstr "Respuesta doble escucha"

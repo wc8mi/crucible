@@ -57,6 +57,7 @@
 //   timeout             the TX timeout cuts the transmission off while PTT is still held (shows the timeout deny)
 //   pttlocked:on|off    turns Settings > Key lock > PTT when locked on or off
 //   autolock:<s>        Settings > Keys > Auto lock: s seconds, 0 off
+//   scandelay:<ms>      the scan's wait after a signal is ms, as the debug link sets it (any value in range)
 //   battery:<pct>       the battery reads pct; offfailed: auto power off couldn't switch off
 //   foreign             the codeplug is another firmware's: a channel write asks first (codeplug-foreign)
 //   aeskeys             system 3 is a DMR AES one holding traffic keys 0 and 7 (the channel editor's AES key row)
@@ -808,6 +809,8 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 {
 	if ((id == UI_SET_RSSI_VHF || id == UI_SET_RSSI_UHF) && (value < -20 || value > 20))
 		return false;
+	if (id == UI_SET_SCAN_DELAY_MS && (value < 0 || value > (int32_t)RADIO_SCAN_DELAY_MAX_MS))
+		return false;	// ui_svc_storage.c's range
 #if CONFIG_NXDN
 	if (id >= UI_SET_NXDN_RATE && id <= UI_SET_NXDN_TG)
 		return sim_nxdn_default(id, value);
@@ -2868,6 +2871,7 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	sim_late[UI_SET_NXDN_RATE - UI_SET_RAM_COUNT] = sim_late[UI_SET_NXDN_RX_RAN - UI_SET_RAM_COUNT] = 0;
 	sim_late[UI_SET_NXDN_TX_RAN - UI_SET_RAM_COUNT] = sim_late[UI_SET_NXDN_TG - UI_SET_RAM_COUNT] = 1;
 #endif
+	sim_late[UI_SET_SCAN_DELAY_MS - UI_SET_RAM_COUNT] = RADIO_SCAN_DELAY_MS;	// the radio core's default
 	ui_svc_ram_set(UI_SET_AGC_RX_AUTO, 1);	// Digital AGC: both switches On, as a new radio starts
 	ui_svc_ram_set(UI_SET_AGC_TX_AUTO, 1);
 	emergency_on = false;
@@ -3343,6 +3347,7 @@ static bool check(const char *kv, char *err, size_t len)
 	else if (strcmp(key, "wake") == 0) snprintf(got, sizeof got, "%u", ui_app_take_wake());	// the backlight asked for
 	else if (strncmp(key, "set", 3) == 0 && key[3] >= '0' && key[3] <= '9')	// set<N>: ui_setting_t N's value
 		snprintf(got, sizeof got, "%d", (int)ui_svc_setting_get((uint8_t)atoi(key + 3)));
+	else if (strcmp(key, "scan_delay") == 0) snprintf(got, sizeof got, "%d", (int)ui_svc_setting_get(UI_SET_SCAN_DELAY_MS));
 	else if (strcmp(key, "radio_tot") == 0) snprintf(got, sizeof got, "%u", (unsigned)sim_rec.tot_s);
 	else if (strcmp(key, "radio_backlight") == 0) snprintf(got, sizeof got, "%ld", (long)sim_rec.backlight_s);
 	else if (strcmp(key, "count") == 0) snprintf(got, sizeof got, "%u", s.count);
@@ -3476,6 +3481,14 @@ static bool run_token(char *t, char *err, size_t len)
 		int32_t sec = atoi(arg);
 		ui_svc_setting_set(UI_SET_AUTO_LOCK_S, sec);
 		ui_apply_setting(UI_SET_AUTO_LOCK_S, sec);
+		advance(200);
+		return true;
+	}
+	if (strcmp(t, "scandelay") == 0 && arg != NULL) {	// the debug link's SETTING 8: any wait, not only the menu's
+		if (!ui_svc_setting_set(UI_SET_SCAN_DELAY_MS, atoi(arg))) {
+			snprintf(err, len, "scandelay: out of range, %s", arg);
+			return false;
+		}
 		advance(200);
 		return true;
 	}

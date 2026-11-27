@@ -90,7 +90,7 @@ typedef struct {
 	  "screen=message focus=Full_message", 1, false }, \
 	{ "7 PTT in Full message calls the sender", "msg:9991234," LONG_TEXT " wait:9000 ok 2 ok ok", "ptt", \
 	  "txid=9991234 txpriv=1", 1, false },
-#define TALK_BACK	"ok 7 3 down down down down down down down down down ok long:back quick 7 ctx 3 5 ok "	// on, and A 3 / B 5
+#define TALK_BACK	"ok 7 3 down down down down down down down down down down ok long:back quick 7 ctx 3 5 ok "	// on, and A 3 / B 5
 
 static const flow_t flows[] = {
 	{ "Context Select opens Home menu", "", "selectab", "screen=hub", 1, false },
@@ -754,8 +754,8 @@ static const flow_t flows[] = {
 #endif
 	{ "S FM broadcast step on a radio with the receiver", "bcast", "ok 7 3 down down down down", "shows=FM_broadcast_step",
 	  7, false },
-	{ "11 dual watch talk back on", "", "ok 7 3 down down down down down down down down down ok", "shows=Dual_watch_talk_back", 13,
-	  false },
+	{ "11 dual watch talk back on", "", "ok 7 3 down down down down down down down down down down ok",
+	  "shows=Dual_watch_talk_back", 14, false },
 	{ "11 dual watch talk back: a call on B", TALK_BACK, "tune:b call:9991234,91,g wait:4000", "dual=1 sel=B", 0,
 	  false },
 	{ "11 dual watch talk back: then back on A", TALK_BACK, "tune:b call:9991234,91,g wait:4000 wait:11000",
@@ -1107,6 +1107,18 @@ static const flow_t flows[] = {
 #endif
 	// Settings the radio core acts on reach it (ui_svc_apply), key presses ask for a key beep
 	{ "S TX timeout to the radio", "", "ok 7 3 down ok", "radio_tot=300", 5, false },
+#if CONFIG_SCAN
+	// Settings > Talk & listen > Scan delay: 5 s on a new radio; OK steps through the choices; a wait no choice has
+	// (the debug link's) is shown in seconds and kept until a choice is made
+#define SCAN_DELAY_ROW	"ok 7 3 down down down down down down down down down"
+	{ "S scan delay row", "", SCAN_DELAY_ROW, "screen=group focus=Scan_delay shows=5_s scan_delay=5000", 12, false },
+	{ "S scan delay: 10 s, then 15 s", SCAN_DELAY_ROW, "ok ok", "focus=Scan_delay shows=15_s scan_delay=15000", 2,
+	  false },
+	{ "S scan delay: past 15 s back to 1 s", SCAN_DELAY_ROW " ok ok", "ok", "shows=1_s scan_delay=1000", 1, false },
+	{ "S scan delay set elsewhere: shown in seconds", "scandelay:2500", SCAN_DELAY_ROW,
+	  "focus=Scan_delay shows=2.5_s scan_delay=2500", 12, false },
+	{ "S scan delay: kept over a restart", SCAN_DELAY_ROW " ok reboot", "", "scan_delay=10000", 0, false },
+#endif
 	{ "S backlight time to the radio", "", "ok 7 2 down ok", "radio_backlight=60", 5, false },
 	{ "S backlight dim only to the radio", "", "ok 7 2 down ok ok ok ok", "radio_backlight=-30", 8, false },
 	{ "S key beep", "", "up", "beeps=1", 1, false },
