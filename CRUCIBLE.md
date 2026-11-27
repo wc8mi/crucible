@@ -130,5 +130,28 @@ validation limits and a link to the [usage guide](docs/kf8sfork/README.md). Mark
 pre-releases when a radio has no full release. The
 [Crucible flasher](https://tinker.wc8mi.net/crucible/) lists a release once its site is rebuilt.
 
+## Flasher page
+
+The [Crucible flasher](https://tinker.wc8mi.net/crucible/) is one static folder: RadioFoundry's flasher page with
+Crucible's shell and look, offering only the releases above. Build it after publishing a release:
+
+```
+uv run --no-project --with-requirements site/requirements.txt python3 tools/crucible_site.py
+```
+
+The result is `build/crucible-site/`. Copy it to `/crucible/` on the tinker host. The tool:
+
+- builds the shared site and keeps only the flash page and the files it loads
+- downloads each `crucible-*.zip` release (with `gh`, so a private repository works), checks it against its `.zip.sha256`
+  and `SHA256SUMS`, and writes the images for the four radios with `releases/index.json` (`--package ZIP` adds a local
+  one, `--no-github` skips the download)
+- sets `data-reporting="off"`: the page sends nothing to RadioFoundry's services, and a problem report is saved as a
+  file for a wc8mi/crucible issue
+- says Crucible wherever the flasher's English says RadioFoundry, and credits RadioFoundry in the footer
+
+The look lives in `site/crucible/` (`crucible.css`, the self-hosted Barlow Condensed heading face, OFL-1.1). It loads
+after the shared stylesheets and changes no markup, so upstream's flasher keeps merging. The design record is
+`DESIGN.md`; the product notes behind it are `PRODUCT.md`.
+
 Documentation for testers: the [usage and testing guide](docs/kf8sfork/README.md) and the
 [changelog](docs/kf8sfork/CHANGELOG.md).
