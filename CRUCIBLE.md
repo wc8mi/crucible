@@ -10,9 +10,10 @@ agents alike. Everything in [AGENTS.md](AGENTS.md) still applies. This page adds
 
 ## Rules
 
-1. **Upstream first.** A change that would help RadioFoundry goes to RadioFoundry as a pull request from a feature
-   branch, and comes back with the next merge. Crucible carries only what upstream won't take or what is ours alone:
-   the identity, the radio subset, our defaults, packaging, the flasher site. Keep that carried diff small.
+1. **Bite-size feature branches.** Each change is a small feature branch that does one thing, merged into `main`
+   when it is ready. We don't wait on RadioFoundry. Keep each branch self-contained, with its generic parts (shared
+   code, tools, docs) in their own commits, so it could be offered to RadioFoundry as it stands. A change to shared
+   files can conflict with each upstream merge, so keep it small.
 2. **Merge, never rebase.** `main` merges `upstream/main`. Shared history is what keeps those merges cheap. Never
    rewrite `main`.
 3. **Thin identity layer.** What users see says Crucible. Internal names stay RadioFoundry's (`rfoundry_*` files,
@@ -33,7 +34,7 @@ agents alike. Everything in [AGENTS.md](AGENTS.md) still applies. This page adds
 | Name | What |
 |---|---|
 | `main` | What we release. Every release is tagged on it. |
-| feature branches | Work in progress; upstream candidates are branched from `upstream/main`, not from `main`. |
+| feature branches | One change each, branched from `main` and merged back through a pull request. |
 | `origin` | `https://github.com/wc8mi/crucible` |
 | `upstream` | `https://github.com/radiofoundry/radiofoundry` |
 
