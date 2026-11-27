@@ -25,6 +25,11 @@
 #define PAYLOAD_MAX	STORAGE_SLOT_PAYLOAD_MAX
 #define MAGIC		STORAGE_SLOT_MAGIC
 #define RETRIES		4		// slots tried when a write doesn't read back
+// The longest record RadioFoundry (upstream) writes: settings_t up to aes_mi_res. Every Crucible release wrote more
+// (420 bytes and up), which tells a Crucible record with mic_input at 399 from upstream's aprs_cp_freq there (ADR 004).
+// If upstream grows past this, a record cross-flashed from it reads byte 399 as a clamped Mic input and the APRS
+// frequency is taken from the codeplug once more
+#define UPSTREAM_BYTES	412u
 
 _Static_assert(SETTINGS_PAGE_BYTES == PAYLOAD_MAX, "a page is a slot's payload");
 _Static_assert(SETTINGS_PAGES <= SETTINGS_PAGES_MAX, "settings_t outgrew its pages");
@@ -38,6 +43,7 @@ _Static_assert(offsetof(settings_t, nxdn_marker) == 428, "NXDN radio default blo
 _Static_assert(offsetof(settings_t, nxdn_tg) == 432, "NXDN talk group offset (Crucible)");
 _Static_assert(offsetof(settings_t, mic_input) == 434, "Mic input offset (Crucible)");
 _Static_assert(offsetof(settings_t, aprs_cp_freq) == 399, "upstream's APRS codeplug frequency mark offset");
+_Static_assert(offsetof(settings_t, aes_mi_res) + sizeof(uint32_t) == UPSTREAM_BYTES, "upstream's record ends after aes_mi_res");
 _Static_assert(sizeof(settings_t) == 436, "settings_t changed size: update docs/spec/settings-store.md 3 and this");
 
 static settings_t live;			// under the quick lock
@@ -159,17 +165,11 @@ static uint8_t slot_buf[SLOT_SIZE];
 static uint16_t rec_page(const uint8_t *r) { return (uint16_t)((r[8] | (r[9] << 8)) >> SETTINGS_PAGE_SHIFT); }
 static uint16_t rec_layout(const uint8_t *r) { return (uint16_t)((r[8] | (r[9] << 8)) & 0x0FFFu); }
 
-// Whether a record of this many bytes carries the Digital AGC block (settings.h) as this firmware writes it
-static bool agc_block_present(const settings_t *s, size_t bytes)
-{
-	return bytes >= offsetof(settings_t, agc_marker) + 4u && s->agc_marker == SETTINGS_AGC_MARKER;
-}
-
-// The Digital AGC block of a record without this firmware's marker: the defaults, marked in RAM so the next ordinary
-// save carries it (no save is forced)
+// The Digital AGC block (settings.h) of a record without this firmware's marker: the defaults, marked in RAM so the
+// next ordinary save carries it (no save is forced)
 static void agc_block_check(settings_t *s, size_t bytes)
 {
-	if (agc_block_present(s, bytes))
+	if (bytes >= offsetof(settings_t, agc_marker) + 4u && s->agc_marker == SETTINGS_AGC_MARKER)
 		return;
 	s->agc_marker = SETTINGS_AGC_MARKER;
 	s->agc_manual = 0;
@@ -181,15 +181,15 @@ static int8_t mic_input_in_range(int8_t v) { return v >= HAL_MIC_INPUT_MIN && v 
 
 // The NXDN radio default block (settings.h): a record without this firmware's marker reads the defaults, marked in
 // RAM like the Digital AGC block; a marked one has each value out of range read as its default. mic_input moved here
-// from offset 399 when upstream took that byte for aprs_cp_freq (ADR 004): a record with the Digital AGC block but
-// not this marker was written by a Crucible release that kept it at 399, so it comes across and the APRS mark reads
-// none yet. agc_block: the record had the Digital AGC block (asked before agc_block_check marks it)
-static void nxdn_block_check(settings_t *s, size_t bytes, bool agc_block)
+// from offset 399 when upstream took that byte for aprs_cp_freq (ADR 004). Upstream's records are at most
+// UPSTREAM_BYTES long and every Crucible release wrote more, so a longer record without this marker was written by a
+// Crucible release that kept mic_input at 399: it comes across and the APRS mark reads none yet
+static void nxdn_block_check(settings_t *s, size_t bytes)
 {
 	if (bytes < offsetof(settings_t, nxdn_reserved) + sizeof s->nxdn_reserved ||
 	    s->nxdn_marker != SETTINGS_NXDN_MARKER) {
 		int8_t mic = 0;
-		if (agc_block) {
+		if (bytes > UPSTREAM_BYTES) {
 			mic = (int8_t)s->aprs_cp_freq;
 			s->aprs_cp_freq = 0;
 		}
@@ -330,9 +330,8 @@ settings_load_t settings_init(void)
 		stats.load = whole ? SETTINGS_LOADED : SETTINGS_UPGRADED;
 		power_levels_check(&live);
 		aes_migration_check(&live, SETTINGS_PAGE_BYTES + page1_bytes);
-		bool agc_block = agc_block_present(&live, SETTINGS_PAGE_BYTES + page1_bytes);
 		agc_block_check(&live, SETTINGS_PAGE_BYTES + page1_bytes);
-		nxdn_block_check(&live, SETTINGS_PAGE_BYTES + page1_bytes, agc_block);
+		nxdn_block_check(&live, SETTINGS_PAGE_BYTES + page1_bytes);
 	}
 	storage_unlock();
 	saved = live;

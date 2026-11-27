@@ -80,12 +80,18 @@ byte, not an upstream field in a Crucible block.
 - **Upstream keeps its offsets.** `aprs_cp_freq` stays at 399. `mic_input` moves to offset 434, the first of this
   block's two reserved bytes. settings_t stays 436 bytes.
 - **New marker.** The block's marker changes from 0xA7 to 0xA8, so a record in the new layout can be told apart.
-  0xA7 was never released: the released Crucible firmware has only the Digital AGC block.
-- **Load.** A record with the Digital AGC block (at least 428 bytes, 0xA6 at 424) and without 0xA8 at 428 was written
-  with `mic_input` at 399. Its byte 399 is read as `mic_input` (outside -7..+8 reads 0) and `aprs_cp_freq` reads 0,
-  none yet. The NXDN values read their defaults as before. A record without the Digital AGC block (RadioFoundry's, or
-  older) keeps its `aprs_cp_freq` and reads `mic_input` 0. A record with 0xA8 is read as stored. No save is forced:
-  the next ordinary save writes the new layout.
+  0xA7 was never released: no Crucible release has the NXDN block.
+- **Load.** The record's size tells whose it is. Upstream's settings record has never been longer than 412 bytes;
+  every Crucible release wrote more (420, 424 or 428 bytes, with or without the Digital AGC block). A record longer
+  than 412 bytes and without 0xA8 at 428 was written with `mic_input` at 399. Its byte 399 is read as `mic_input`
+  (outside -7..+8 reads 0) and `aprs_cp_freq` reads 0, none yet. The NXDN values read their defaults as before. A
+  record of 412 bytes or fewer (upstream's) keeps its `aprs_cp_freq` and reads `mic_input` 0. A record with 0xA8 is
+  read as stored. No save is forced: the next ordinary save writes the new layout.
+- **Why not the AGC block.** The first releases (26 November) have no Digital AGC block. Keyed on that block, they
+  would lose the Mic input and keep the step as a bogus APRS mark, which skips the radio's protection of its own APRS
+  frequency, so the codeplug's frequency would overwrite the user's.
+- **Caveat.** If upstream's record grows past 412 bytes and a user installs Crucible over it, byte 399 is read as a
+  clamped Mic input and the APRS frequency is taken from the codeplug once more.
 - **Rule.** A Crucible field goes in a Crucible block, never in a byte upstream reserved.
 
 ## Plan

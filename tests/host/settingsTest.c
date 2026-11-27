@@ -1532,10 +1532,10 @@ static void check_no_save_forced(void)
 	CHECK(st.saves == 0 && st.seq == 2);
 }
 
-// mic_input (Crucible) moved from offset 399 to 434 when upstream took 399 for aprs_cp_freq (ADR 004). A record from a
-// Crucible release (the Digital AGC block, no NXDN block marker 0xA8) has the Mic input at 399: it comes across and the
-// APRS mark reads none yet. A record without the Digital AGC block (RadioFoundry's, or older) keeps its APRS mark and
-// reads Mic input 0; a record in the new layout keeps both
+// mic_input (Crucible) moved from offset 399 to 434 when upstream took 399 for aprs_cp_freq (ADR 004). A record longer
+// than upstream's 412 bytes without the NXDN block marker 0xA8 is a Crucible release's, with the Mic input at 399: it
+// comes across and the APRS mark reads none yet. A record of 412 bytes or fewer (RadioFoundry's) keeps its APRS mark
+// and reads Mic input 0; a record in the new layout keeps both
 static void test_settings_mic_input_move(void)
 {
 	settings_t s;
@@ -1543,7 +1543,7 @@ static void test_settings_mic_input_move(void)
 	settings_defaults(&d);
 	CHECK(d.nxdn_marker == 0xA8 && d.mic_input == 0 && d.aprs_cp_freq == 0);
 
-	// A Crucible release: 428 bytes, the Digital AGC block, the Mic input at 399
+	// A Crucible release with the Digital AGC block: 428 bytes, the Mic input at 399
 	settings_t rel = d;
 	rel.squelch = 3;
 	rel.agc_manual = SETTINGS_AGC_TX_MANUAL;
@@ -1570,6 +1570,21 @@ static void test_settings_mic_input_move(void)
 	CHECK(s.mic_input == 0 && s.aprs_cp_freq == 0);
 	check_no_save_forced();
 
+	// The 26 Nov releases: 424 bytes, no Digital AGC block, the Mic input at 399
+	settings_t nov = d;
+	nov.squelch = 5;
+	nov.aprs_cp_freq = (uint8_t)(int8_t)-3;
+	boot_audio_record(&nov, PRE_DAGC_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.squelch == 5 && s.mic_input == -3 && s.aprs_cp_freq == 0 && s.agc_manual == 0);
+	nxdn_block_is_default(&s);
+	check_no_save_forced();
+	// 420 bytes, Mic input never set (0 at 399): Mic input 0, no APRS mark
+	nov.aprs_cp_freq = 0;
+	boot_audio_record(&nov, PRE_RSSI_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.mic_input == 0 && s.aprs_cp_freq == 0);
+
 	// Full length with the pre-release NXDN marker 0xA7: still the Mic input at 399
 	settings_t pre = d;
 	pre.nxdn_marker = 0xA7;
@@ -1593,14 +1608,16 @@ static void test_settings_mic_input_move(void)
 	settings_read(&s);
 	CHECK(s.aprs_cp_freq == 0x5A && s.mic_input == 0);
 
-	// Full length, another firmware's bytes where the Crucible markers go: the APRS mark kept, Mic input 0
+	// Longer than upstream's records and another firmware's bytes where the Crucible markers go (an upstream that grew
+	// past 412 bytes): read as a Crucible release, byte 399 a Mic input clamped to range (0x5A is out: 0) and the APRS
+	// frequency taken from the codeplug once more; the block bytes are not read
 	settings_t foreign = rf;
 	foreign.agc_marker = 0x11;
 	foreign.nxdn_marker = 0x11;
 	foreign.mic_input = 4;
 	boot_audio_record(&foreign, CURRENT_SETTINGS_BYTES);
 	settings_read(&s);
-	CHECK(s.aprs_cp_freq == 0x5A && s.mic_input == 0 && s.agc_marker == SETTINGS_AGC_MARKER);
+	CHECK(s.aprs_cp_freq == 0 && s.mic_input == 0 && s.agc_marker == SETTINGS_AGC_MARKER);
 	nxdn_block_is_default(&s);
 
 	// The new layout: both kept, across a save too
