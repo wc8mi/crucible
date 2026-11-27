@@ -221,7 +221,8 @@ instead of OK pressed once per step. The rows shown follow the copy's mode, so a
   of its own (a trunked channel, [channel-modes.md](channel-modes.md)) only on the channel opened as one, since its
   system can't be picked here. In a listen band only FM. The step back to the mode the channel was opened with
   restores it as it was, with its system and its NAC or RAN: a slip on the row is taken back by pressing on. A
-  channel made P25 starts with NAC 293 both ways and squelch normal, one made NXDN with RAN 1 both ways at 9600 bit/s,
+  channel made P25 starts with NAC 293 both ways and squelch normal, one made NXDN with the NXDN radio default's rate and RANs (`UI_SET_NXDN_RATE`, `UI_SET_NXDN_RX_RAN`,
+  `UI_SET_NXDN_TX_RAN`; [nxdn.md](nxdn.md) 6.2),
   one made YSF with DG-ID 0 both ways; each keeps its talk target and own ID, and Save writes it as a stored channel of the kind with that block. The
   row's changed mark counts the kind. Saving a stored channel of a kind as a plain one or one of another kind
   replaces its tag, so Save asks first on the `discard` screen, titled "Save as FM?" (or "Save as DMR?"; "Unsaved
@@ -237,6 +238,17 @@ instead of OK pressed once per step. The rows shown follow the copy's mode, so a
 - A YSF channel: Mode "YSF", then DG-ID in place of NAC; no TX contact, Own ID or Talkaround (YSF names the
   radio by callsign and radio ID). DG-ID shows the sent DG-ID, then the heard one where they differ ("12/00"); OK opens
   it, digits type 0-99, Up and Down step through 0-99, and OK sets both to the value (00 hears every DG-ID).
+- In NXDN quick settings tile 8 is the rate (`QT_NXDN_RATE`, no width): "4800" or "9600", what runs now. OK flips the
+  NXDN radio default's rate (stored, `UI_SET_NXDN_RATE`) where the radio runs on the settings (the VFO, a channel in
+  NXDN for now); a rate the board's provider can't run says "This rate: not on this radio". On a stored NXDN channel
+  the tile is dimmed and OK says "NXDN: set in the channel".
+- Settings > Talk & listen > NXDN opens a page of its own (`SCR_GROUP`, after the groups): the NXDN radio default's
+  Rate, RX RAN ("Any" at 0), TX RAN and Talkgroup (1-65519; Up past 65519 is "All", 0xFFFF, which OK stores; Down from
+  All is 65519; a digit that would type past 65519 starts the number over, so typed digits never reach All and a
+  typed value out of range is refused with the range), under a line saying stored NXDN channels keep their own. Dimmed without `UI_FEAT_NXDN`.
+- Talk to in NXDN ([nxdn.md](nxdn.md) 6.2): on the settings a target for now shows the VFO's talk target hint and
+  Back undoes it; hold OK keeps a group as the talkgroup; IDs above 65519 say "NXDN IDs go up to 65519"; a stored
+  NXDN channel says "NXDN: set in the channel".
 - On a YSF channel quick settings tile 3 opens Rooms (no tones) and tile 8 is the DG-ID (no width): Up/Down step
   0-99, digits type two, OK sets it both ways (`ui_svc_ysf_dgid`). In the VFO it stays; on a stored channel it lasts
   until another channel is taken (`radio_ysf_settings_t.temp_chan`). # on Home opens Rooms (a YSF call has no
@@ -774,8 +786,9 @@ HIL: `tests/hil/test_ui.py` (`tests/hil/README.md`) replays the main sequences o
   text reads on them (at least 7.5:1 after RGB565 rounding); the red is lighter and pinker than TX's red, and there is
   no green, which would hide the RX pill. Gallery: `home_dmr*`, `home_plain`, `channels*` (section 7).
 - The VFO has a mode of its own (`dmr-voice.md` 2.1). The Mode tile (tile 4 in the VFO only) switches it FM / DMR ("VFO: DMR", no "for now": it is kept), and in a build with only one VFO kind the tile is dimmed ("VFO: one mode in this build"). On a channel tile 4 is "To VFO" (`dmr-voice.md` 2.2): it copies what is in effect on the channel to the VFO and opens it on Home ("Copied to VFO"); a channel the VFO can't hold is refused with a toast. A channel has no temporary mode change any more. In DMR the quick menu is the DMR one: Timeslot, Color and Talk to change the VFO's own settings, with no dot on Home. The talk target picker lists the VFO's current target first ("Current"); both OK and hold OK keep the target for the VFO.
-- The privacy key types are named by key size with the key's range, "8-bit (1-255)" and "16-bit (0-65535)". The key
-  is typed in decimal. Number rows take typed digits; a value outside the range or between steps is refused with the
+- The privacy key types are named by key size with the key's range, "8-bit (1-255)" and "16-bit (0-65535)"; where the
+  range doesn't fit beside the row's label it drops out ("16-bit"), so the label stays whole. The key is typed in
+  decimal. Number rows take typed digits; a value outside the range or between steps is refused with the
   range. Only key slot 1 is reachable from the menu.
 - Switching USB to network has no confirmation (P7: reversible); the info page says what stops and how to get back.
 - A failed message isn't kept for a retry: the banner says "Not delivered: send it again".

@@ -34,6 +34,36 @@
 #define ADV_BELOW_DIAG_N	0
 #endif
 
+// Talk & listen's Digital AGC rows, reached with up from its first row (the list wraps to its end). The rows a build
+// lacks are not there. Mic input is three up; below it the rows after the TX levels
+#if CONFIG_YSF
+#define TL_YSF " up"
+#else
+#define TL_YSF ""
+#endif
+#if CONFIG_NXDN
+#define TL_NXDN " up"
+#else
+#define TL_NXDN ""
+#endif
+#if CONFIG_P25
+#define TL_P25 " up"
+#else
+#define TL_P25 ""
+#endif
+#if CONFIG_P25_TX_AGC
+#define TL_P25TX " up"
+#else
+#define TL_P25TX ""
+#endif
+#define TL_MIC		"ok 7 3 up up up"
+#define TL_YSF_TX	TL_MIC TL_YSF
+#define TL_P25_TX	TL_MIC TL_YSF TL_NXDN " up"
+#define TL_DMR_TX	TL_MIC TL_YSF TL_NXDN TL_P25TX " up"
+#define TL_AGC_TX	TL_DMR_TX " up"
+#define TL_DMR_RX	TL_AGC_TX TL_YSF TL_NXDN TL_P25 " up"
+#define TL_AGC_RX	TL_DMR_RX " up"
+
 static int fails, flows_run;
 
 typedef struct {
@@ -210,13 +240,29 @@ static const flow_t flows[] = {
 	{ "P25 channel shows its mode", "dlmode:p25", "", "mode=p25 screen=home shows=P25 hides=No_tone hides=12.5k hides=25k hides=SQ5", 0, false },
 #if CONFIG_NXDN
 	// NXDN the same way: the power, the RAN sent and the rate in the chips, the group PTT calls on the talk line
-	{ "NXDN channel shows its mode", "dlmode:nxdn", "", "mode=nxdn screen=home shows=NXDN shows=RAN_1_9600 shows=TG_1 hides=No_tone hides=SQ5", 0, false },
+	{ "NXDN channel shows its mode", "dlmode:nxdn", "", "mode=nxdn screen=home shows=NXDN shows=RAN_1_4800 shows=TG_1 hides=No_tone hides=SQ5", 0, false },
 	{ "NXDN home: scrambled call on a stored channel",
 	  "chkind:3,nxdn,COUNTY_NXDN dlpos:3 dlmode:nxdn", "nxdnrx:1234,7,p",
 	  "screen=home shows=COUNTY_NXDN shows=ENC shows=ID_1234 shows=TG_7 hides=Encrypted:_not_played", 0, false },
 	{ "NXDN home: scrambled call without a matching key", "dlmode:nxdn", "nxdnrx:1234,7,e",
 	  "screen=home shows=Encrypted:_not_played hides=ID_1234", 0, false },
-	{ "NXDN channel: bandwidth is FM only", "dlmode:nxdn", "quick 8", "mode=nxdn toast=FM_only:_this_is_NXDN", 2, false },
+	// Tile 8 is the radio default's rate (docs/crucible/adr/004-nxdn-radio-default.md); a stored NXDN channel has its
+	// own, set in the channel
+	{ "NXDN quick: rate to 9600", "dlmode:nxdn", "quick 8", "mode=nxdn toast=NXDN_9600_bit/s", 2, false },
+	{ "NXDN quick: rate back to 4800", "dlmode:nxdn quick 8", "8", "toast=NXDN_4800_bit/s", 1, false },
+	{ "NXDN quick: a stored channel's rate", "chkind:3,nxdn dlpos:3 dlmode:nxdn", "quick 8",
+	  "toast=NXDN:_set_in_the_channel", 2, false },
+	// Talk to on the radio default: for now (Back undoes it); not past 65519; a stored channel keeps its record's
+	{ "NXDN channel: talk to a typed TG", "dlmode:nxdn", "3 1 0 0 ok",
+	  "screen=home shows=TG_3100 toast=Talking_to", 5, false },
+	{ "NXDN channel: an ID past 65519 refused", "dlmode:nxdn", "9 9 9 1 2 3 4 ok",
+	  "toast=NXDN_IDs_go_up_to_65519", 8, false },
+	{ "NXDN VFO: talk to a contact", "dlvfo:438800000 dlmode:nxdn", "ok 1 9 6 7 5 3 ok",
+	  "screen=home shows=TG_91 toast=Talking_to", 8, false },
+	{ "NXDN VFO: Back undoes the talk target", "dlvfo:438800000 dlmode:nxdn ok 1 9 6 7 5 3 ok", "back",
+	  "screen=home shows=TG_1 hides=TG_91 toast=Changes_undone", 1, false },
+	{ "NXDN stored channel: talk to refused", "chkind:3,nxdn dlpos:3 dlmode:nxdn", "3 1 0 0 ok",
+	  "toast=NXDN:_set_in_the_channel", 5, false },
 #endif
 	{ "P25 channel: bandwidth is FM only", "dlmode:p25", "quick 8", "mode=p25 toast=FM_only:_this_is_a_P25_channel",
 	  2, false },
@@ -430,7 +476,7 @@ static const flow_t flows[] = {
 	{ "NXDN new from current: RAN", "dlmode:nxdn", "ok 5 up up up ok down down down",
 	  "screen=channel shows=NXDN focus=RAN hides=Color_code hides=Timeslot", 9, false },
 	{ "NXDN RAN: typed", "dlmode:nxdn ok 5 up up up ok down down down", "ok 1 7 ok", "focus=RAN shows=17", 4, false },
-	{ "NXDN rate: 4800", "dlmode:nxdn ok 5 up up up ok down down down down", "ok", "focus=Rate shows=4800_bit/s", 1,
+	{ "NXDN rate: 9600", "dlmode:nxdn ok 5 up up up ok down down down down", "ok", "focus=Rate shows=9600_bit/s", 1,
 	  false },
 	{ "NXDN ID: past 65519 refused", "dlmode:nxdn ok 5 up up up ok down down down down down down down down down down",
 	  "ok 7 0 0 0 0 ok", "toast=NXDN_IDs_go_up_to_65519", 7, false },
@@ -440,11 +486,11 @@ static const flow_t flows[] = {
 	  "focus=Mode shows=NXDN shows=RAN", 3, false },
 	{ "stored NXDN channel as FM: Save asks", "chkind:3,nxdn ok 5 ok down down ok", "long:ok",
 	  "screen=discard shows=Save_as_FM? shows=NXDN_settings_will_be shows=removed writes=0", 1, false },
-	// Where the radio runs P25 and NXDN, Mode steps through every mode: DMR, P25 with the default NAC, NXDN with
-	// RAN 1 at 9600, FM, and DMR again with nothing to save
+	// Where the radio runs P25 and NXDN, Mode steps through every mode: DMR, P25 with the default NAC, NXDN with the
+	// radio default's rate and RANs (4800, any RAN in, RAN 1 out), FM, and DMR again with nothing to save
 	{ "E Mode: DMR to P25", "p25 nxdn ok 5 ok down down", "ok", "focus=Mode shows=P25 shows=NAC shows=293", 1,
 	  false },
-	{ "E Mode: P25 to NXDN", "p25 nxdn ok 5 ok down down", "ok ok", "focus=Mode shows=NXDN shows=RAN shows=9600",
+	{ "E Mode: P25 to NXDN", "p25 nxdn ok 5 ok down down", "ok ok", "focus=Mode shows=NXDN shows=RAN shows=4800",
 	  2, false },
 	{ "E Mode: NXDN to FM", "p25 nxdn ok 5 ok down down", "ok ok ok", "focus=Mode shows=FM hides=RAN hides=NAC", 3,
 	  false },
@@ -738,6 +784,16 @@ static const flow_t flows[] = {
 	{ "11 dual watch: changes kept over hops", "quick 7 ctx 3 5 ok quick 2 back", "tune:b tune:a", "pos=3 temporary=1", 0,
 	  false },
 	{ "11 dual watch: talk target for the selected", "quick 7 tune:b", "tt", "dual=1 screen=picker", 1, false },
+	// #1116: Up / Down set to Talk target (Settings > Keys) step the selected channel's talk target in dual watch too,
+	// not the channel, as on the single Home
+	{ "11 dual watch: Up/Down on talk target", "ok 7 8 down down ok ok long:back quick 7", "up",
+	  "dual=1 sel=A pos=3 talk=91 toast=Talking_to", 1, false },
+	// #1013: the receiver hops to A's channel between the UI's passes, just before a digit: the digit still goes to
+	// B's VFO entry, not to Find
+	{ "11 dual watch: a digit just after a hop to the channel", "quick 7 ctx 1 vfokey tune:b", "hop:a 1",
+	  "dual=1 sel=B bvfo=1 screen=home entry=1", 1, false },
+	{ "11 dual watch: digits across hops to the channel", "quick 7 ctx 1 vfokey tune:b", "hop:a 1 hop:b 4 hop:a 6",
+	  "dual=1 sel=B bvfo=1 screen=home entry=146", 3, false },
 	{ "11 dual watch: VFO entry over a hop", "quick 7 ctx 1 vfokey", "1 4 6 tune:a 5", "dual=1 sel=B bvfo=1 entry=1465",
 	  4, false },
 	{ "11 dual watch: set B VFO frequency while A is tuned", "quick 7 ctx 1 vfokey tune:a", "1 4 6 5 5 0 0 ok wait:1000",
@@ -885,12 +941,14 @@ static const flow_t flows[] = {
 	// like any other: a DMR channel there stays DMR, RX only. With AM it is a listen band: AM, never DMR
 	{ "E a DMR channel's RX in a receive-only band: DMR, RX only, saved", "ok 5 ok down down down",
 	  "ok 1 2 1 5 0 0 ok long:ok", "shows=121.500 hides=FM toast=Saved_channel_3 writes=1", 9, true },
+#if CONFIG_AM_RX
 	{ "E on a radio with AM: a DMR channel's air band RX makes it AM", "am ok 5 ok down down down", "ok 1 2 1 5 0 0 ok",
 	  "shows=121.500 shows=AM hides=Color_code", 8, false },
 	{ "E on a radio with AM: an air band RX makes the Mode AM", "am ok 5 up up ok down down down", "ok 1 2 1 5 0 0 ok",
 	  "shows=121.500 shows=AM hides=FM", 8, false },
 	{ "E on a radio with AM: OK on the Mode row keeps it AM", "am ok 5 up up ok down down down ok 1 2 1 5 0 0 ok up",
 	  "ok", "toast=Air_band:_receive_only shows=AM hides=FM hides=Color_code hides=RX_CTCSS", 1, false },
+#endif
 	{ "E RX refuses a digit no band starts with", "ok 5 up up ok down down down", "ok 2", "toast=Bands:", 2, false },
 	{ "E RX needs the MHz digits", "ok 5 up up ok down down down", "ok 1 4 ok", "toast=Type_at_least screen=channel",
 	  4, false },
@@ -1081,22 +1139,46 @@ static const flow_t flows[] = {
 	{ "S hear all by default: BACK", "ok 7 3 down down down down down down down ok long:back up up", "back", "hearall=0", 1, false },
 	{ "S mic noise reduction off", "", "ok 7 3 down down down down down down ok", "set70=0", 10, false },
 #if CONFIG_TX_MIC_LIMITER
-	// The TX level rows sit just above the end of Talk & listen: set on one radio, read on another's RX audio levels
+	// The Digital AGC rows sit near the end of Talk & listen (TL_* above): with a switch On its rows are dimmed and
+	// show the radio's default; Off, the user's value. Set on one radio, read on another's RX audio levels
+	{ "S DMR TX level row", TL_AGC_TX " ok", "down", "screen=group focus=DMR_TX_level shows=Off",
+	  1, false },
 #if CONFIG_YSF
-	{ "S DMR TX level row", "", "ok 7 3 up up up up up", "screen=group focus=DMR_TX_level shows=Off", 8, false },
-	{ "S YSF TX level row", "", "ok 7 3 up up up up", "screen=group focus=YSF_TX_level", 7, false },
-#else
-	{ "S DMR TX level row", "", "ok 7 3 up up up up", "screen=group focus=DMR_TX_level shows=Off", 7, false },
+	{ "S YSF TX level row", "", TL_YSF_TX, "screen=group focus=YSF_TX_level", 14, false },
 #endif
 	{ "S Mic input row", "", "ok 7 3 up up up", "screen=group focus=Mic_input", 6, false },
+	{ "S Digital AGC TX on: DMR TX level dimmed", "", TL_DMR_TX " ok",
+	  "screen=group focus=DMR_TX_level shows=-30_dBFS toast=Digital_AGC_sets", 16, false },
+#if CONFIG_P25_TX_AGC
+	{ "S Digital AGC TX on: P25 TX level -20", "", TL_P25_TX, "screen=group focus=P25_TX_level shows=-20_dBFS", 16,
+	  false },
+#endif
+	{ "S Digital AGC RX on: DMR RX AGC dimmed", "", TL_DMR_RX " ok",
+	  "screen=group focus=DMR_RX_AGC shows=-30_dBFS toast=Digital_AGC_sets", 22, false },
+	{ "S Digital AGC RX off: DMR RX AGC editable", TL_AGC_RX " ok", "down",
+	  "screen=group focus=DMR_RX_AGC shows=Off", 1, false },
+#if CONFIG_NXDN
+	// The NXDN radio default, a page under the row above Digital AGC RX: 4800, any RAN in, RAN 1 out, group 1
+	{ "S NXDN radio default page", "nxdn " TL_AGC_RX " up", "ok",
+	  "screen=group focus=Rate shows=For_the_VFO", 1, false },
+	{ "S NXDN default rate: 9600, the quick tile's", "nxdn dlmode:nxdn " TL_AGC_RX " up ok ok long:back",
+	  "quick 8", "toast=NXDN_4800_bit/s", 2, false },
+	{ "S NXDN default talkgroup: All past the top", "nxdn dlmode:nxdn " TL_AGC_RX " up ok up ok 6 5 5 1 9",
+	  "up ok long:back", "screen=home shows=All hides=TG_65519", 3, false },
+	{ "S NXDN default talkgroup: past 65519 refused", "nxdn " TL_AGC_RX " up ok up ok", "6 5 5 2 0 ok",
+	  "toast=Not_changed:_1_to_65519", 6, false },
+	{ "S NXDN default without NXDN on the radio", TL_AGC_RX " up", "ok", "screen=group toast=Not_on_this_radio", 1,
+	  false },
+#endif
 #endif
 	// Mic AGC on: Mic gain (the row above) shows "AGC", is dimmed and says why
 	{ "S mic AGC on", "", "ok 7 3 down down down down down ok", "set71=1 shows=AGC", 9, false },
 	{ "S mic gain while AGC is on", "ok 7 3 down down down down down ok", "up ok", "toast=Mic_AGC_sets set13=5", 2, false },
 #if CONFIG_P25
 #if CONFIG_P25_TX_AGC
-	{ "S P25 mic gain is dimmed by P25 AGC", "dlmode:p25 ok 7 3 down down down down down ok", "up ok",
-	  "toast=Mic_AGC_sets set13=5", 2, false },
+	// P25 levels the mic itself while its TX level is in force (Digital AGC TX On: -20 dBFS)
+	{ "S P25 mic gain is dimmed by P25 TX level", "dlmode:p25 ok 7 3 down down down down", "ok",
+	  "focus=Mic_gain toast=P25_TX_level_sets set13=5", 1, false },
 #else
 	{ "S P25 mic gain is editable with AMBE AGC on", "dlmode:p25 ok 7 3 down down down down down ok",
 	  "up ok up up up ok", "set71=1 set13=8", 6, false },
@@ -1173,6 +1255,10 @@ static const flow_t flows[] = {
 	// Vibrate (Settings > Sound, radio-features.md 4.1): ui_vibe_t 0 message, 1 call, 2 emergency
 	{ "S vibrate on a message", "", "msg:9991234,Hi", "vibes=1 vibe=0", 0, false },
 	{ "S vibrate on a call alert", "", "alert:91", "vibes=1 vibe=1", 0, false },
+	// A call alert rings (ui_beep_t 4), with no setting of its own: Message tone off doesn't silence it
+	{ "S call alert tone", "", "alert:91", "beeps=1 beep=4", 0, false },
+	{ "S call alert tone, message tone off", "ok 7 1 down down down down down down down down down down ok long:back",
+	  "alert:91", "set4=0 beep=4", 0, false },
 	{ "S vibrate on a private call", "", "privcall:91", "vibes=1 vibe=1", 0, false },
 	{ "S vibrate on an emergency", "", "emergency:91", "vibes=1 vibe=2", 0, false },
 	{ "S vibrate off", "ok 7 1 down down down down down down down down down down down ok long:back", "msg:9991234,Hi", "vibes=0 beep=2", 0,
@@ -1205,6 +1291,11 @@ static const flow_t flows[] = {
 	{ "S VFO step: auto, wide", "vfokey", "up", "freq=146545000", 1, false },
 	{ "S VFO step: auto, narrow", "vfokey quick 8 back", "up", "freq=146532500", 1, false },
 	{ "S VFO step: 2.5 kHz", "ok 7 3 down down down ok long:back vfokey", "up", "freq=146522500", 1, false },
+#if CONFIG_AM_RX
+	{ "S VFO step: the fourth after Auto", "ok 7 3 down down down ok ok ok", "ok", "shows=8.33_kHz", 1, false },
+#else
+	{ "S VFO step: the fourth after Auto", "ok 7 3 down down down ok ok ok", "ok", "shows=10_kHz", 1, false },
+#endif
 	// Page titles are in Title Case; the row that opens the page keeps its sentence case (ui.md 1)
 	{ "S a group's title in Title Case", "", "ok 7 3", "screen=group shows=Talk_&_Listen hides=Talk_&_listen", 3, false },
 	{ "S the group's row as it was", "", "ok 7", "screen=settings shows=Talk_&_listen", 2, false },
@@ -1319,8 +1410,21 @@ static const flow_t flows[] = {
 	{ "A beacons on", "", "ok 6 8 2", "aprs_auto=1 toast=Beacons_on", 4, false },
 	{ "A beacons off again", "ok 6 8 2", "2", "aprs_auto=0 toast=Beacons_off", 1, false },
 	{ "A next region", "", "ok 6 8 3", "aprs_region=1", 4, false },
-	{ "A regions skip an unset custom", "ok 6 8 3 3 3 3 3", "3", "aprs_region=0", 1, false },
-	{ "A regions with a custom frequency", "aprs:custom ok 6 8 3 3 3 3 3", "3", "aprs_region=6", 1, false },
+	// Custom: the step after the last region opens a frequency entry on the row; the region stays until OK
+	{ "A custom opens a frequency entry", "ok 6 8 3 3 3 3 3", "3", "aprs_region=5 hides=China shows=OK_set", 1, false },
+	{ "A custom frequency typed", "ok 6 8 3 3 3 3 3 3", "1 4 5 5 7 ok",
+	  "aprs_region=6 aprs_freq=145570000 shows=145.570", 6, false },
+	{ "A custom entry takes back a digit", "ok 6 8 3 3 3 3 3 3", "1 4 5 5 8 back 7 ok", "aprs_freq=145570000", 8, false },
+	{ "A custom entry needs the MHz digits", "ok 6 8 3 3 3 3 3 3", "1 4 ok", "aprs_region=5 toast=Type_at_least", 3, false },
+	{ "A custom entry, nothing typed, none set", "ok 6 8 3 3 3 3 3 3", "ok", "aprs_region=0", 1, false },
+	{ "A custom entry, nothing typed, keeps the set one", "aprs:custom ok 6 8 3 3 3 3 3 3", "ok",
+	  "aprs_region=6 aprs_freq=144930000", 1, false },
+	{ "A custom entry: Back leaves it", "ok 6 8 3 3 3 3 3 3", "1 back back", "aprs_region=5 screen=aprs", 3, false },
+	{ "A custom entry: Down leaves it", "ok 6 8 3 3 3 3 3 3", "1 4 down", "aprs_region=5 screen=aprs", 3, false },
+	{ "A custom entry shows its hint", "ok 6 8 3 3 3 3 3", "3", "shows=OK_set", 1, false },
+	{ "A custom entry keeps its digits over quick settings", "ok 6 8 3 3 3 3 3 3 1 4", "quick back 5 5 7 ok",
+	  "aprs_region=6 aprs_freq=145570000", 6, false },
+	{ "A custom: the next step wraps", "aprs:custom ok 6 8 3 3 3 3 3 3 ok", "3", "aprs_region=0", 1, false },
 	{ "A power as the channel", "ok 6 8", "down down down", "shows=As_channel aprs_power=0", 3, false },
 	{ "A power of its own", "", "ok 6 8 4", "aprs_power=1", 4, false },
 	{ "A path shows the default", "ok 6 8", "down down down down", "shows=WIDE1-1,WIDE2-1 aprs_path=2", 4, false },
@@ -2541,8 +2645,9 @@ static void dark_key_checks(void)
 }
 
 // The volume bar when the knob turns (#354): over whatever screen is open, 3 s after the last change; never at
-// power-up, for an unchanged level, a radio without a knob or the debug link taking over. EP and BVA cases, then a
-// seeded property run: the bar shows exactly when the knob's level changed in the last 3 s, at that level
+// power-up, for an unchanged level, a radio without a knob or the debug link taking over. A radio that only reads the
+// knob's position ("knobpos") shows it too. EP and BVA cases, then a seeded property run: the bar shows exactly when the
+// knob's level changed in the last 3 s, at that level
 #if CONFIG_VOLUME_BAR
 static bool vol_run(const sim_geom_t *g, const char *script, const char *expect, char *err, size_t len)
 {
@@ -2579,6 +2684,9 @@ static void volume_bar_checks(void)
 		{ "a turn at 2 s keeps it", "knob:50 knob:60 wait:2000 knob:70 wait:2900", "volbar=11" },
 		{ "over a menu, which stays", "ok knob:50 knob:60", "volbar=10 screen=hub" },
 		{ "no knob: none", "softvol knob:50 knob:75", "volbar=-1" },
+		{ "position only: a turn shows it", "knobpos:50 knobpos:75", "volbar=12 shows=Vol wake=1 screen=home" },
+		{ "position only, power-up: none", "knobpos:50", "volbar=-1" },
+		{ "position only, down to the stop", "knobpos:50 knobpos:1", "volbar=1" },
 		{ "the debug link takes over: none", "knob:50 override:80", "volbar=-1" },
 		{ "and gives it back: none", "knob:50 override:80 knob:30", "volbar=-1" },
 		{ "a turn after it gave back", "knob:50 override:80 knob:30 knob:40", "volbar=6" },

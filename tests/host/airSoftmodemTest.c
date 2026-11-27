@@ -948,6 +948,113 @@ static void testAdapt(void)
 	air_softmodem_adapt_off = 0;
 	CHECK(v.opts == AIR_RX_EQ && v.tone_dhz == 0, "bench off: opts %u tone %u", v.opts, v.tone_dhz);
 }
+
+// Calls after squelch-open noise or a clipping call, once a tone is picked. The notch runs on every sample for the
+// rest of the session. Its state saturating on near full-scale input (the discriminator's noise between calls, a
+// strong call clipping) left it ringing at the tone into the next call, whose level and offset were then tracked from
+// the ringing: lost syncs until a retune opened the session again. Each call must decode as on a session just opened,
+// with the receive scale known (cpk 2000) and unknown (0, as an FM copy gives it)
+static int16_t call_copy[24000];
+
+// The session from tap sample 0 against one opened at `start`: syncs from `start` to `end`, each way
+static void session_vs_fresh(const air_profile_t *p, uint16_t cpk, uint32_t start, uint32_t end, uint32_t *sess,
+			     uint32_t *fresh, air_softmodem_adapt_view_t *v)
+{
+	air_softmodem_t m;
+
+	air_softmodem_lend(&adapt_mem);
+	air_softmodem_rx_open(&m, p, 8000, cpk, on_chunk, NULL);
+	out_reset();
+	feed(&m, 8000, 0, end, 256);
+	air_softmodem_adapt_get(v);
+	air_softmodem_lend(NULL);
+	*sess = 0;
+	for (uint8_t i = 0; i < out_nsync; i++)
+		if (out_sync[i].t_us >= start * 125.0 && out_sync[i].t_us < end * 125.0)
+			(*sess)++;
+	air_softmodem_lend(&adapt_mem);
+	air_softmodem_rx_open(&m, p, 8000, cpk, on_chunk, NULL);
+	out_reset();
+	feed(&m, 8000, start, end, 256);
+	air_softmodem_lend(NULL);
+	*fresh = out_nsync;
+}
+
+// One call into call_copy: 7000 symbols, scaled `cpk` counts a kHz (clipped at full scale), a tone under it
+static uint32_t make_call(const air_profile_t *p, double cpk, double tone_hz)
+{
+	air_stream(p, 0, 7000, 200, 480);
+	modulate(p, 0);
+	sample_tap(8000, 17, 3600, cpk, 300, 300);
+	add_tone(tone_hz, 0.3 * 0.9 * cpk);
+	if (tap_n > sizeof(call_copy) / sizeof(call_copy[0]))
+		return 0;
+	memcpy(call_copy, tap, tap_n * sizeof(tap[0]));
+	return tap_n;
+}
+
+static void testNotchAfterNoise(void)
+{
+	air_profile_t tone = c4fm_like(AIR_RX_TONE);
+	air_softmodem_adapt_view_t v;
+	uint32_t n, sess, fresh, total = 0;
+
+	for (int round = 0; round < 8; round++) {
+		uint16_t cpk = round < 4 ? 2000 : 0;
+		uint32_t gap = 2000u + 1500u * (uint32_t)(round & 3) + (uint32_t)(round >> 2) * 700u, start;
+
+		n = make_call(&tone, 2000, round & 1 ? 67.0 : 127.3);
+		if (!n || 2 * n + gap > sizeof(tap) / sizeof(tap[0])) {
+			CHECK(0, "round %d: the test's buffers", round);
+			return;
+		}
+		// One session: the call (a tone picked), the noise, the same call again
+		for (uint32_t i = 0; i < gap; i++) {
+			double x = 14000 * gauss();
+
+			tap[n + i] = (int16_t)lround(x > 32767 ? 32767 : x < -32768 ? -32768 : x);
+		}
+		start = n + gap;
+		memcpy(tap + start, call_copy, n * sizeof(tap[0]));
+		session_vs_fresh(&tone, cpk, start, start + n, &sess, &fresh, &v);
+		CHECK(v.tone_dhz != 0, "round %d: a tone picked (%u)", round, v.tone_dhz);
+		total += fresh > sess ? fresh - sess : 0;
+		CHECK(sess + 1 >= fresh, "round %d, cpk %u, %u ms of noise: %u syncs after it, %u on a session just opened",
+		      round, cpk, gap / 8, sess, fresh);
+	}
+	printf("  calls after loud noise with a tone picked: %u syncs short in all\n", total);
+
+	// A strong call clipping at full scale, three times in one session with a little quiet between. The scale
+	// unknown, as the FM copy gives it: a known one would be wrong for a call this loud
+	total = 0;
+	{
+		uint16_t cpk = 0;
+		uint32_t quiet = 1600, at = 0;
+
+		n = make_call(&tone, 11000, 67.0);	// 30 kHz-scale peaks with the tone: clipped
+		if (!n || 3 * (n + quiet) > sizeof(tap) / sizeof(tap[0])) {
+			CHECK(0, "clipping calls: the test's buffers");
+			return;
+		}
+		for (int c = 0; c < 3; c++) {
+			memcpy(tap + at, call_copy, n * sizeof(tap[0]));
+			at += n;
+			for (uint32_t i = 0; i < quiet; i++)
+				tap[at++] = (int16_t)lround(300 * gauss());
+		}
+		for (int c = 1; c < 3; c++) {
+			uint32_t start = (uint32_t)c * (n + quiet);
+
+			session_vs_fresh(&tone, cpk, start, start + n, &sess, &fresh, &v);
+			CHECK(v.tone_dhz != 0, "clipping calls: a tone picked (%u)", v.tone_dhz);
+			total += fresh > sess ? fresh - sess : 0;
+			// 15 sent. Clamped, the notch rang on the clipping and kept 4 here, and a session just opened 9
+			CHECK(sess + 1 >= fresh && sess >= 14, "clipping call %d, cpk %u: %u syncs in the session, %u on one just "
+			      "opened", c, cpk, sess, fresh);
+		}
+	}
+	printf("  clipping calls with a tone picked: %u syncs short in all\n", total);
+}
 #endif
 
 int main(void)
@@ -962,6 +1069,7 @@ int main(void)
 	testHole();
 #if CONFIG_AIR_RX_ADAPT
 	testAdapt();
+	testNotchAfterNoise();
 #endif
 	printf("airSoftmodemTest: %d checks, %d failed\n", checks, failures);
 	return failures ? 1 : 0;

@@ -24,6 +24,7 @@
 #include "dsp/speech_meter.h"
 #endif
 #endif
+#include "radio/digital_agc.h"
 #include "dsp/tx_level.h"	// the TX level choices (CONFIG_TX_MIC_LIMITER) and the P25 calibration's
 #include "dmr/dmrDataService.h"
 #include "config.h"
@@ -2663,7 +2664,8 @@ static ui_air_conv_t ced_air;		// a P25 or NXDN channel's own settings, read onc
 static ui_air_conv_t ced_air_orig;	// as stored
 #endif
 
-// A P25 or NXDN channel's settings where none are stored: the default NAC both ways; NXDN at 9600 bit/s on RAN 1
+// A P25 or NXDN channel's settings where none are stored: the default NAC both ways; NXDN the radio default's rate and
+// RANs (Settings > Talk & listen > NXDN)
 static void ced_air_default(uint8_t mode)
 {
 	memset(&ced_air, 0, sizeof ced_air);
@@ -2675,8 +2677,9 @@ static void ced_air_default(uint8_t mode)
 #endif
 #if CONFIG_NXDN
 	if (mode == RADIO_MODE_NXDN) {
-		ced_air.nxdn.rate9600 = true;
-		ced_air.nxdn.rx_ran = ced_air.nxdn.tx_ran = NXDN_CP_TX_RAN_DEFAULT;
+		ced_air.nxdn.rate9600 = ui_svc_setting_get(UI_SET_NXDN_RATE) != 0;
+		ced_air.nxdn.rx_ran = (uint8_t)ui_svc_setting_get(UI_SET_NXDN_RX_RAN);
+		ced_air.nxdn.tx_ran = (uint8_t)ui_svc_setting_get(UI_SET_NXDN_TX_RAN);
 		ced_air.nxdn.squelch = NXDN_SQUELCH_RAN;
 	}
 #endif
@@ -7007,7 +7010,7 @@ bool ui_menus_home_leave(ui_scr_t scr, bool text_open)
 typedef enum { ST_TOGGLE, ST_LIST, ST_NUMBER, ST_ACTION } set_type_t;
 enum { SA_DIAG, SA_FIRMWARE, SA_CODEPLUG, SA_RESET, SA_MY_RADIO, SA_CRASH, SA_LANGUAGE, SA_HARDWARE, SA_FIXED_POS,
 	SA_SAVE_GPS_POS, SA_DATA_SERVICES, SA_BL_TEST, SA_P25_PARROT, SA_AES_RECOVERY, SA_SIG_BEGIN, SA_SIG_END,
-	SA_SIG_IDLE, SA_RSSI, SA_RSSI_RESET };	// signaling tone steps, by sig_event_t
+	SA_SIG_IDLE, SA_RSSI, SA_RSSI_RESET, SA_NXDN };	// signaling tone steps, by sig_event_t
 
 typedef struct {
 	tr_id_t name;			// TRN; TR_NONE for a key's row (set_name)
@@ -7178,11 +7181,20 @@ static const int16_t v_updown[] = { 0, 1, 2 };
 static const tr_id_t n_updown[] = { TRN(SET_VALUE_UPDOWN_CHANNEL, "Channel"), TRN(WORD_ZONE, "Zone"),
 	TRN(KEYFN_VALUE_TALK_TARGET, "Talk target") };
 #if CONFIG_VFO
-static const int16_t v_step[] = { 0, 250, 500, 625, 833, 1000, 1250, 2000, 2500, 5000, 10000 };	// 10 Hz units
+// 1 step = 10 Hz
+static const int16_t v_step[] = { 0, 250, 500, 625,
+#if CONFIG_AM_RX
+	// 8.33 kHz is the air band's channel spacing
+	833,
+#endif
+	1000, 1250, 2000, 2500, 5000, 10000 };
 static const tr_id_t n_step[] = { TRN(VALUE_AUTO, "Auto"), TRX(VALUE_2_5_KHZ, "2.5 kHz"), TRX(VALUE_5_KHZ, "5 kHz"),
-	TRX(VALUE_6_25_KHZ, "6.25 kHz"), TRX(VALUE_8_33_KHZ, "8.33 kHz"), TRX(VALUE_10_KHZ, "10 kHz"),
-	TRX(VALUE_12_5_KHZ, "12.5 kHz"), TRX(VALUE_20_KHZ, "20 kHz"), TRX(VALUE_25_KHZ, "25 kHz"),
-	TRX(VALUE_50_KHZ, "50 kHz"), TRX(VALUE_100_KHZ, "100 kHz") };
+	TRX(VALUE_6_25_KHZ, "6.25 kHz"),
+#if CONFIG_AM_RX
+	TRX(VALUE_8_33_KHZ, "8.33 kHz"),
+#endif
+	TRX(VALUE_10_KHZ, "10 kHz"), TRX(VALUE_12_5_KHZ, "12.5 kHz"), TRX(VALUE_20_KHZ, "20 kHz"),
+	TRX(VALUE_25_KHZ, "25 kHz"), TRX(VALUE_50_KHZ, "50 kHz"), TRX(VALUE_100_KHZ, "100 kHz") };
 #endif
 #if CONFIG_VFO && CONFIG_BCAST_FM
 static const int16_t v_bcast_step[] = { 200, 100 };	// kHz
@@ -7233,8 +7245,10 @@ static const tr_id_t n_sfrcwid[] = { TRN(VALUE_OFF, "Off"), TRN(VALUE_5_MIN, "5 
 #if CONFIG_DMR && CONFIG_DMR_PRIVACY
 static const int16_t v_ptype[] = { 0, 1, 2 };	// dmrPrivacyType_t
 // Basic privacy key types, named by key size with the key's range (set_range follows the type)
-static const tr_id_t n_ptype[] = { TRN(VALUE_OFF, "Off"), TRN(SET_VALUE_KEY_TYPE_8_BIT, "8-bit (1-255)"),
-	TRN(SET_VALUE_KEY_TYPE_16_BIT, "16-bit (0-65535)") };
+// A type's key range drops out where it and the row's label don't both fit: a row keeps its label whole (ui.md)
+static const tr_id_t n_ptype[] = { TRN(VALUE_OFF, "Off"), TRN(SET_VALUE_KEY_TYPE_8_BIT,
+	TEXT_ALT_OPEN "8-bit (1-255)" TEXT_ALT_NEXT "8-bit" TEXT_ALT_CLOSE),
+	TRN(SET_VALUE_KEY_TYPE_16_BIT, TEXT_ALT_OPEN "16-bit (0-65535)" TEXT_ALT_NEXT "16-bit" TEXT_ALT_CLOSE) };
 #endif
 
 #if CONFIG_SIG_TONES
@@ -7324,7 +7338,7 @@ static const tr_id_t n_rx_agc[] = {
 	TRX(AGC_VALUE_MINUS_15, "-15 dBFS"), TRX(AGC_VALUE_MINUS_12, "-12 dBFS"),
 };
 #endif
-#if CONFIG_TX_MIC_LIMITER
+#if CONFIG_TX_MIC_LIMITER || CONFIG_P25_TX_AGC
 static const int16_t v_tx_level[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 static const tr_id_t n_tx_level[] = {
 	TRN(VALUE_OFF, "Off"), TRX(AGC_VALUE_MINUS_30, "-30 dBFS"), TRX(TX_LEVEL_VALUE_MINUS_28, "-28 dBFS"),
@@ -7365,7 +7379,13 @@ static const set_item_t s_talk[] = {
 	LIST(TRN(SET_LABEL_SFR_CW_ID, "SFR CW ID"), "single frequency repeater morse callsign identify",
 		UI_SET_SFR_CWID, v_sfrcwid, n_sfrcwid),
 #endif
+#if CONFIG_NXDN
+	// The NXDN radio default (s_nxdn), a page of its own
+	ACTION(TRX(SET_ROW_NXDN, "NXDN"), "rate 4800 9600 RAN talk group VFO default", SA_NXDN),
+#endif
 #if CONFIG_RX_AGC
+	TOGGLE(TRN(SET_LABEL_DIGITAL_AGC_RX, "Digital AGC RX"), "receive audio level automatic defaults",
+		UI_SET_AGC_RX_AUTO),
 	LIST(TRN(SET_LABEL_DMR_RX_AGC, "DMR RX AGC"), "receive audio target gain level", UI_SET_RX_AGC_DMR, v_rx_agc, n_rx_agc),
 #if CONFIG_P25
 	LIST(TRN(SET_LABEL_P25_RX_AGC, "P25 RX AGC"), "receive audio target gain level", UI_SET_RX_AGC_P25, v_rx_agc, n_rx_agc),
@@ -7377,9 +7397,23 @@ static const set_item_t s_talk[] = {
 	LIST(TRN(SET_LABEL_YSF_RX_AGC, "YSF RX AGC"), "receive audio target gain level", UI_SET_RX_AGC_YSF, v_rx_agc, n_rx_agc),
 #endif
 #endif
+#if CONFIG_TX_MIC_LIMITER || CONFIG_P25_TX_AGC
+	TOGGLE(TRN(SET_LABEL_DIGITAL_AGC_TX, "Digital AGC TX"), "transmit mic level automatic defaults",
+		UI_SET_AGC_TX_AUTO),
+#endif
 #if CONFIG_TX_MIC_LIMITER
 	LIST(TRN(SET_LABEL_DMR_TX_LEVEL, "DMR TX level"), "transmit mic AGC target leveler loud modulation",
 		UI_SET_TX_LEVEL_DMR, v_tx_level, n_tx_level),
+#endif
+#if CONFIG_P25_TX_AGC
+	LIST(TRN(SET_LABEL_P25_TX_LEVEL, "P25 TX level"), "transmit mic AGC target leveler loud modulation",
+		UI_SET_TX_LEVEL_P25, v_tx_level, n_tx_level),
+#endif
+#if CONFIG_TX_MIC_LIMITER
+#if CONFIG_NXDN
+	LIST(TRN(SET_LABEL_NXDN_TX_LEVEL, "NXDN TX level"), "transmit mic AGC target leveler loud modulation",
+		UI_SET_TX_LEVEL_NXDN, v_tx_level, n_tx_level),
+#endif
 #if CONFIG_YSF
 	LIST(TRN(SET_LABEL_YSF_TX_LEVEL, "YSF TX level"), "transmit mic AGC target leveler loud modulation fusion",
 		UI_SET_TX_LEVEL_YSF, v_tx_level, n_tx_level),
@@ -7515,6 +7549,22 @@ static const set_item_t s_my_radio[] = {
 	// Also in Advanced, where users didn't look for it
 	ACTION(TRN(TITLE_ABOUT, "About"), "firmware version release build date", SA_FIRMWARE),
 };
+#if CONFIG_NXDN
+// The NXDN radio default (docs/crucible/adr/004-nxdn-radio-default.md): what the VFO and a channel in NXDN for now run
+// on. A stored NXDN channel keeps its own. Settings > Talk & listen > NXDN
+static const int16_t v_nxdn_rate[] = { 0, 1 };
+static const tr_id_t n_nxdn_rate[] = { TRX(NXDN_VALUE_4800, "4800 bit/s"), TRX(NXDN_VALUE_9600, "9600 bit/s") };
+static const set_item_t s_nxdn[] = {
+	LIST(TRN(CHAN_LABEL_RATE, "Rate"), "NXDN 4800 9600 bit/s", UI_SET_NXDN_RATE, v_nxdn_rate, n_nxdn_rate),
+	NUMBER(TRN(SET_LABEL_NXDN_RX_RAN, "RX RAN"), "NXDN radio access number receive", UI_SET_NXDN_RX_RAN, 0,
+		RADIO_NXDN_RAN_MAX, 1, NULL),
+	NUMBER(TRN(SET_LABEL_NXDN_TX_RAN, "TX RAN"), "NXDN radio access number transmit", UI_SET_NXDN_TX_RAN, 0,
+		RADIO_NXDN_RAN_MAX, 1, NULL),
+	// 1 to 65519 (set_range: past a row's int16_t), and All past the top (group_key)
+	NUMBER(TRN(SET_LABEL_NXDN_TALKGROUP, "Talkgroup"), "NXDN TG group call PTT", UI_SET_NXDN_TG, 1, 1, 1, NULL),
+};
+#define NXDN_TG_ALL	((int32_t)UI_NXDN_ID_ALL)	// the talkgroup row's All
+#endif
 #if CONFIG_SIGNAL_METER
 static const set_item_t s_rssi[] = {
 	NUMBER(TRN(SET_ROW_RSSI_VHF, "VHF correction"), NULL, UI_SET_RSSI_VHF, -20, 20, 1, "dB"),
@@ -7635,12 +7685,20 @@ static bool set_hidden(const set_item_t *s)
 	       (s->id == UI_SET_BATTERY_SAVER || s->id == UI_SET_LOW_BATTERY);
 }
 
+// Pages a row opens, numbered after the groups (SCR_GROUP's argument): no row in Settings, Find doesn't list them
+#define GROUP_RSSI	GROUPS
+#define GROUP_NXDN	(GROUPS + 1u)
+
 // The i-th setting of group g that this radio has, NULL past the end
 static const set_item_t *set_nth(uint8_t g, uint16_t i)
 {
 #if CONFIG_SIGNAL_METER
-	if (g == GROUPS)
+	if (g == GROUP_RSSI)
 		return i < sizeof s_rssi / sizeof s_rssi[0] ? &s_rssi[i] : NULL;
+#endif
+#if CONFIG_NXDN
+	if (g == GROUP_NXDN)
+		return i < sizeof s_nxdn / sizeof s_nxdn[0] ? &s_nxdn[i] : NULL;
 #endif
 	if (g >= GROUPS)
 		return NULL;
@@ -7927,7 +7985,7 @@ static int32_t set_value;
 static const set_item_t *set_item_at(uint16_t i)
 {
 	uint16_t g = ui_frame()->arg;
-	return g <= GROUPS ? set_nth((uint8_t)g, i) : NULL;
+	return g <= GROUP_NXDN ? set_nth((uint8_t)g, i) : NULL;
 }
 
 #if CONFIG_KEY_ASSIGN
@@ -7995,6 +8053,12 @@ static void set_value_text(const set_item_t *s, int32_t v, char *out, size_t len
 			break;
 		}
 #endif
+#if CONFIG_NXDN
+		if ((s->id == UI_SET_NXDN_RX_RAN && v == 0) || (s->id == UI_SET_NXDN_TG && v == NXDN_TG_ALL)) {
+			sb_str(&b, s->id == UI_SET_NXDN_RX_RAN ? TR(NXDN_VALUE_ANY_RAN, "Any") : TR(QUICK_VALUE_ALL, "All"));
+			break;
+		}
+#endif
 		sb_i32(&b, v);
 		if (s->unit != NULL)
 			sb_str(&b, s->unit);
@@ -8013,20 +8077,55 @@ static bool vocoder_has(uint32_t opt)
 	return board.vocoder != NULL && board.vocoder->options != NULL && (board.vocoder->options() & opt) != 0;
 }
 
-// Mic AGC is on and in force: Mic gain doesn't apply (shown as "AGC", dimmed)
+// Digital AGC (radio/digital_agc.h): a level row whose switch is On, so the radio's default applies (the row is
+// dimmed and shows it), and the choice its mode uses now
+static bool agc_auto_row(uint8_t id)
+{
+	if (id >= UI_SET_RX_AGC_DMR && id <= UI_SET_RX_AGC_YSF)
+		return ui_svc_setting_get(UI_SET_AGC_RX_AUTO) != 0;
+	if (id == UI_SET_TX_LEVEL_DMR || id == UI_SET_TX_LEVEL_YSF || id == UI_SET_TX_LEVEL_NXDN ||
+	    id == UI_SET_TX_LEVEL_P25)
+		return ui_svc_setting_get(UI_SET_AGC_TX_AUTO) != 0;
+	return false;
+}
+
+static int32_t agc_in_force(uint8_t id)
+{
+	bool manual = !agc_auto_row(id);
+	int32_t stored = ui_svc_setting_get(id);
+	uint8_t c = (uint8_t)(stored < 0 ? 0 : stored);
+	if (id >= UI_SET_RX_AGC_DMR && id <= UI_SET_RX_AGC_YSF)
+		return dagc_rx(manual, c, board.rx_agc_default_db);
+	dagc_tx_mode_t mode = id == UI_SET_TX_LEVEL_P25 ? DAGC_TX_P25 : id == UI_SET_TX_LEVEL_NXDN ? DAGC_TX_NXDN :
+			      id == UI_SET_TX_LEVEL_YSF ? DAGC_TX_YSF : DAGC_TX_DMR;
+	return dagc_tx(mode, manual, c, board.tx_level_default_db);
+}
+
+// Mic gain doesn't apply (shown as "AGC", dimmed): in P25 while its TX level levels the mic, in the other modes while
+// Mic AGC (the vocoder's own) is on
+static bool p25_leveling(void)
+{
+	return ui_view()->ch.mode == RADIO_MODE_P25 && CONFIG_P25_TX_AGC && agc_in_force(UI_SET_TX_LEVEL_P25) != 0;
+}
+
 static bool mic_agc_on(void)
 {
-	bool available = ui_view()->ch.mode == RADIO_MODE_P25 ? CONFIG_P25_TX_AGC : vocoder_has(VOCODER_OPT_AGC);
-	return available && ui_svc_setting_get(UI_SET_MIC_AGC) != 0;
+	if (ui_view()->ch.mode == RADIO_MODE_P25)
+		return p25_leveling();
+	return vocoder_has(VOCODER_OPT_AGC) && ui_svc_setting_get(UI_SET_MIC_AGC) != 0;
 }
 
 // Why a setting can't be used on this radio or in this build (the row is dimmed and OK says it), NULL if it can
 static const char *set_why_not(const set_item_t *s)
 {
+	if (s->type == ST_ACTION && s->id == SA_NXDN)
+		return feats() & UI_FEAT_NXDN ? NULL : TR(WHY_NOT_ON_THIS_RADIO, "Not on this radio");
 	if (s->type == ST_ACTION)
 		return s->id >= SA_SIG_BEGIN && s->id <= SA_SIG_IDLE && !(CONFIG_BEEP && CONFIG_SIG_TONES) ?
 			TR(WHY_TONES_NOT_IN_BUILD, "Tones: not in this build") : NULL;
 	switch (s->id) {
+	case UI_SET_NXDN_RATE ... UI_SET_NXDN_TG:
+		return feats() & UI_FEAT_NXDN ? NULL : TR(WHY_NOT_ON_THIS_RADIO, "Not on this radio");
 	case UI_SET_VOICE_PROMPTS:
 		return TR(WHY_VOICE_PROMPTS_NOT_IN_BUILD, "Voice prompts: not in this build");
 	case UI_SET_TALK_PERMIT:
@@ -8069,21 +8168,29 @@ static const char *set_why_not(const set_item_t *s)
 	case UI_SET_MIC_GAIN:
 		if (!mic_gain_available())
 			return TR(WHY_MIC_GAIN_NOT_IN_BUILD, "Mic gain: not in this build");
+		if (p25_leveling())
+			return TR(SET_WHY_P25_TX_LEVEL_SETS_LEVEL, "P25 TX level sets the level");
 		return mic_agc_on() ? TR(SET_WHY_MIC_AGC_SETS_LEVEL, "Mic AGC sets the level") : NULL;
 	case UI_SET_NOISE_REDUCTION:
 		if (!CONFIG_DMR)
 			return TR(WHY_NOISE_REDUCTION_NOT_IN_BUILD, "Noise reduction: not in this build");
 		return vocoder_has(VOCODER_OPT_NOISE_REDUCTION) ? NULL : TR(WHY_NOT_ON_THIS_RADIO, "Not on this radio");
+	case UI_SET_RX_AGC_DMR ... UI_SET_RX_AGC_YSF:
+		return agc_auto_row(s->id) ? TR(SET_WHY_DIGITAL_AGC_ON, "Digital AGC sets the level") : NULL;
 	case UI_SET_TX_LEVEL_DMR:
 	case UI_SET_TX_LEVEL_YSF:
-		return CONFIG_TX_MIC_LIMITER ? NULL : TR(WHY_TX_LEVEL_NOT_IN_BUILD, "TX level: not in this build");
+	case UI_SET_TX_LEVEL_NXDN:
+	case UI_SET_TX_LEVEL_P25:
+		if (!(s->id == UI_SET_TX_LEVEL_P25 ? CONFIG_P25_TX_AGC : CONFIG_TX_MIC_LIMITER))
+			return TR(WHY_TX_LEVEL_NOT_IN_BUILD, "TX level: not in this build");
+		return agc_auto_row(s->id) ? TR(SET_WHY_DIGITAL_AGC_ON, "Digital AGC sets the level") : NULL;
 	case UI_SET_MIC_INPUT:
 		return board.radio != NULL && board.radio->mic_input != NULL ? NULL :
 			TR(WHY_NOT_ON_THIS_RADIO, "Not on this radio");
 	case UI_SET_MIC_AGC:
 		if (!CONFIG_DMR)
 			return TR(WHY_MIC_AGC_NOT_IN_BUILD, "Mic AGC: not in this build");
-		return (CONFIG_P25_TX_AGC || vocoder_has(VOCODER_OPT_AGC)) ? NULL : TR(WHY_NOT_ON_THIS_RADIO, "Not on this radio");
+		return vocoder_has(VOCODER_OPT_AGC) ? NULL : TR(WHY_NOT_ON_THIS_RADIO, "Not on this radio");
 	case UI_SET_HEAR_ALL_DEFAULT:
 		return feats() & UI_FEAT_HEAR_ALL ? NULL :
 			TR(WHY_DMON_NOT_IN_BUILD, "Digital monitor: not in this build");
@@ -8116,6 +8223,10 @@ static void set_range(const set_item_t *s, int32_t *lo, int32_t *hi)
 		*lo = 0;
 		*hi = 65535;
 	}
+#if CONFIG_NXDN
+	if (s->id == UI_SET_NXDN_TG)
+		*hi = RADIO_NXDN_UNIT_MAX;	// and All past it (group_key)
+#endif
 
 }
 
@@ -8138,6 +8249,8 @@ static void group_item(uint16_t i, ui_item_t *it)
 		strcpy(it->value, "-");
 	if (s->type == ST_NUMBER && s->id == UI_SET_MIC_GAIN && !edit && mic_agc_on())
 		strcpy(it->value, "AGC");
+	if (s->type == ST_LIST && !edit && agc_auto_row(s->id))	// the radio's default, while Digital AGC is On
+		set_value_text(s, agc_in_force(s->id), it->value, sizeof it->value);
 	if (edit)
 		it->flags |= UI_ITEM_EDIT;
 	if (set_why_not(s) != NULL)
@@ -8210,11 +8323,14 @@ static void group_select(uint16_t i, bool hold)
 	case ST_ACTION:
 		switch (s->id) {
 #if CONFIG_SIGNAL_METER
-		case SA_RSSI: ui_push(SCR_GROUP, GROUPS); break;
+		case SA_RSSI: ui_push(SCR_GROUP, GROUP_RSSI); break;
 		case SA_RSSI_RESET:
 			ui_svc_setting_set(UI_SET_RSSI_VHF, 0);
 			ui_svc_setting_set(UI_SET_RSSI_UHF, 0);
 			break;
+#endif
+#if CONFIG_NXDN
+		case SA_NXDN: ui_push(SCR_GROUP, GROUP_NXDN); break;
 #endif
 		case SA_DIAG:
 			if (CONFIG_DIAG)
@@ -8286,6 +8402,13 @@ static bool group_key(const input_event_t *ev)
 		ev->action == ACT_ENC_STEP ? (ev->value > 0 ? 1 : -1) : 0;
 	if (dir != 0 && ev->gesture != GESTURE_UP) {
 		int32_t v = set_value + dir * s->step;
+#if CONFIG_NXDN
+		if (s->id == UI_SET_NXDN_TG && (set_value == NXDN_TG_ALL || v > hi)) {
+			set_value = dir > 0 ? NXDN_TG_ALL : hi;	// All is the step past the top, Down from it the top
+			ui_dirty();
+			return true;
+		}
+#endif
 		set_value = v < lo ? lo : v > hi ? hi : v;
 		ui_dirty();
 		return true;
@@ -8309,7 +8432,9 @@ static bool group_key(const input_event_t *ev)
 	}
 	if (ev->action == ACT_SELECT && (ev->gesture == GESTURE_PRESS || ev->gesture == GESTURE_LONG)) {
 		set_editing = false;
-		if (set_value < lo || set_value > hi || (s->step > 1 && (set_value - lo) % s->step != 0)) {
+		// The talkgroup's All, reached with Up past the top (typed digits start over past 65519, so never reach it)
+		bool all = CONFIG_NXDN && s->id == UI_SET_NXDN_TG && set_value == 0xFFFF;
+		if (!all && (set_value < lo || set_value > hi || (s->step > 1 && (set_value - lo) % s->step != 0))) {
 			// A typed value outside the range or between the steps: say what fits instead of guessing
 			static char msg[40];
 			sbuf_t b;
@@ -8338,16 +8463,31 @@ static const char *group_title(void)
 {
 	uint8_t g = (uint8_t)ui_frame()->arg;
 #if CONFIG_SIGNAL_METER
-	if (g == GROUPS)
+	if (g == GROUP_RSSI)
 		return TR(SET_TITLE_RSSI_CORRECTION, "RSSI correction");
 #endif
+#if CONFIG_NXDN
+	if (g == GROUP_NXDN)
+		return "NXDN";	// a mode's name is never translated
+#endif
 	return g < GROUPS ? tr(groups[g].title) : "";
+}
+
+// What a page is for, above its rows: the NXDN radio default's (NULL: the others say it in their rows)
+static const char *group_body(void)
+{
+#if CONFIG_NXDN
+	if (ui_frame()->arg == GROUP_NXDN)
+		return TR(SET_BODY_NXDN_DEFAULT, "For the VFO and channels in NXDN for now. Stored NXDN channels keep their "
+			"own.");
+#endif
+	return NULL;
 }
 
 static const ui_scr_def_t group_screen = {
 	.name = "group", .flags = SF_LIST, .hint = TRN(HINT_OK_CHANGE_BACK, "OK change  Back"),
 	.count = group_count, .item = group_item, .select = group_select, .key = group_key, .enter = group_enter,
-	.title = group_title,
+	.title = group_title, .body = group_body,
 };
 
 #if RFOUNDRY_HWOPTS

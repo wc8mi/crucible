@@ -982,7 +982,7 @@ static void test_settings_layout(void)
 		{ offsetof(settings_t, t3_stun), 396 },
 		{ offsetof(settings_t, t3_kill), 397 },
 		{ offsetof(settings_t, satellite_index), 398 },
-		{ offsetof(settings_t, mic_input), 399 },
+		{ offsetof(settings_t, aprs_cp_freq), 399 },
 		{ offsetof(settings_t, sig_dmr), 400 },
 		{ offsetof(settings_t, sig_fm), 403 },
 		{ offsetof(settings_t, caller_flags), 406 },
@@ -993,8 +993,19 @@ static void test_settings_layout(void)
 		{ offsetof(settings_t, aes_migration), 416 },
 		{ offsetof(settings_t, rx_agc_ysf), 422 },
 		{ offsetof(settings_t, tx_level_ysf), 423 },
+		{ offsetof(settings_t, agc_marker), 424 },
+		{ offsetof(settings_t, agc_manual), 425 },
+		{ offsetof(settings_t, tx_level_p25), 426 },
+		{ offsetof(settings_t, tx_level_nxdn), 427 },
+		{ offsetof(settings_t, nxdn_marker), 428 },
+		{ offsetof(settings_t, nxdn_flags), 429 },
+		{ offsetof(settings_t, nxdn_rx_ran), 430 },
+		{ offsetof(settings_t, nxdn_tx_ran), 431 },
+		{ offsetof(settings_t, nxdn_tg), 432 },
+		{ offsetof(settings_t, mic_input), 434 },
+		{ offsetof(settings_t, nxdn_reserved), 435 },
 	};
-	CHECK(sizeof(settings_t) == 424);
+	CHECK(sizeof(settings_t) == 436);
 	for (unsigned i = 0; i < sizeof(offs) / sizeof(offs[0]); i++) {
 		if (offs[i].got != offs[i].want) {
 			printf("FAIL settings_t field %u at %zu, layout 1 has it at %zu\n", i, offs[i].got, offs[i].want);
@@ -1318,7 +1329,9 @@ enum {
 	LEGACY_SETTINGS_BYTES = 412,
 	UNMARKED_SETTINGS_BYTES = 416,
 	PRE_RSSI_SETTINGS_BYTES = 420,
-	CURRENT_SETTINGS_BYTES = 424,
+	PRE_DAGC_SETTINGS_BYTES = 424,
+	PRE_NXDN_SETTINGS_BYTES = 428,
+	CURRENT_SETTINGS_BYTES = 436,
 };
 
 static void boot_audio_record(const settings_t *settings, uint16_t bytes)
@@ -1395,6 +1408,237 @@ static void test_settings_receive_agc(void)
 	CHECK(settings_flush());
 	boot();
 	check_audio_record(&current, SETTINGS_LOADED, 4);
+}
+
+// Digital AGC (Crucible): the block's values are kept across a save, and a record without the marker (shorter, or
+// another firmware's byte at 424) reads as both switches On, P25 and NXDN TX unset
+static void test_settings_digital_agc(void)
+{
+	settings_t d;
+	settings_defaults(&d);
+	CHECK(d.agc_marker == SETTINGS_AGC_MARKER && d.agc_manual == 0 && d.tx_level_p25 == 0 && d.tx_level_nxdn == 0);
+
+	settings_t manual = d;
+	manual.squelch = 3;
+	manual.agc_manual = SETTINGS_AGC_RX_MANUAL | SETTINGS_AGC_TX_MANUAL;
+	manual.tx_level_p25 = 5;
+	manual.tx_level_nxdn = 2;
+	boot_audio_record(&manual, CURRENT_SETTINGS_BYTES);
+	settings_t s;
+	settings_read(&s);
+	CHECK(s.agc_marker == SETTINGS_AGC_MARKER && s.agc_manual == manual.agc_manual && s.tx_level_p25 == 5 &&
+	      s.tx_level_nxdn == 2);
+	settings_begin()->squelch = 6;	// saved again: the block goes with it
+	settings_end(1);
+	CHECK(settings_flush());
+	boot();
+	settings_read(&s);
+	CHECK(s.squelch == 6 && s.agc_manual == manual.agc_manual && s.tx_level_p25 == 5 && s.tx_level_nxdn == 2);
+
+	// A record from before the block: the defaults, marked in RAM
+	boot_audio_record(&manual, PRE_DAGC_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.squelch == 3 && s.agc_marker == SETTINGS_AGC_MARKER && s.agc_manual == 0 && s.tx_level_p25 == 0 &&
+	      s.tx_level_nxdn == 0);
+
+	// A full-length record whose byte 424 is not the marker (a later upstream field): the defaults
+	settings_t foreign = manual;
+	foreign.agc_marker = 0x11;
+	boot_audio_record(&foreign, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.agc_marker == SETTINGS_AGC_MARKER && s.agc_manual == 0 && s.tx_level_p25 == 0 && s.tx_level_nxdn == 0);
+	CHECK(sim_flash_violations() == 0);
+}
+
+// The NXDN radio default (Crucible): kept across a save; a record without the block (shorter, or another firmware's
+// byte at 428) reads the defaults; a value out of range reads its default, All (0xFFFF) is kept
+static void nxdn_block_is_default(const settings_t *s)
+{
+	CHECK(s->nxdn_marker == SETTINGS_NXDN_MARKER && s->nxdn_flags == 0 && s->nxdn_rx_ran == 0 &&
+	      s->nxdn_tx_ran == SETTINGS_NXDN_TX_RAN && s->nxdn_tg == SETTINGS_NXDN_TG);
+}
+
+static void test_settings_nxdn_default(void)
+{
+	settings_t d;
+	settings_defaults(&d);
+	nxdn_block_is_default(&d);
+	CHECK(d.mic_input == 0 && d.nxdn_reserved[0] == 0);
+
+	settings_t set = d;
+	set.squelch = 3;
+	set.nxdn_flags = SETTINGS_NXDN_9600;
+	set.nxdn_rx_ran = 12;
+	set.nxdn_tx_ran = 13;
+	set.nxdn_tg = 4000;
+	boot_audio_record(&set, CURRENT_SETTINGS_BYTES);
+	settings_t s;
+	settings_read(&s);
+	CHECK(s.nxdn_flags == SETTINGS_NXDN_9600 && s.nxdn_rx_ran == 12 && s.nxdn_tx_ran == 13 && s.nxdn_tg == 4000);
+	settings_begin()->squelch = 6;	// saved again: the block goes with it
+	settings_end(1);
+	CHECK(settings_flush());
+	boot();
+	settings_read(&s);
+	CHECK(s.squelch == 6 && s.nxdn_flags == SETTINGS_NXDN_9600 && s.nxdn_rx_ran == 12 && s.nxdn_tx_ran == 13 &&
+	      s.nxdn_tg == 4000);
+
+	// A record from before the block (the Digital AGC block its end): the defaults, the AGC block kept
+	settings_t agc = set;
+	agc.agc_manual = SETTINGS_AGC_RX_MANUAL;
+	boot_audio_record(&agc, PRE_NXDN_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.squelch == 3 && s.agc_manual == SETTINGS_AGC_RX_MANUAL);
+	nxdn_block_is_default(&s);
+
+	// A full-length record whose byte 428 is not the marker (a later upstream field): the defaults
+	settings_t foreign = set;
+	foreign.nxdn_marker = 0x11;
+	boot_audio_record(&foreign, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	nxdn_block_is_default(&s);
+
+	// Marked, out of range: each value its default
+	settings_t wild = set;
+	wild.nxdn_flags = 0xFE;		// no 9600 bit, the rest unknown
+	wild.nxdn_rx_ran = 64;
+	wild.nxdn_tx_ran = 200;
+	wild.nxdn_tg = 65520;
+	boot_audio_record(&wild, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	nxdn_block_is_default(&s);
+	wild.nxdn_tg = 0;
+	boot_audio_record(&wild, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.nxdn_tg == SETTINGS_NXDN_TG);
+
+	// All groups is a talk group the block holds
+	settings_t all = set;
+	all.nxdn_tg = SETTINGS_NXDN_TG_ALL;
+	boot_audio_record(&all, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.nxdn_tg == SETTINGS_NXDN_TG_ALL && s.nxdn_tx_ran == 13);
+	CHECK(sim_flash_violations() == 0);
+}
+
+// Loaded and left alone: nothing is dirty and a flush writes nothing (the load's fix-ups are carried by the next save)
+static void check_no_save_forced(void)
+{
+	settings_stats_t st;
+	settings_get_stats(&st);
+	CHECK(!st.dirty && st.seq == 2);
+	CHECK(settings_flush());
+	settings_get_stats(&st);
+	CHECK(st.saves == 0 && st.seq == 2);
+}
+
+// mic_input (Crucible) moved from offset 399 to 434 when upstream took 399 for aprs_cp_freq (ADR 004). A record longer
+// than upstream's 412 bytes without the NXDN block marker 0xA8 is a Crucible release's, with the Mic input at 399: it
+// comes across and the APRS mark reads none yet. A record of 412 bytes or fewer (RadioFoundry's) keeps its APRS mark
+// and reads Mic input 0; a record in the new layout keeps both
+static void test_settings_mic_input_move(void)
+{
+	settings_t s;
+	settings_t d;
+	settings_defaults(&d);
+	CHECK(d.nxdn_marker == 0xA8 && d.mic_input == 0 && d.aprs_cp_freq == 0);
+
+	// A Crucible release with the Digital AGC block: 428 bytes, the Mic input at 399
+	settings_t rel = d;
+	rel.squelch = 3;
+	rel.agc_manual = SETTINGS_AGC_TX_MANUAL;
+	rel.aprs_cp_freq = (uint8_t)(int8_t)-3;
+	boot_audio_record(&rel, PRE_NXDN_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.squelch == 3 && s.agc_manual == SETTINGS_AGC_TX_MANUAL && s.mic_input == -3 && s.aprs_cp_freq == 0);
+	nxdn_block_is_default(&s);
+	CHECK((int8_t)SETTINGS_FIELD(mic_input) == -3 && SETTINGS_FIELD(aprs_cp_freq) == 0);
+	check_no_save_forced();
+	settings_begin()->squelch = 6;	// the next save writes the new layout
+	settings_end(1);
+	CHECK(settings_flush());
+	boot();
+	settings_read(&s);
+	CHECK(s.squelch == 6 && s.mic_input == -3 && s.aprs_cp_freq == 0 && s.nxdn_marker == SETTINGS_NXDN_MARKER);
+	rel.aprs_cp_freq = (uint8_t)HAL_MIC_INPUT_MAX;
+	boot_audio_record(&rel, PRE_NXDN_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.mic_input == HAL_MIC_INPUT_MAX && s.aprs_cp_freq == 0);
+	rel.aprs_cp_freq = (uint8_t)(HAL_MIC_INPUT_MAX + 1);	// out of range: the board's level
+	boot_audio_record(&rel, PRE_NXDN_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.mic_input == 0 && s.aprs_cp_freq == 0);
+	check_no_save_forced();
+
+	// The 26 Nov releases: 424 bytes, no Digital AGC block, the Mic input at 399
+	settings_t nov = d;
+	nov.squelch = 5;
+	nov.aprs_cp_freq = (uint8_t)(int8_t)-3;
+	boot_audio_record(&nov, PRE_DAGC_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.squelch == 5 && s.mic_input == -3 && s.aprs_cp_freq == 0 && s.agc_manual == 0);
+	nxdn_block_is_default(&s);
+	check_no_save_forced();
+	// 420 bytes, Mic input never set (0 at 399): Mic input 0, no APRS mark
+	nov.aprs_cp_freq = 0;
+	boot_audio_record(&nov, PRE_RSSI_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.mic_input == 0 && s.aprs_cp_freq == 0);
+
+	// Full length with the pre-release NXDN marker 0xA7: still the Mic input at 399
+	settings_t pre = d;
+	pre.nxdn_marker = 0xA7;
+	pre.nxdn_tg = 4000;
+	pre.aprs_cp_freq = (uint8_t)(int8_t)HAL_MIC_INPUT_MIN;
+	pre.mic_input = 5;		// a reserved byte then: not read
+	boot_audio_record(&pre, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.mic_input == HAL_MIC_INPUT_MIN && s.aprs_cp_freq == 0);
+	nxdn_block_is_default(&s);
+
+	// RadioFoundry's record (412 bytes, no Crucible blocks): the APRS mark kept, Mic input 0
+	settings_t rf = d;
+	rf.squelch = 4;
+	rf.aprs_cp_freq = 0x5A;
+	boot_audio_record(&rf, LEGACY_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.squelch == 4 && s.aprs_cp_freq == 0x5A && s.mic_input == 0);
+	check_no_save_forced();
+	boot_audio_record(&rf, PRE_AES_SETTINGS_BYTES);	// shorter still
+	settings_read(&s);
+	CHECK(s.aprs_cp_freq == 0x5A && s.mic_input == 0);
+
+	// Longer than upstream's records and another firmware's bytes where the Crucible markers go (an upstream that grew
+	// past 412 bytes): read as a Crucible release, byte 399 a Mic input clamped to range (0x5A is out: 0) and the APRS
+	// frequency taken from the codeplug once more; the block bytes are not read
+	settings_t foreign = rf;
+	foreign.agc_marker = 0x11;
+	foreign.nxdn_marker = 0x11;
+	foreign.mic_input = 4;
+	boot_audio_record(&foreign, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.aprs_cp_freq == 0 && s.mic_input == 0 && s.agc_marker == SETTINGS_AGC_MARKER);
+	nxdn_block_is_default(&s);
+
+	// The new layout: both kept, across a save too
+	settings_t now = d;
+	now.aprs_cp_freq = 0x5A;
+	now.mic_input = HAL_MIC_INPUT_MIN;
+	boot_audio_record(&now, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.aprs_cp_freq == 0x5A && s.mic_input == HAL_MIC_INPUT_MIN);
+	check_no_save_forced();
+	settings_begin()->squelch = 2;
+	settings_end(1);
+	CHECK(settings_flush());
+	boot();
+	settings_read(&s);
+	CHECK(s.squelch == 2 && s.aprs_cp_freq == 0x5A && s.mic_input == HAL_MIC_INPUT_MIN);
+	now.mic_input = HAL_MIC_INPUT_MIN - 1;	// out of range: the board's level
+	boot_audio_record(&now, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.aprs_cp_freq == 0x5A && s.mic_input == 0);
+	CHECK(sim_flash_violations() == 0);
 }
 
 static void test_settings_legacy_audio_tail(void)
@@ -1545,6 +1789,9 @@ int main(void)
 	test_journal_cuts();
 	test_settings_basic();
 	test_settings_receive_agc();
+	test_settings_digital_agc();
+	test_settings_nxdn_default();
+	test_settings_mic_input_move();
 	test_settings_legacy_audio_tail();
 	test_settings_incomplete_aes_tail();
 	test_settings_aes_rekey_only();

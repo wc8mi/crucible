@@ -154,6 +154,9 @@ const board_t board = {
 	.power_count = sizeof(power_names) / sizeof(power_names[0]),
 	.power_names = power_names,
 	.power_default = 2,	// 1 W
+	// Digital AGC defaults (radio/digital_agc.h; docs/crucible/adr/003-digital-agc.md)
+	.rx_agc_default_db = -30,
+	.tx_level_default_db = -30,
 	.display = &uvf_display,
 	.input = &uvf_input,
 	.keymap = keymap,

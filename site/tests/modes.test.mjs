@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The channel-mode layer of the Codeplug Editor (docs/spec/channel-modes.md): static/js/codeplug/channelmodes.js, the
 // registry (modes.js) and the DMR Tier III and P25 modules, against the shared vectors (tests/vectors/channel-modes.txt)
 // the C host tests read too. Run with node --test site/tests/ (site/tests/run.sh).
@@ -514,12 +515,16 @@ function nxdnSample() {
 	m.channels.push(a, b);
 	numberAll(m);
 	setKind(m, a, 4);
-	a.params = { ...a.params, rxRan: 9, txRan: 9, squelch: 1 };
+	a.params = { ...a.params, rate9600: true, rxRan: 9, txRan: 9, squelch: 1 };
 	setKind(m, b, 4);
 	b.params = { ...b.params, rate9600: false, rxRan: 0, txRan: 2 };
 	m.modeSettings[4] = { unitId: 1234 };
 	return { m, a, b };
 }
+
+test("NXDN: a new channel starts at 4800 bit/s, the radio's own default", () => {
+	assert.deepEqual(nxdn.nxdnKind.newParams(), { rate9600: false, squelch: 0, rxRan: 0, txRan: 1 });
+});
 
 test("NXDN: channels and the unit ID round-trip; unknown bytes are kept", () => {
 	const { m } = nxdnSample();

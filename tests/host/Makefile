@@ -32,8 +32,8 @@ RXSEEN  := $(CORE)/fec/rx_seen.c
 
 TSHARK  ?= $(firstword $(wildcard /Applications/Wireshark*.app/Contents/MacOS/tshark) $(shell command -v tshark))
 
-TESTS   := dmrFecTest dmrSoftBptcTest dmrSoftCombTest sfrTest dmrDataTest dmrDataServiceTest hotspotDataTest hotspotUplinkTest dmrPrivacyTest \
-           ipGatewayTest ipGatewayTest16 ipGatewayTestShared ipGatewayTestAir440
+TESTS   := digitalAgcTest dmrFecTest dmrSoftBptcTest dmrSoftCombTest sfrTest dmrDataTest dmrDataServiceTest hotspotDataTest hotspotUplinkTest dmrPrivacyTest \
+           ipGatewayTest ipGatewayTest16 ipGatewayTestShared ipGatewayTestAir440 spkAuxTest spkAuxTestMux
 
 all: run
 
@@ -61,6 +61,15 @@ hotspotUplinkTest: hotspotUplinkTest.c $(CORE)/hotspot/hotspotUplink.c $(CORE)/h
 	$(CC) $(CFLAGS) -o $@ hotspotUplinkTest.c $(CORE)/hotspot/hotspotUplink.c
 
 IPGW    := ipGatewayTest.c $(CORE)/dmr/ipGateway.c $(DATA)
+
+# The speaker's second output (core/radio/spk_aux.c)
+spkAuxTest: spkAuxTest.c $(CORE)/radio/spk_aux.c $(CORE)/radio/spk_aux.h $(ROOT)/hal/hal_audio.h
+	$(CC) $(CFLAGS) $(CORE_HAL) -DCONFIG_NET_USRP=0 -DCONFIG_APRS_RX=0 -o $@ spkAuxTest.c \
+	      $(CORE)/radio/spk_aux.c
+# ... with the audio mux, whose wrapper runs the step instead of spk_aux's own
+spkAuxTestMux: spkAuxTest.c $(CORE)/radio/spk_aux.c $(CORE)/radio/spk_aux.h $(CORE)/usbaudio/audio_mux.c $(ROOT)/hal/hal_audio.h
+	$(CC) $(CFLAGS) $(CORE_HAL) -DCONFIG_NET_USRP=1 -DSPK_AUX_MUX -o $@ spkAuxTest.c \
+	      $(CORE)/radio/spk_aux.c $(CORE)/usbaudio/audio_mux.c $(CORE)/usbaudio/pcm_slip.c
 
 ipGatewayTest: $(IPGW) $(CORE)/dmr/ipGateway.h
 	$(CC) $(CFLAGS) -o $@ $(IPGW)
@@ -180,6 +189,8 @@ p25VoiceLevelTest: $(CORE)/audio/rx_agc.c $(CORE)/audio/rx_agc.h $(CORE)/dsp/spe
 # Diagnostic leveling remains available with transmit AGC and DC removal compiled out.
 p25VoiceParrotTest: $(CORE)/audio/rx_agc.c $(CORE)/audio/rx_agc.h $(CORE)/dsp/speech_meter.h $(CORE)/dsp/mic_gain.h $(CORE)/dsp/dc_block.h p25VoiceTest.c $(CORE)/p25/p25Voice.c $(CORE)/p25/p25Voice.h $(CORE)/p25/p25_parrot.h $(CORE)/dsp/tx_level.h $(MBE)
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -DCONFIG_P25=1 -DCONFIG_P25_TX_AGC=0 -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_TX_DC_BLOCK=0 -DCONFIG_P25_PARROT=1 -o $@ $(CORE)/audio/rx_agc.c p25VoiceTest.c $(CORE)/p25/p25Voice.c $(MBE) -lm
+digitalAgcTest: digitalAgcTest.c $(CORE)/radio/digital_agc.h $(CORE)/audio/rx_agc.c $(CORE)/audio/rx_agc.h $(CORE)/dsp/tx_level.h
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -DCONFIG_RX_AGC=1 '-DBOARDS_DIR="$(ROOT)/boards"' -o $@ digitalAgcTest.c $(CORE)/audio/rx_agc.c -lm
 txLevelTest: txLevelTest.c $(CORE)/dsp/dc_block.h $(CORE)/dsp/tx_level.h $(CORE)/dsp/mic_gain.h
 	$(CC) $(CFLAGS) -Wshadow -o $@ txLevelTest.c -lm
 p25VoiceTest: $(CORE)/audio/rx_agc.c $(CORE)/audio/rx_agc.h $(CORE)/dsp/speech_meter.h $(CORE)/dsp/mic_gain.h $(CORE)/dsp/tx_level.h $(CORE)/dsp/dc_block.h p25VoiceTest.c $(CORE)/p25/p25Voice.c $(CORE)/p25/p25Voice.h $(MBE) $(wildcard $(CORE)/mbe/*.h)
@@ -253,6 +264,8 @@ aprsTest: aprsTest.c $(APRSLIB) $(NMEALIB) $(wildcard $(CORE)/aprs/*.h)
 	$(CC) $(CFLAGS) -o $@ aprsTest.c $(APRSLIB) $(NMEALIB) -lm
 
 run: $(TESTS)
+	./spkAuxTest
+	./spkAuxTestMux
 	./dmrFecTest
 	./dmrSoftBptcTest
 	./dmrSoftCombTest
@@ -322,7 +335,7 @@ T3RADIO := $(CORE)/radio/radio_trunk.c $(CORE)/radio/radio_trunk_cp.c $(CORE)/co
            $(CORE)/dmr/trunk/t3_ms.c $(CORE)/dmr/trunk/t3_pdu.c $(CORE)/dmr/trunk/t3_sys.c \
            $(CORE)/dmr/trunk/t3_plan.c sim/codeplug_copy_stub.c $(RXSEEN)
 # With the DMR call stack, the AMBE voice glue and the simulated modem behind board.dmr
-RFEAT   := $(CORE)/radio/scan.c $(CORE)/radio/beep.c $(CORE)/radio/sigtone.c $(CORE)/radio/battery.c $(CORE)/radio/roam.c $(CORE)/radio/radio_am.c $(CORE)/radio/radio_bcast.c \
+RFEAT   := $(CORE)/radio/scan.c $(CORE)/radio/beep.c $(CORE)/radio/spk_aux.c $(CORE)/radio/sigtone.c $(CORE)/radio/battery.c $(CORE)/radio/roam.c $(CORE)/radio/radio_am.c $(CORE)/radio/radio_bcast.c \
            $(CORE)/radio/vibe.c $(CORE)/radio/mic_gain.c $(CORE)/radio/ref_trim.c $(CORE)/radio/pa_keyup.c $(CORE)/codeplug/codeplug_talk.c $(CORE)/codeplug/zone_shift.c \
            $(CORE)/codeplug/zone_settle.c \
            $(CORE)/radio/radio_sfr.c $(CORE)/radio/radio_cwid.c $(CORE)/radio/tx_limit.c $(T3RADIO)
@@ -350,6 +363,13 @@ TESTS   += radioCoreTestNoVfoDmr
 radioCoreTestNoVfoDmr: $(RCORE) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/call/*.h) $(CORE)/dmr/dmrDataService.h \
                        $(CORE)/ui/ui_svc.h
 	$(CC) $(CFLAGS) $(CORE_HAL) -I. -DDMR_RX_TRACE=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_SFR=1 -DCONFIG_APRS=0 -DCONFIG_VFO_DMR=0 -o $@ $(RCORE) -lm
+
+# The same with air band receive off (CONFIG_AM_RX=0)
+TESTS   += radioCoreTestNoAm
+radioCoreTestNoAm: $(RCORE) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/call/*.h) $(CORE)/dmr/dmrDataService.h \
+                   $(CORE)/ui/ui_svc.h
+	$(CC) $(CFLAGS) $(CORE_HAL) -I. -DDMR_RX_TRACE=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_SFR=1 -DCONFIG_APRS=0 \
+		-DCONFIG_SATELLITE_TLE=1 -DCONFIG_AM_RX=0 -o $@ $(RCORE) -lm
 
 # The same with P25 conventional (CONFIG_P25) and the air interface bench (CONFIG_AIR_RAW): a fake board.air whose far
 # end is a second P25 engine, and a vocoder that lends its memory as the HR_C7000 platform's does
@@ -443,6 +463,12 @@ radioFeaturesTestNoDual: $(RFTEST) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CO
 	$(CC) $(CFLAGS) $(CORE_HAL) -I. -DDMR_RX_TRACE=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_HOTSPOT=0 -DCONFIG_APRS=0 \
 		-DCONFIG_NET_USRP=1 -DCONFIG_DUAL_WATCH=0 -o $@ $(RFTEST) -lm
 
+# A volume potentiometer read on an ADC, as a position
+TESTS   += volumePotTest
+
+volumePotTest: volumePotTest.c $(CORE)/radio/volume_pot.c $(CORE)/radio/volume_pot.h $(CORE)/radio/cal_curve.h
+	$(CC) $(CFLAGS) -o $@ volumePotTest.c $(CORE)/radio/volume_pot.c
+
 # The volume knob power switch read from the battery sense line
 TESTS   += powerSwitchTest
 
@@ -465,7 +491,7 @@ roamTest: $(ROAMT) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/call/*.h
 TESTS   += aprsRadioTest
 FMONLY  := -DCONFIG_DMR=0 -DCONFIG_DMR_PRIVACY=0 -DCONFIG_DMR_TALKER_ALIAS=0 -DCONFIG_DMR_SMS=0 -DCONFIG_DMR_ARS=0 \
            -DCONFIG_DMR_LRRP=0 -DCONFIG_DMR_SIGNALING=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_SFR=0 -DCONFIG_HOTSPOT=0
-APRSRT  := aprsRadioTest.c $(CORE)/radio/radio_sm.c $(CORE)/codeplug/codeplug_keys.c $(CORE)/radio/tones.c $(CORE)/radio/tx_limit.c $(CORE)/radio/scan.c $(CORE)/radio/beep.c $(CORE)/radio/sigtone.c \
+APRSRT  := aprsRadioTest.c $(CORE)/radio/radio_sm.c $(CORE)/codeplug/codeplug_keys.c $(CORE)/radio/tones.c $(CORE)/radio/tx_limit.c $(CORE)/radio/scan.c $(CORE)/radio/beep.c $(CORE)/radio/spk_aux.c $(CORE)/radio/sigtone.c \
            $(CORE)/radio/vibe.c $(CORE)/codeplug/codeplug_talk.c $(CORE)/codeplug/zone_shift.c $(CORE)/codeplug/zone_settle.c \
            $(CORE)/radio/battery.c $(CORE)/radio/morse.c $(CORE)/settings/settings.c $(CORE)/storage/storage.c \
            $(CORE)/radio/radio_am.c $(CORE)/radio/radio_bcast.c $(CORE)/aprs/aprs.c $(CORE)/aprs/aprs_ax25.c $(CORE)/aprs/aprs_dmr.c $(CORE)/aprs/aprs_host.c $(APRSLIB) \
@@ -527,11 +553,12 @@ boardBandTest: boardBandTest.c $(ROOT)/hal/board.h
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ boardBandTest.c
 
 run: run-core
-run-core: radioCoreTest radioCoreTestNoVfoDmr radioCoreTestP25 radioCoreTestP25NoAgc radioCoreTestP25T radioCoreTestNxdn radioCoreTestP25Nxdn radioCoreTestAir radioCoreTestAprs radioCoreTestAprsDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest inputTest switchFollowTest aprsRadioTest quadratureTest serialmicTest miclevelTest resampleTest \
-          rx2LinkTest keyassignTest powerSwitchTest powerKeyTest boardBandTest batteryTest
+run-core: radioCoreTest radioCoreTestNoVfoDmr radioCoreTestNoAm radioCoreTestP25 radioCoreTestP25NoAgc radioCoreTestP25T radioCoreTestNxdn radioCoreTestP25Nxdn radioCoreTestAir radioCoreTestAprs radioCoreTestAprsDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest inputTest switchFollowTest aprsRadioTest quadratureTest serialmicTest miclevelTest resampleTest \
+          rx2LinkTest keyassignTest volumePotTest powerSwitchTest powerKeyTest boardBandTest batteryTest
 	./aprsRadioTest
 	./radioCoreTest
 	./radioCoreTestNoVfoDmr
+	./radioCoreTestNoAm
 	./radioCoreTestP25
 	./radioCoreTestP25NoAgc
 	./radioCoreTestNxdn
@@ -552,6 +579,7 @@ run-core: radioCoreTest radioCoreTestNoVfoDmr radioCoreTestP25 radioCoreTestP25N
 	./resampleTest
 	./rx2LinkTest
 	./keyassignTest
+	./volumePotTest
 	./powerSwitchTest
 	./powerKeyTest
 	./boardBandTest
@@ -588,19 +616,22 @@ codeplugPower%Test: codeplugPowerTest.c $(CORE)/codeplug/codeplug.c $(CORE)/code
 	$(CC) $(CFLAGS) $(FLASH_HAL) -DPOWER_COUNT=$* -o $@ codeplugPowerTest.c $(CORE)/codeplug/codeplug.c $(CORE)/codeplug/codeplug_kv.c $(CORE)/codeplug/codeplug_tag.c $(CORE)/codeplug/dmr_iddb.c $(CORE)/storage/storage.c
 
 # The calibration curve every board's reader shares
-TESTS   += calCurveTest
+TESTS   += calCurveTest sqlRssiTest
 
 calCurveTest: calCurveTest.c $(CORE)/radio/cal_curve.h
 	$(CC) $(CFLAGS) -Wshadow -o $@ calCurveTest.c
+sqlRssiTest: sqlRssiTest.c $(CORE)/radio/sql_rssi.c $(CORE)/radio/sql_rssi.h $(CORE)/radio/radio_sm.h
+	$(CC) $(CFLAGS) -Wshadow -I$(ROOT)/hal -o $@ sqlRssiTest.c $(CORE)/radio/sql_rssi.c
 
 run: run-flash
-run-flash: codeplugTest codeplugNoCompactTest calCurveTest codeplugPower2Test codeplugPower3Test codeplugPower9Test
+run-flash: codeplugTest codeplugNoCompactTest calCurveTest sqlRssiTest codeplugPower2Test codeplugPower3Test codeplugPower9Test
 	./codeplugPower2Test
 	./codeplugPower3Test
 	./codeplugPower9Test
 	./codeplugTest
 	./codeplugNoCompactTest
 	./calCurveTest
+	./sqlRssiTest
 .PHONY: run-flash
 
 # The AT1846S driver: frequency word, register cache and write sequences, on a fake bus
@@ -775,14 +806,16 @@ uiFlowTestP25NoAgc: uiFlowTest.c $(UIDEPS) $(CORE)/p25/p25_parrot.h $(CORE)/dsp/
 # The same flows built as a radio with only a monochrome screen builds them (CONFIG_UI_COLOR=n): no color rows;
 # without a translation (CONFIG_LANG_ES=n): the Language screen dims Spanish; and with the backlight tests
 # (CONFIG_BACKLIGHT_TEST=y, off in uiFlowTest): their screen, and the Advanced rows below it one further down; and
-# without privacy (CONFIG_DMR_PRIVACY=n): Settings > Privacy dimmed.
+# without privacy (CONFIG_DMR_PRIVACY=n): Settings > Privacy dimmed; and without air band receive
+# (CONFIG_AM_RX=n): no 8.33 kHz VFO step.
 # uiFlowTest has P25 and NXDN (CONFIG_P25, CONFIG_NXDN) and this one not: their home screen flows run in the first
 TESTS += uiFlowTestNoCallerLookup
 uiFlowTestNoCallerLookup: uiFlowTest.c $(UIDEPS)
 	$(CC) $(UIFLAGS) -DCONFIG_P25=1 -DCONFIG_P25_ID_LOOKUP=0 -DCONFIG_P25_TRUNK=1 -DCONFIG_NXDN=1 -o $@ uiFlowTest.c $(UIAPP) -lz
 
 uiFlowTestNoColor: uiFlowTest.c $(UIDEPS)
-	$(CC) $(UIFLAGS) -DCONFIG_UI_COLOR=0 -DCONFIG_LANG_ES=0 -DCONFIG_BACKLIGHT_TEST=1 -DCONFIG_DMR_PRIVACY=0 -o $@ \
+	$(CC) $(UIFLAGS) -DCONFIG_UI_COLOR=0 -DCONFIG_LANG_ES=0 -DCONFIG_BACKLIGHT_TEST=1 -DCONFIG_DMR_PRIVACY=0 \
+		-DCONFIG_AM_RX=0 -o $@ \
 		uiFlowTest.c $(UIAPP) -lz
 
 uiFlowTestSatellite: uiFlowTest.c $(UIDEPS)
@@ -1285,8 +1318,8 @@ st7789Test: st7789Test.c $(ROOT)/drivers/display/st7789/st7789.c $(ROOT)/drivers
 chswitchTest: chswitchTest.c $(ROOT)/drivers/input/chswitch/chswitch.c $(ROOT)/drivers/input/chswitch/chswitch.h
 	$(CC) $(CFLAGS) -I$(ROOT)/drivers -Wshadow -o $@ chswitchTest.c $(ROOT)/drivers/input/chswitch/chswitch.c
 
-sharedPttTest: sharedPttTest.c $(ROOT)/drivers/input/sharedptt/shared_ptt.c $(ROOT)/drivers/input/sharedptt/shared_ptt.h
-	$(CC) $(CFLAGS) -Wshadow -o $@ sharedPttTest.c $(ROOT)/drivers/input/sharedptt/shared_ptt.c
+sharedPttTest: sharedPttTest.c $(ROOT)/drivers/input/sharedptt/shared_ptt.c $(ROOT)/drivers/input/sharedptt/shared_ptt.h $(ROOT)/drivers/input/plugptt/plug_ptt.c
+	$(CC) $(CFLAGS) -Wshadow -o $@ sharedPttTest.c $(ROOT)/drivers/input/sharedptt/shared_ptt.c $(ROOT)/drivers/input/plugptt/plug_ptt.c
 plugPttTest: plugPttTest.c $(ROOT)/drivers/input/plugptt/plug_ptt.c $(ROOT)/drivers/input/plugptt/plug_ptt.h
 	$(CC) $(CFLAGS) -Wshadow -o $@ plugPttTest.c $(ROOT)/drivers/input/plugptt/plug_ptt.c
 keymatrixTest: keymatrixTest.c $(ROOT)/drivers/input/keymatrix/keymatrix.c $(ROOT)/drivers/input/keymatrix/keymatrix.h
@@ -1530,8 +1563,9 @@ settingsTest: settingsTest.c $(STORE) $(wildcard $(CORE)/storage/*.h $(CORE)/set
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -I. -Wshadow -DCONFIG_RADIO_DETOUR=1 -o $@ settingsTest.c $(STORE)
 
 run: run-settings
-run-settings: settingsTest spiNorTest spiNandTest nandSectorsTest
+run-settings: settingsTest digitalAgcTest spiNorTest spiNandTest nandSectorsTest
 	./settingsTest
+	./digitalAgcTest
 	./spiNorTest
 	./spiNandTest
 	./nandSectorsTest

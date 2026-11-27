@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The NXDN mode module of the Codeplug Editor (docs/spec/nxdn-codeplug.md): kind 4 (conventional) on the channel-mode
 // layer (channelmodes.js). Bytes to fields and back, and the fields the pages show, as data. Talk targets are the
 // contact list's: a group contact is a group, a private one a unit.
@@ -77,7 +78,8 @@ export const nxdnKind = {
 	flags: {},
 	// in the params only when set: the traffic key the channel transmits with
 	optionalParams: ["txKeyId"],
-	newParams: () => ({ rate9600: true, squelch: 0, rxRan: 0, txRan: TX_RAN_DEFAULT }),
+	// a new channel at the radio's own default rate, 4800 bit/s (docs/crucible/adr/004-nxdn-radio-default.md)
+	newParams: () => ({ rate9600: false, squelch: 0, rxRan: 0, txRan: TX_RAN_DEFAULT }),
 	decode: decodeConv,
 	encode: encodeConv,
 	fields: () => [

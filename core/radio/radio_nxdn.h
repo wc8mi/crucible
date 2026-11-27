@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // NXDN conventional on a channel, the radio core's side (docs/spec/nxdn.md 6): the engine (core/nxdn/nxdn_engine.h)
 // on the memory it runs in, its voice frames to and from the vocoder the board hosts for DMR (core/dmr/ambe), the
 // channel's NXDN parameters, and a compact view for the radio view. radio_sm.c decides when NXDN runs and keys the
 // transmitter (radio_air.h); nothing here keys it.
 //
 // The parameters of a stored NXDN channel are its own (docs/spec/nxdn-codeplug.md); the VFO and a channel whose mode
-// was changed to NXDN for now take the RAM settings the debug link changes (radio_req_nxdn_settings).
+// was changed to NXDN for now take the RAM settings (radio_req_nxdn_settings), which start from the stored radio
+// default and which the UI's NXDN settings and the debug link change.
 #ifndef RADIO_NXDN_H
 #define RADIO_NXDN_H
 
@@ -16,7 +18,8 @@
 #include "codeplug/codeplug.h"
 #include "radio/radio_air.h"
 
-// The NXDN settings (RAM only, reset at start-up; nxdn.md 6.2): the VFO's, and the shape of what is in force
+// The NXDN settings (RAM, seeded at start-up from the stored radio default; nxdn.md 6.2): the VFO's, and the shape of
+// what is in force
 typedef struct {
 	bool rate9600;		// 9600 bit/s (4800 symbols/s), else 4800 bit/s (2400 symbols/s)
 	uint8_t rx_ran;		// 0 (every RAN) to 63
@@ -67,7 +70,9 @@ typedef struct {
 
 extern const radio_air_ops_t radio_nxdn_air;
 
-void radio_nxdn_init(void);
+// Start-up: the settings from the stored radio default (settings_t's NXDN block): the rate, both RANs and the group
+// PTT calls; the rest their defaults
+void radio_nxdn_init(bool rate9600, uint8_t rx_ran, uint8_t tx_ran, uint16_t tg);
 // The board's provider gives NXDN something (receive or transmit) at either rate (any task): what the UI and the
 // mode request offer NXDN on
 bool radio_nxdn_fits(void);

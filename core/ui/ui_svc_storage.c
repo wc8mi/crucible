@@ -21,6 +21,7 @@
 #include "settings/settings.h"
 #include "radio/ref_trim.h"
 #include "dsp/tx_level.h"
+#include "radio/digital_agc.h"
 #include "storage/storage.h"
 #include "codeplug/codeplug.h"
 #include "codeplug/codeplug_kv.h"
@@ -377,6 +378,24 @@ static __attribute__((noinline)) int32_t setting_get_flash(uint8_t id)
 		return (SETTINGS_FIELD(accent) & SETTINGS_AUDIO_NO_NOISE_REDUCTION) == 0;
 	case UI_SET_MIC_AGC:
 		return (SETTINGS_FIELD(accent) & SETTINGS_AUDIO_AGC) != 0;
+	case UI_SET_AGC_RX_AUTO:
+		return (SETTINGS_FIELD(agc_manual) & SETTINGS_AGC_RX_MANUAL) == 0;
+	case UI_SET_AGC_TX_AUTO:
+		return (SETTINGS_FIELD(agc_manual) & SETTINGS_AGC_TX_MANUAL) == 0;
+	case UI_SET_TX_LEVEL_P25:
+		return dagc_tx_p25_stored(SETTINGS_FIELD(tx_level_p25));
+	case UI_SET_TX_LEVEL_NXDN:
+		return dagc_tx_nxdn_stored(SETTINGS_FIELD(tx_level_nxdn), SETTINGS_FIELD(tx_level_dmr));
+#if CONFIG_NXDN
+	case UI_SET_NXDN_RATE:
+		return (SETTINGS_FIELD(nxdn_flags) & SETTINGS_NXDN_9600) != 0;
+	case UI_SET_NXDN_RX_RAN:
+		return SETTINGS_FIELD(nxdn_rx_ran);
+	case UI_SET_NXDN_TX_RAN:
+		return SETTINGS_FIELD(nxdn_tx_ran);
+	case UI_SET_NXDN_TG:
+		return SETTINGS_FIELD(nxdn_tg);
+#endif
 #if CONFIG_TX_MIC_LIMITER
 	case UI_SET_TX_LEVEL_DMR:
 	case UI_SET_TX_LEVEL_YSF: {
@@ -465,6 +484,47 @@ int32_t ui_svc_setting_get(uint8_t id)
 	return val != INT32_MIN ? val : setting_get_flash(id);
 }
 
+#if CONFIG_NXDN
+// The NXDN radio default (settings.h): stored, and into the radio's RAM settings at once. Read, change, write: the
+// fields the default doesn't hold (unit ID, group squelch, emergency) stay as they are, and a change of rate or RAN
+// keeps a temporary talk target. A debug link change between the read and the write is lost (accepted: a tool's)
+static bool nxdn_default_set(uint8_t id, int32_t value)
+{
+	if (id == UI_SET_NXDN_RATE ? (value != 0 && value != 1) :
+	    id == UI_SET_NXDN_TG ? (value <= 0 || (value > (int32_t)SETTINGS_NXDN_TG_MAX &&
+						 value != (int32_t)SETTINGS_NXDN_TG_ALL)) :
+	    (value < 0 || value > (int32_t)SETTINGS_NXDN_RAN_MAX))
+		return false;
+	if (id == UI_SET_NXDN_RATE && (radio_nxdn_fit(value != 0) & (AIR_FIT_RX | AIR_FIT_TX)) == 0)
+		return false;	// the board's provider runs nothing at this rate
+	radio_nxdn_settings_t n;
+	radio_nxdn_settings(&n);
+	settings_t *st = settings_begin();
+	switch (id) {
+	case UI_SET_NXDN_RATE:
+		st->nxdn_flags = (uint8_t)(value ? st->nxdn_flags | SETTINGS_NXDN_9600 : st->nxdn_flags & ~SETTINGS_NXDN_9600);
+		n.rate9600 = value != 0;
+		break;
+	case UI_SET_NXDN_RX_RAN:
+		st->nxdn_rx_ran = (uint8_t)value;
+		n.rx_ran = (uint8_t)value;
+		break;
+	case UI_SET_NXDN_TX_RAN:
+		st->nxdn_tx_ran = (uint8_t)value;
+		n.tx_ran = (uint8_t)value;
+		break;
+	default:	// the talk group: what PTT calls from now on, a temporary target or unit call replaced
+		st->nxdn_tg = (uint16_t)value;
+		n.tx_dst = (uint16_t)value;
+		n.unit_call = false;
+		break;
+	}
+	settings_end(hal_millis());
+	radio_req_nxdn_settings(&n);
+	return true;
+}
+#endif
+
 bool ui_svc_setting_set(uint8_t id, int32_t value)
 {
 	settings_t *st;
@@ -483,8 +543,21 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 		uint8_t choice = value >= 0 && value < (int32_t)RX_AGC_TARGETS ? (uint8_t)value : 0;
 		st = settings_begin();
 		settings_set_rx_agc(st, mode, choice);
+		bool manual = (st->agc_manual & SETTINGS_AGC_RX_MANUAL) != 0;
 		settings_end(hal_millis());
-		rx_agc_configure((rx_agc_mode_t)mode, choice);
+		rx_agc_configure((rx_agc_mode_t)mode, dagc_rx(manual, choice, board.rx_agc_default_db));
+		return true;
+	}
+	case UI_SET_AGC_RX_AUTO: {	// every mode's choice in force changes with it
+		uint8_t stored[RX_AGC_MODES];
+		st = settings_begin();
+		st->agc_manual = (uint8_t)(value != 0 ? st->agc_manual & ~SETTINGS_AGC_RX_MANUAL :
+					   st->agc_manual | SETTINGS_AGC_RX_MANUAL);
+		for (unsigned mode = 0; mode < RX_AGC_MODES; mode++)
+			stored[mode] = settings_rx_agc(st, mode);
+		settings_end(hal_millis());
+		for (unsigned mode = 0; mode < RX_AGC_MODES; mode++)
+			rx_agc_configure((rx_agc_mode_t)mode, dagc_rx(value == 0, stored[mode], board.rx_agc_default_db));
 		return true;
 	}
 	case UI_SET_RX_AUDIO_LEVELS:
@@ -731,6 +804,30 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 			st->tx_level_ysf = (uint8_t)(value >= 0 && value < (int32_t)TX_LEVEL_CHOICES ? value : 0);
 		settings_end(hal_millis());
 		return true;
+#endif
+	case UI_SET_AGC_TX_AUTO:	// ui_svc_apply hands the targets on
+		st = settings_begin();
+		st->agc_manual = (uint8_t)(value != 0 ? st->agc_manual & ~SETTINGS_AGC_TX_MANUAL :
+					   st->agc_manual | SETTINGS_AGC_TX_MANUAL);
+		settings_end(hal_millis());
+		return true;
+	case UI_SET_TX_LEVEL_P25:
+	case UI_SET_TX_LEVEL_NXDN: {
+		uint8_t raw = (uint8_t)(value >= 0 && value < (int32_t)TX_LEVEL_CHOICES ? value + 1 : 1);
+		st = settings_begin();
+		if (id == UI_SET_TX_LEVEL_P25)
+			st->tx_level_p25 = raw;
+		else
+			st->tx_level_nxdn = raw;
+		settings_end(hal_millis());
+		return true;
+	}
+#if CONFIG_NXDN
+	case UI_SET_NXDN_RATE:
+	case UI_SET_NXDN_RX_RAN:
+	case UI_SET_NXDN_TX_RAN:
+	case UI_SET_NXDN_TG:
+		return nxdn_default_set(id, value);
 #endif
 	case UI_SET_NOISE_REDUCTION:	// ui_svc_apply hands them to the vocoder
 	case UI_SET_MIC_AGC: {

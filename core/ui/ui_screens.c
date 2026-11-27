@@ -1290,10 +1290,14 @@ static void draw_talk(const radio_view_t *v, bool label_first)
 #endif
 #if CONFIG_NXDN
 	} else if (v->ch.mode == RADIO_MODE_NXDN) {
-		// The same for NXDN: the group, or the unit's ID
-		if ((v->nxdn.flags & RADIO_NXDN_TALK_UNIT) == 0)
-			sb_str(&b, "TG ");
-		sb_u32(&b, v->nxdn.talk, 1);
+		// The same for NXDN: the group, or the unit's ID; 0xFFFF calls all of them
+		if (v->nxdn.talk == UI_NXDN_ID_ALL) {
+			sb_str(&b, TR(QUICK_VALUE_ALL, "All"));
+		} else {
+			if ((v->nxdn.flags & RADIO_NXDN_TALK_UNIT) == 0)
+				sb_str(&b, "TG ");
+			sb_u32(&b, v->nxdn.talk, 1);
+		}
 #endif
 #if CONFIG_YSF
 	} else if (v->ch.mode == RADIO_MODE_YSF && (v->ysf.flags & RADIO_YSF_NO_CALL) != 0) {
@@ -2791,6 +2795,17 @@ static void draw_activity(const radio_view_t *v, const ui_state_t *s)
 	}
 }
 
+// An NXDN talk target set for now on the radio default (Back undoes it, as DMR's target_manual)
+static bool nxdn_talk_temporary(const radio_view_t *v)
+{
+#if CONFIG_NXDN
+	return ui_nxdn_talk_temporary(v);
+#else
+	(void)v;
+	return false;
+#endif
+}
+
 static const char *home_hint(const radio_view_t *v, const ui_state_t *s)
 {
 	if (v->state == RS_TX_DENIED)
@@ -2817,7 +2832,7 @@ static const char *home_hint(const radio_view_t *v, const ui_state_t *s)
 	if (v->temporary)
 		return TR(HOME_HINT_UNSAVED, "Back undo  Hold OK save");
 #if CONFIG_DMR
-	if (v->ch.mode == RADIO_MODE_DMR && v->dmr.target_manual)
+	if ((v->ch.mode == RADIO_MODE_DMR && v->dmr.target_manual) || nxdn_talk_temporary(v))
 		return v->vfo ?
 			TR(HOME_HINT_TALK_TARGET_VFO, TEXT_ALT_OPEN "Back: VFO's talk target"
 				TEXT_ALT_NEXT "Back default target" TEXT_ALT_CLOSE) :
@@ -4289,6 +4304,8 @@ uint8_t ui_quick_kind(int pos, const radio_view_t *v)
 		kind = QT_YSF_ROOMS;	// no tones on YSF: tile 3 opens Rooms
 	if (CONFIG_YSF && v->ch.mode == RADIO_MODE_YSF && kind == QT_BANDWIDTH)
 		kind = QT_DGID;		// nor a width: tile 8 is the DG-ID
+	if (CONFIG_NXDN && v->ch.mode == RADIO_MODE_NXDN && kind == QT_BANDWIDTH)
+		kind = QT_NXDN_RATE;	// NXDN's width is fixed: tile 8 is the rate
 	if (v->vfo && (kind == QT_MONITOR || kind == QT_PRIVACY))
 		return QT_SPLIT;	// the VFO's TX frequency; Monitor stays on its key, privacy on channels
 	return kind;
@@ -4328,6 +4345,7 @@ bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *l
 		[QT_SPLIT] = TRN(QUICK_LABEL_TX_FREQ, TEXT_ALT_OPEN "TX freq" TEXT_ALT_NEXT "TXFreq" TEXT_ALT_CLOSE),
 		[QT_YSF_ROOMS] = TRN(QUICK_LABEL_ROOMS, "Rooms"),
 		[QT_DGID] = TRX(QUICK_LABEL_DGID, "DG-ID"),
+		[QT_NXDN_RATE] = TRN(CHAN_LABEL_RATE, "Rate"),
 	};
 	uint8_t kind = ui_quick_kind(tile, v);
 	bool editing = s->quick_edit && s->quick_focus == tile;
@@ -4420,6 +4438,12 @@ bool ui_quick_tile(int tile, const radio_view_t *v, const ui_state_t *s, char *l
 	case QT_DGID:
 		sb_u32(&b, editing ? s->dgid_edit : v->ysf.tx_dgid, 2);
 		return true;
+#endif
+#if CONFIG_NXDN
+	case QT_NXDN_RATE:
+		// The rate in force; a stored NXDN channel's own is shown dimmed (OK says to set it in the channel)
+		sb_str(&b, (v->nxdn.flags & RADIO_NXDN_9600) != 0 ? "9600" : "4800");
+		return ui_nxdn_on_settings(v);
 #endif
 #if CONFIG_DMR
 	case QT_TIMESLOT:

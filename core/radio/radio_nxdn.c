@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // NXDN conventional on a channel, the radio core's side (radio_nxdn.h)
 #include "config.h"
 #if CONFIG_NXDN	// the whole file
@@ -21,7 +22,7 @@ _Static_assert(NXDN_EHR_BYTES == DMR_AMBE_FRAME_BYTES, "one voice frame size");
 
 
 static const radio_nxdn_settings_t defaults = {
-	.rate9600 = true, .rx_ran = NXDN_RAN_ANY, .tx_ran = 1, .rx_gid = 0, .unit_id = 1, .unit_call = false,
+	.rate9600 = false, .rx_ran = NXDN_RAN_ANY, .tx_ran = 1, .rx_gid = 0, .unit_id = 1, .unit_call = false,
 	.tx_dst = 1, .emergency = false,
 };
 static radio_nxdn_settings_t set;
@@ -31,9 +32,15 @@ static nxdn_call_stats_t call_base;	// the call layer's counters already counted
 static radio_air_counts_t air_base;	// the same for the engine's and the session's
 static uint32_t rejects_base;
 
-void radio_nxdn_init(void)
+void radio_nxdn_init(bool rate9600, uint8_t rx_ran, uint8_t tx_ran, uint16_t tg)
 {
-	set = defaults;
+	radio_nxdn_settings_t s = defaults;
+
+	s.rate9600 = rate9600;
+	s.rx_ran = rx_ran;
+	s.tx_ran = tx_ran;
+	s.tx_dst = tg;
+	radio_nxdn_set_settings(&s);
 	eng = NULL;
 }
 
@@ -51,6 +58,8 @@ void radio_nxdn_set_settings(const radio_nxdn_settings_t *s)
 		set.tx_ran = 1;
 	if (set.unit_id == 0 || set.unit_id > RADIO_NXDN_UNIT_MAX)
 		set.unit_id = defaults.unit_id;
+	if (set.tx_dst == 0)
+		set.tx_dst = defaults.tx_dst;	// no call goes to 0
 }
 
 uint32_t radio_nxdn_fit(bool rate9600)
@@ -339,6 +348,7 @@ static bool nxdn_tx_prepare(void)
 {
 	if (eng == NULL || !nxdn_engine_tx_prepare(eng))
 		return false;
+	ambeVoiceTxProfile(AMBE_TX_NXDN);	// its own leveling target (ambeVoice.h); begin() takes it
 	radio_air_voice_tx(true);
 	return true;
 }

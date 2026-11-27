@@ -10,6 +10,8 @@
 #include "ui_svc_aprs.h"
 #include "audio/rx_agc.h"
 #include "settings/settings.h"
+#include "radio/digital_agc.h"
+#include "board.h"
 
 #define WEAK __attribute__((weak))
 
@@ -253,10 +255,32 @@ static int32_t settings[UI_SET_RAM_COUNT] = {
 static uint8_t rx_audio_preferences[UI_SET_RX_AUDIO_LEVELS - UI_SET_RX_AGC_DMR + 1];
 #endif
 static int8_t tx_audio_preferences[UI_SET_MIC_INPUT - UI_SET_TX_LEVEL_DMR + 1];	// past the table: kept here
+// Digital AGC (radio/digital_agc.h), past the table too, held as settings_t holds them: the switches as manual bits
+// (0 = both On, as the store starts), P25 and NXDN as a choice + 1 (0 = unset)
+static uint8_t agc_manual, agc_tx_p25, agc_tx_nxdn;
+// The NXDN radio default, past the table too: the store's defaults (4800 bit/s, RX any RAN, TX RAN 1, group 1)
+static int32_t nxdn_default[UI_SET_NXDN_TG - UI_SET_NXDN_RATE + 1] = { 0, 0, 1, 1 };
+#if CONFIG_RX_AGC
+// The RX choice in force for every mode, after a row or the switch changed
+static void agc_rx_configure(void)
+{
+	for (unsigned mode = 0; mode < RX_AGC_MODES; mode++)
+		rx_agc_configure((rx_agc_mode_t)mode, dagc_rx((agc_manual & SETTINGS_AGC_RX_MANUAL) != 0,
+							   rx_audio_preferences[mode], board.rx_agc_default_db));
+}
+#endif
 int32_t ui_svc_ram_get(uint8_t id)
 {
 	if (id >= UI_SET_TX_LEVEL_DMR && id <= UI_SET_MIC_INPUT)
 		return tx_audio_preferences[id - UI_SET_TX_LEVEL_DMR];
+	if (id == UI_SET_AGC_RX_AUTO || id == UI_SET_AGC_TX_AUTO)
+		return (agc_manual & (id == UI_SET_AGC_RX_AUTO ? SETTINGS_AGC_RX_MANUAL : SETTINGS_AGC_TX_MANUAL)) == 0;
+	if (id == UI_SET_TX_LEVEL_P25)
+		return dagc_tx_p25_stored(agc_tx_p25);
+	if (id == UI_SET_TX_LEVEL_NXDN)
+		return dagc_tx_nxdn_stored(agc_tx_nxdn, (uint8_t)tx_audio_preferences[0]);
+	if (id >= UI_SET_NXDN_RATE && id <= UI_SET_NXDN_TG)
+		return nxdn_default[id - UI_SET_NXDN_RATE];
 #if CONFIG_RX_AGC
 	if (id >= UI_SET_RX_AGC_DMR && id <= UI_SET_RX_AUDIO_LEVELS)
 		return rx_audio_preferences[id - UI_SET_RX_AGC_DMR];
@@ -272,12 +296,29 @@ bool ui_svc_ram_set(uint8_t id, int32_t value)
 			value >= 0 && value < (int32_t)RX_AGC_TARGETS ? (uint8_t)value : 0;
 		rx_audio_preferences[id - UI_SET_RX_AGC_DMR] = choice;
 		if (id != UI_SET_RX_AUDIO_LEVELS)
-			rx_agc_configure((rx_agc_mode_t)(id - UI_SET_RX_AGC_DMR), choice);
+			agc_rx_configure();
 		return true;
 	}
 #endif
+	if (id == UI_SET_AGC_RX_AUTO || id == UI_SET_AGC_TX_AUTO) {
+		uint8_t bit = id == UI_SET_AGC_RX_AUTO ? SETTINGS_AGC_RX_MANUAL : SETTINGS_AGC_TX_MANUAL;
+		agc_manual = (uint8_t)(value != 0 ? agc_manual & ~bit : agc_manual | bit);
+#if CONFIG_RX_AGC
+		agc_rx_configure();
+#endif
+		return true;
+	}
+	if (id == UI_SET_TX_LEVEL_P25 || id == UI_SET_TX_LEVEL_NXDN) {
+		uint8_t raw = (uint8_t)(value >= 0 && value < (int32_t)TX_LEVEL_CHOICES ? value + 1 : 1);
+		*(id == UI_SET_TX_LEVEL_P25 ? &agc_tx_p25 : &agc_tx_nxdn) = raw;
+		return true;
+	}
 	if (id >= UI_SET_TX_LEVEL_DMR && id <= UI_SET_MIC_INPUT) {
 		tx_audio_preferences[id - UI_SET_TX_LEVEL_DMR] = (int8_t)value;
+		return true;
+	}
+	if (id >= UI_SET_NXDN_RATE && id <= UI_SET_NXDN_TG) {
+		nxdn_default[id - UI_SET_NXDN_RATE] = value;
 		return true;
 	}
 	if (id >= UI_SET_RAM_COUNT)

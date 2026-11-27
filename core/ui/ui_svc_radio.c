@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The ui_svc.h calls the radio core answers: the talk target and the one-shot target of the focused row
 // (docs/spec/dmr-voice.md), the temporary channel changes (timeslot, color code, mode), the hear all, monitor and VOX
 // latches, privacy with the stored key, scan, key beeps and the radio's settings (docs/spec/radio-features.md).
@@ -17,6 +18,7 @@
 #include "codeplug/codeplug_modes.h"	// channel kinds: a trunked one is never watched
 #include "input/input.h"
 #include "settings/settings.h"
+#include "radio/digital_agc.h"
 #include <string.h>
 #include "config.h"
 #if CONFIG_POSITION
@@ -270,7 +272,7 @@ bool ui_svc_roam(uint8_t cmd)
 uint32_t ui_svc_feat_radio(void)
 {
 	bool motor = CONFIG_VIBRATE && board.power != NULL && board.power->vibrate != NULL;
-	bool knob = radio_volume_knob();
+	bool knob = radio_volume_follows_knob();
 	return (CONFIG_SCAN ? UI_FEAT_SCAN : 0) | (CONFIG_DMR_ROAMING ? UI_FEAT_ROAMING : 0) |
 	       (motor ? UI_FEAT_VIBRATE : 0) | (radio_volume_soft() ? UI_FEAT_VOLUME : 0) |
 	       (knob ? UI_FEAT_VOLUME_KNOB : 0) |
@@ -288,9 +290,43 @@ uint32_t ui_svc_feat_radio(void)
 	       0;
 }
 
+#if CONFIG_NXDN
+// The talk target in NXDN on the radio's settings (ui_nxdn_on_settings): the RAM settings' call. TEMPORARY sets it
+// (the UI counts it temporary while it isn't the stored talk group); PERMANENT makes a group the stored talk group (a
+// unit stays a call for now: the radio default holds a group); DEFAULT goes back to the stored talk group
+static bool nxdn_talk_to(uint32_t id, bool private_call, uint8_t life)
+{
+	radio_nxdn_settings_t n;
+	uint16_t dst;
+
+	radio_nxdn_settings(&n);
+	if (life == UI_TALK_DEFAULT) {
+		n.tx_dst = (uint16_t)ui_svc_setting_get(UI_SET_NXDN_TG);
+		n.unit_call = false;
+		radio_req_nxdn_settings(&n);
+		return true;
+	}
+	if ((life != UI_TALK_TEMPORARY && life != UI_TALK_PERMANENT) || !ui_nxdn_talk_id(id, &dst))
+		return false;
+	if (life == UI_TALK_PERMANENT && !private_call)
+		return ui_svc_setting_set(UI_SET_NXDN_TG, dst);	// stored, and in force at once
+	n.tx_dst = dst;
+	n.unit_call = private_call;
+	radio_req_nxdn_settings(&n);
+	return true;
+}
+#endif
+
 #if CONFIG_DMR
 bool ui_svc_talk_to(uint32_t id, bool private_call, uint8_t life)
 {
+#if CONFIG_NXDN
+	radio_get_view(&ui_svc_view);
+	if (ui_nxdn_on_settings(&ui_svc_view))
+		return nxdn_talk_to(id, private_call, life);
+	if (ui_nxdn_stored_channel(&ui_svc_view))
+		return false;	// its own record's target (the UI says so)
+#endif
 	switch (life) {
 	case UI_TALK_TEMPORARY:
 		radio_req_dmr_target(id, private_call);
@@ -444,7 +480,7 @@ void ui_svc_beep(uint8_t beep)
 {
 	static const uint8_t map[] = {
 		[UI_BEEP_KEY] = BEEP_KEY, [UI_BEEP_ERROR] = BEEP_ERROR, [UI_BEEP_MESSAGE] = BEEP_MESSAGE,
-		[UI_BEEP_BATTERY_LOW] = BEEP_BATTERY_LOW,
+		[UI_BEEP_BATTERY_LOW] = BEEP_BATTERY_LOW, [UI_BEEP_CALL_ALERT] = BEEP_CALL_ALERT,
 	};
 	radio_req_beep(beep < sizeof map ? map[beep] : BEEP_KEY);
 }
@@ -503,6 +539,32 @@ static void apply_mic_gain(int32_t step, bool agc)
 	radio_set_mic_gain_with_agc((uint8_t)step, agc);
 }
 
+// Digital AGC (radio/digital_agc.h): each transmit profile's target in force, after the switch or a TX level row
+// changed and once at start-up. The rows keep the user's values; with the switch On the radio's defaults apply
+static void agc_apply_tx(void)
+{
+	bool manual = ui_svc_setting_get(UI_SET_AGC_TX_AUTO) == 0;
+	int8_t db = board.tx_level_default_db;
+#if CONFIG_TX_MIC_LIMITER
+	static const struct { uint8_t id, mode, profile; } ambe[] = {
+		{ UI_SET_TX_LEVEL_DMR, DAGC_TX_DMR, AMBE_TX_DMR },
+		{ UI_SET_TX_LEVEL_NXDN, DAGC_TX_NXDN, AMBE_TX_NXDN },
+		{ UI_SET_TX_LEVEL_YSF, DAGC_TX_YSF, AMBE_TX_YSF },
+	};
+	for (unsigned i = 0; i < sizeof ambe / sizeof ambe[0]; i++) {
+		uint8_t stored = (uint8_t)ui_svc_setting_get(ambe[i].id);
+		ambeVoiceSetTxTarget((ambe_tx_profile_t)ambe[i].profile,
+				     tx_level_choice_rms(dagc_tx((dagc_tx_mode_t)ambe[i].mode, manual, stored, db)));
+	}
+#endif
+#if CONFIG_P25 && CONFIG_IMBE && CONFIG_P25_TX_AGC
+	uint8_t p25 = (uint8_t)ui_svc_setting_get(UI_SET_TX_LEVEL_P25);
+	p25VoiceSetTxTarget(tx_level_choice_rms(dagc_tx(DAGC_TX_P25, manual, p25, db)));
+#endif
+	(void)manual;
+	(void)db;
+}
+
 // The UI's settings that live in radio_settings_t. The radio core saves them (settings store) and restores them at
 // start-up, so ui_svc_setting_get reads them back from it (ui_svc_storage.c) and a value it already has is not sent
 // again. Only the field the setting names changes (rs_copy)
@@ -528,12 +590,14 @@ void ui_svc_apply(uint8_t id, int32_t value)
 	case UI_SET_MIC_GAIN:		// the board's gain (FM and DMR) or DMR's sample scaling (radio/mic_gain.h)
 		apply_mic_gain(value, ui_svc_setting_get(UI_SET_MIC_AGC) != 0);
 		return;
-#if CONFIG_TX_MIC_LIMITER
-	case UI_SET_TX_LEVEL_DMR:	// the leveling target of a profile (ambeVoice.h); 0 = the manual gain
+	case UI_SET_AGC_TX_AUTO:	// the leveling targets of the profiles (ambeVoice.h, p25Voice.h); 0 = the manual gain
+	case UI_SET_TX_LEVEL_DMR:
 	case UI_SET_TX_LEVEL_YSF:
-		ambeVoiceSetTxTarget(id == UI_SET_TX_LEVEL_DMR ? AMBE_TX_DMR : AMBE_TX_YSF,
-				     tx_level_choice_rms((uint8_t)(value < 0 ? 0 : value)));
+	case UI_SET_TX_LEVEL_NXDN:
+	case UI_SET_TX_LEVEL_P25:
+		agc_apply_tx();
 		return;
+#if CONFIG_TX_MIC_LIMITER
 	case UI_SET_MIC_INPUT:		// the board's analog input gain (hal_radio_t.mic_input), in the radio task
 		if (board.radio->mic_input != NULL)
 			radio_req_mic_input((int8_t)value);

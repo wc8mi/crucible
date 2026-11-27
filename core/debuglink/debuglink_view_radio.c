@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The radio features for the debug link (docs/spec/debuglink.md 3.7, 3.8): the "features" view section (scan, FM
 // extras, battery, beeps, settings) and the RADIO operations that drive them (scan, beep, tone burst, one setting,
 // roaming)
@@ -12,6 +13,7 @@
 #include "debuglink/debuglink.h"
 #include "debuglink/debuglink_proto.h"
 #include "radio/beep.h"
+#include "radio/spk_aux.h"
 #include "radio/vibe.h"
 #include "radio/mic_gain.h"
 #include "radio/ref_trim.h"
@@ -24,6 +26,7 @@
 #include "hal_time.h"
 #include "hal_dtmf.h"
 #include "settings/settings.h"
+#include "radio/digital_agc.h"
 #include "dmr/sfr.h"
 #include "input/input.h"
 #if CONFIG_KEY_ASSIGN
@@ -36,16 +39,12 @@
 #include "dmr/zone_share_api.h"
 #endif
 #endif
+#if CONFIG_P25 && CONFIG_IMBE
+#include "p25/p25Voice.h"
+#endif
 #if CONFIG_GPS
 #include "position/position.h"
 #endif
-
-#define DL_SETTING_MIC_GAIN	29u	// SETTING id of the mic gain step (radio/mic_gain.h)
-#define DL_SETTING_ENC_OPTIONS	31u	// SETTING id of the vocoder's encode options (VOCODER_OPT_*)
-#define DL_SETTING_ZS_OFFERS	32u	// SETTING id of zone share offers (zone_share_api.h)
-#define DL_SETTING_REF_TRIM	35u	// SETTING id of the reference trim, ppb two's complement (radio/ref_trim.h)
-#define DL_SETTING_TONES_OFF	36u	// SETTING id of the Settings > Sound tones (radio_settings_t.tones_off)
-#define DL_SETTING_GPS		37u	// SETTING id of Settings > Location > GPS (settings_t.gps, board_t.gps)
 
 static const char *word(uint8_t v, const char *const *names, uint8_t n)
 {
@@ -70,11 +69,25 @@ void debuglink_view_audio(dl_text_t *t)
 #else
 	dl_text(t, "agc.built=0\n");
 #endif
+	// Digital AGC (radio/digital_agc.h): the switches (1 On: the radio's defaults) and the RX choice each mode uses
+	uint8_t manual = SETTINGS_FIELD(agc_manual);
+	dl_text(t, "agc.rx_auto=%u\nagc.tx_auto=%u\n", (manual & SETTINGS_AGC_RX_MANUAL) == 0,
+		(manual & SETTINGS_AGC_TX_MANUAL) == 0);
+#if CONFIG_RX_AGC
+	for (unsigned mode = 0; mode < RX_AGC_MODES; mode++) {
+		uint8_t stored = (uint8_t)settings_read_field(settings_rx_agc_offset(mode), 1);
+		dl_text(t, "agc.%u.choice=%u\n", mode,
+			dagc_rx((manual & SETTINGS_AGC_RX_MANUAL) != 0, stored, board.rx_agc_default_db));
+	}
+#endif
+#if CONFIG_P25 && CONFIG_IMBE
+	dl_text(t, "voice.tx_target_p25=%u\n", p25VoiceTxTarget());
+#endif
 #if CONFIG_BEEP
 	beep_stats_t b;
 	beep_get_stats(&b);
-	dl_text(t, "beep.shared=%u\nbeep.leads=%u\nbeep.warm=%u\nbeep.warms=%u\n", (unsigned)b.shared, (unsigned)b.leads,
-		beep_warm_on(), (unsigned)b.warms);
+	dl_text(t, "beep.shared=%u\nbeep.leads=%u\nbeep.warm=%u\nbeep.warms=%u\nbeep.last=%u\n", (unsigned)b.shared,
+		(unsigned)b.leads, beep_warm_on(), (unsigned)b.warms, (unsigned)b.last);
 	radio_settings_t rs;	// the features section is full: the Sound tones' switches go here
 	radio_get_settings(&rs);
 	dl_text(t, "beep.tones_off=%u\n", rs.tones_off);
@@ -89,6 +102,11 @@ void debuglink_view_audio(dl_text_t *t)
 			dl_text(t, "audio.fifo_chunks=%u\naudio.fifo_gaps=%u\naudio.fifo_full=%u\naudio.fifo_fm=%u\n",
 				(unsigned)s.fifo_chunks, (unsigned)s.fifo_gaps, (unsigned)s.fifo_full, s.fifo_fm ? 1u : 0u);
 		}
+	}
+	const hal_spk_aux_t *aux = spk_aux_of(a);
+	if (aux != NULL) {	// the speaker's second output (radio-features.md 4.4)
+		dl_text(t, "audio.spk_aux=1\naudio.spk_aux_on=%u\naudio.spk_aux_sounds=%u\n", aux->core->pending() ? 1u : 0u,
+			(unsigned)aux->core->sounds());
 	}
 	// Settings > Display > Brightness as stored (the UI saves each change), the backlight's level while lit: a board
 	// may drive the backlight differently while transmitting or receiving a signal. Here, as the features section is
@@ -217,6 +235,11 @@ void debuglink_view_radio(const radio_view_t *v, dl_text_t *t)
 	static const char *const vsrc[] = { "none", "knob", "soft", "override", "hold" };
 	dl_text(t, "volume.soft=%u\nvolume.sent=%d\nvolume.src=%s\nvolume.max=%u\nvolume.step=%u\nvolume.override=%d\n",
 		radio_volume_soft(), v->volume, word(v->volume_src, vsrc, 5), RADIO_VOLUME_MAX, v->volume_step, v->volume_override);
+	// Sent only for a radio that can't set its volume: elsewhere volume.sent already shows the level, and this reply has
+	// little room left
+	if (v->volume_src == RVOL_NONE && v->volume_knob >= 0) {
+		dl_text(t, "volume.knob=%d\n", v->volume_knob);
+	}
 #if CONFIG_BEEP
 	beep_stats_t b;
 	beep_get_stats(&b);
@@ -466,7 +489,8 @@ uint8_t debuglink_radio_feature_op(uint8_t op, const uint8_t *a, uint16_t len)
 #endif
 	}
 	case DL_OP_NXDN: {
-		// The NXDN settings (radio_nxdn_settings_t, RAM only; docs/spec/debuglink.md 3.8): u8 flags (bit 0: 9600
+		// The NXDN settings (radio_nxdn_settings_t, RAM only: a restart seeds them again from the stored radio
+		// default, nxdn.default.*; docs/spec/debuglink.md 3.8): u8 flags (bit 0: 9600
 		// bit/s, else 4800; bit 1: PTT calls a unit; bit 2: emergency), u8 rx_ran (0 any), u8 tx_ran, u16 rx_gid (0: the
 		// RAN squelch), u16 unit_id (1..65519), u16 tx_dst, little-endian. The engine takes them when not transmitting;
 		// a new rate starts it over

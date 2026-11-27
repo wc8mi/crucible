@@ -25,6 +25,7 @@
 #endif
 #if CONFIG_NXDN
 #include "nxdn/nxdn_codeplug.h"
+#include "codeplug/codeplug_modes.h"
 #endif
 #if CONFIG_YSF
 #include "ysf/ysf_codeplug.h"
@@ -55,7 +56,7 @@ extern radio_view_t ui_svc_view;
 #define UI_FEAT_VOLUME		(1u << 17)	// the volume is the radio's to set: no knob (radio_volume_soft), VOL key + Settings
 #define UI_FEAT_BCAST		(1u << 18)	// a broadcast FM receiver (radio_bcast_capable): its VFO step setting
 #define UI_FEAT_ZONE_SHARE	(1u << 19)	// ui_svc_zone_* (zone sharing over DMR data, CONFIG_ZONE_SHARE)
-#define UI_FEAT_VOLUME_KNOB	(1u << 21)	// the MCU reads a volume knob (radio_volume_knob): Settings > Key lock > Knob when locked
+#define UI_FEAT_VOLUME_KNOB	(1u << 21)	// the level follows a knob (radio_volume_follows_knob): Settings > Key lock > Knob when locked
 #define UI_FEAT_REF_TRIM	(1u << 20)	// a reference trim (hal_radio_t.ref_trim, radio/ref_trim.h): Freq trim setting
 #define UI_FEAT_P25		(1u << 22)	// P25 on this board (CONFIG_P25, radio_p25_fits): the VFO's mode tile offers it
 #define UI_FEAT_NXDN		(1u << 23)	// NXDN on this board (CONFIG_NXDN, radio_nxdn_fits): the same
@@ -78,6 +79,33 @@ typedef enum {
 	UI_TALK_DEFAULT,	// back to the channel's default (clears a temporary target)
 } ui_talk_life_t;
 bool ui_svc_talk_to(uint32_t id, bool private_call, uint8_t life);
+#if CONFIG_NXDN
+// In NXDN the talk target is the radio's NXDN settings' (docs/crucible/adr/004-nxdn-radio-default.md). They are in
+// force in the VFO and on a channel whose mode was changed to NXDN for now; a stored NXDN channel runs on its own
+// record, which the talk target doesn't change
+static inline bool ui_nxdn_on_settings(const radio_view_t *v)
+{
+	return v->ch.mode == RADIO_MODE_NXDN && (v->vfo || v->ch.kind != CODEPLUG_KIND_NXDN);
+}
+static inline bool ui_nxdn_stored_channel(const radio_view_t *v)
+{
+	return v->ch.mode == RADIO_MODE_NXDN && !ui_nxdn_on_settings(v);
+}
+// A talk target's ID as NXDN calls it: DMR's all call is all groups or units (0xFFFF); 0 and the IDs past 65519 have
+// no NXDN call (false)
+#define UI_NXDN_ID_ALL	0xFFFFu
+static inline bool ui_nxdn_talk_id(uint32_t id, uint16_t *out)
+{
+	if (id == 0xFFFFFFu) {
+		*out = UI_NXDN_ID_ALL;
+		return true;
+	}
+	if (id == 0 || id > RADIO_NXDN_UNIT_MAX)
+		return false;
+	*out = (uint16_t)id;
+	return true;
+}
+#endif
 // The target focused in a list now (0 = none): a PTT press while it is focused transmits to it once (one-shot) and
 // keeps it for the reply window. The radio reads this at PTT down; the UI calls it on every focus change
 void ui_svc_focus_target(uint32_t id, bool private_call);
@@ -211,7 +239,7 @@ bool ui_svc_t3_cli(uint32_t gw, char *out, size_t len);
 #endif
 
 // --- Beeps (radio-features): the radio sounds key beeps only when its key_beep setting is on ---
-typedef enum { UI_BEEP_KEY, UI_BEEP_ERROR, UI_BEEP_MESSAGE, UI_BEEP_BATTERY_LOW } ui_beep_t;
+typedef enum { UI_BEEP_KEY, UI_BEEP_ERROR, UI_BEEP_MESSAGE, UI_BEEP_BATTERY_LOW, UI_BEEP_CALL_ALERT } ui_beep_t;
 void ui_svc_beep(uint8_t beep);
 // --- Vibration (radio-features 4.1): a pattern on the board's motor; the UI asks only when Settings > Sound >
 // Vibrate is on. Weak no-op without CONFIG_VIBRATE ---
@@ -501,9 +529,16 @@ typedef enum {
 	UI_SET_P25_ID_LOOKUP,	// optional P25 names from private contacts and the DMR ID database
 	UI_SET_MASTER_POWER,	// -1 factory default, else a board power level for default channels
 	UI_SET_RSSI_VHF, UI_SET_RSSI_UHF,
-	// Transmit audio (CONFIG_TX_MIC_LIMITER; Settings > Talk & listen): the DMR/NXDN and YSF leveling targets, a
+	// Transmit audio (CONFIG_TX_MIC_LIMITER; Settings > Talk & listen): the DMR and YSF leveling targets, a
 	// tx_level_choice each (0 Off), and the board's mic input gain for digital voice (hal_radio_t.mic_input steps)
 	UI_SET_TX_LEVEL_DMR, UI_SET_TX_LEVEL_YSF, UI_SET_MIC_INPUT,
+	// Digital AGC (radio/digital_agc.h): the two switches (1 On: the radio's defaults), then the P25
+	// (CONFIG_P25_TX_AGC) and NXDN leveling targets, a tx_level_choice each. Appended: the ids before keep their numbers
+	UI_SET_AGC_RX_AUTO, UI_SET_AGC_TX_AUTO, UI_SET_TX_LEVEL_P25, UI_SET_TX_LEVEL_NXDN,
+	// The NXDN radio default (CONFIG_NXDN; docs/crucible/adr/004-nxdn-radio-default.md): what the VFO and a channel in
+	// NXDN for now run on. The rate (1: 9600 bit/s, 0: 4800), the RX RAN (0: any) and TX RAN (0 to 63), the talk group
+	// (1 to 65519, or 0xFFFF: all). A change is stored and goes to the radio at once. Appended like the ones above
+	UI_SET_NXDN_RATE, UI_SET_NXDN_RX_RAN, UI_SET_NXDN_TX_RAN, UI_SET_NXDN_TG,
 	UI_SET_COUNT
 } ui_setting_t;
 
@@ -517,6 +552,15 @@ enum {
 };
 int32_t ui_svc_setting_get(uint8_t id);
 bool ui_svc_setting_set(uint8_t id, int32_t value);
+#if CONFIG_NXDN
+// NXDN on the radio's settings calls something other than the stored talk group (a unit, or another group): a
+// temporary talk target, which Back on Home undoes (UI_TALK_DEFAULT)
+static inline bool ui_nxdn_talk_temporary(const radio_view_t *v)
+{
+	return ui_nxdn_on_settings(v) && ((v->nxdn.flags & RADIO_NXDN_TALK_UNIT) != 0 ||
+					  v->nxdn.talk != (uint16_t)ui_svc_setting_get(UI_SET_NXDN_TG));
+}
+#endif
 // The RAM table behind the stub (defaults until set): for the settings no package stores
 int32_t ui_svc_ram_get(uint8_t id);
 bool ui_svc_ram_set(uint8_t id, int32_t value);

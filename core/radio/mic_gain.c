@@ -48,9 +48,6 @@ void radio_set_mic_gain_with_agc(uint8_t step, bool agc)
 {
 	bool ambe_agc = CONFIG_DMR && agc && board.vocoder != NULL && board.vocoder->options != NULL &&
 		(board.vocoder->options() & VOCODER_OPT_AGC) != 0;
-#if CONFIG_P25 && CONFIG_IMBE
-	p25VoiceSetAgc(agc);
-#endif
 	apply_steps(step, ambe_agc);
 }
 

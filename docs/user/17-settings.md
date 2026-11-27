@@ -71,13 +71,17 @@ Some settings are on the menu before the feature behind them exists, or don't ap
 | TX timeout | Off, 30 s, 1, 2, 3, 5, 10 min | 3 min | Longest transmission, for channels without their own timeout in the codeplug | Works |
 | Default TX power | Factory default, each supported level | Factory default | Power inherited by channels set to Radio's. Explicit channel levels and the VFO keep their own power. A change reloads the current channel, clearing temporary changes. Requires `CONFIG_TX_POWER_MENU` | Host tested; hardware checks pending |
 | Default squelch | 0 to 9 | 5 | The FM squelch level when a channel doesn't set one | Works |
-| VFO step | Auto, 2.5, 5, 6.25, 8.33, 10, 12.5, 20, 25, 50, 100 kHz | Auto | The step of Up, Down and the knob in the VFO. Auto is 25 kHz at width 25K and in AM, else 12.5 kHz. Only on radios with a VFO | Works |
+| VFO step | Auto, 2.5, 5, 6.25, 8.33, 10, 12.5, 20, 25, 50, 100 kHz | Auto | The step of Up, Down and the knob in the VFO. Auto is 25 kHz at width 25K and in AM, else 12.5 kHz. 8.33 kHz, the air band spacing, is listed only on radios with air band receive. Only on radios with a VFO | Works |
 | FM broadcast step | 200 kHz, 100 kHz | 200 kHz | The VFO step in the broadcast band. 200 kHz lands on the odd tenths (88.1, 88.3), the stations in the Americas. You can still type any frequency. Only on radios with a broadcast receiver ([Air band and FM broadcast](07-channels-zones-vfo.md#air-band-and-fm-broadcast)) | Works |
-| Mic gain | 0 to 10 | 5 | Microphone level, 2 dB a step. 5 is the radio's normal level. Sets DMR and P25, and FM on the radios that set the level in their microphone path ([Radio reference](23-radios.md)). Digital peak protection holds back loud peaks before encoding when built in. A change counts from the next transmission. The row shows "AGC" and is dimmed when AGC applies to the selected mode. P25 uses the saved step when its AGC is off or compiled out | Works (DMR); FM not checked on air |
-| Mic AGC | On, Off | Off | Automatically adjusts microphone level for digital voice. P25 builds with `CONFIG_P25_TX_AGC` target -20 dBFS RMS before encoding. DMR uses the codec's own AGC and retains the board's fixed AMBE calibration, unless a DMR or YSF TX level is set: then the TX level levels instead. When AGC applies, it takes over from the manual step. Software cannot repair audio already clipped by the microphone input | P25 host tested; on-device checks pending |
-| DMR TX level | Off, -30 to -12 dBFS | Off | The level the radio holds your voice at before the DMR (and NXDN) encoder, 2 dB a step. Off uses Mic gain and Mic AGC as above. A level replaces the codec's AGC. To choose one, see [Setting a TX level](#setting-a-tx-level). Requires `CONFIG_TX_MIC_LIMITER` | Host tested; on-air checks pending |
-| YSF TX level | Off, -30 to -12 dBFS | Off | The same for YSF transmissions. Only in builds with YSF | Host tested; on-air checks pending |
+| Mic gain | 0 to 10 | 5 | Microphone level, 2 dB a step. 5 is the radio's normal level. Sets DMR and P25, and FM on the radios that set the level in their microphone path ([Radio reference](23-radios.md)). Digital peak protection holds back loud peaks before encoding when built in. A change counts from the next transmission. The row shows "AGC" and is dimmed when AGC applies to the selected mode: Mic AGC, or in P25 the P25 TX level. P25 uses the saved step when its TX level is Off or compiled out | Works (DMR); FM not checked on air |
+| Mic AGC | On, Off | Off | The codec's own microphone AGC for DMR, on radios whose codec has one (dimmed elsewhere). It keeps the board's fixed AMBE calibration, unless a DMR or YSF TX level is in force: then the TX level levels instead. When AGC applies, it takes over from the manual step. Software cannot repair audio already clipped by the microphone input. P25 has its own leveling: the P25 TX level | Host tested; on-device checks pending |
+| Digital AGC TX | On, Off | On | On: the radio's own TX levels for every digital mode, -20 dBFS for P25 ([which levels](../feature-matrix.md)). The TX level rows below are dimmed and show the level in use. Off: each row's value applies. Your values are kept while it is On | Host tested; on-air checks pending |
+| DMR TX level | Off, -30 to -12 dBFS | Off | With Digital AGC TX Off: the level the radio holds your voice at before the DMR encoder, 2 dB a step. Off uses Mic gain and Mic AGC as above. A level replaces the codec's AGC. To choose one, see [Setting a TX level](#setting-a-tx-level). Requires `CONFIG_TX_MIC_LIMITER` | Host tested; on-air checks pending |
+| P25 TX level | Off, -30 to -12 dBFS | -20 dBFS | The same for P25. Off uses Mic gain. Only in builds with `CONFIG_P25_TX_AGC` | Host tested; on-air checks pending |
+| NXDN TX level | Off, -30 to -12 dBFS | the DMR TX level's | The same for NXDN. Only in builds with NXDN | Host tested; on-air checks pending |
+| YSF TX level | Off, -30 to -12 dBFS | Off | The same for YSF. Only in builds with YSF | Host tested; on-air checks pending |
 | Mic input | -7 to +8 | 0 | The microphone's analog level into the radio's digital audio, before any of the above. Lower it if your voice sounds harsh or distorted at every TX level: a TX level can't repair a clipped input. Applies at once. Dimmed on radios without it ([which radios](../feature-matrix.md)) | Host tested; on-air checks pending |
+| NXDN | | | Opens the [NXDN radio default](#nxdn-radio-default). On radios with NXDN | Host tested |
 | Mic noise reduction | On, Off | On | Reduces steady background noise (fans, engines, wind) in what you send on DMR, also between words. Turn it off if a steady sound you want heard is cut. Dimmed on radios whose voice codec can't do it | Needs an on-air check (DMR) |
 | Monitor by default | On, Off | Off | Digital monitor (DMR: every talkgroup, promiscuous; Tier III: every talkgroup's call on the system) goes on each time you select a DMR channel, and a scan started from it keeps it on at every channel. **Back** on Home turns it off until the next channel | Works |
 | Show talker alias | On, Off | On | Show received talker aliases (names) under the caller's ID | Works |
@@ -179,7 +183,7 @@ When the keys lock by themselves and what still works while they are locked ([Ke
 |---|---|---|---|---|
 | Auto lock | Off, 30 s, 1 min, 5 min | Off | Locks the keys after this time without a key press | Works |
 | PTT when locked | On, Off | On | Whether **PTT** works while the keys are locked. Off: **PTT** does nothing until you unlock | Works |
-| Knob when locked | On, Off | On | On radios whose firmware reads the volume knob only (the row is not shown on the others; see the [feature matrix](../feature-matrix.md)). Whether the volume knob works while the keys are locked. Off: turning it does nothing and shows the unlock hint, and when you unlock, the volume goes straight to where the knob is | Works |
+| Knob when locked | On, Off | On | On radios whose volume follows a knob the firmware reads only (the row is not shown on the others; see the [feature matrix](../feature-matrix.md)). Whether the volume knob works while the keys are locked. Off: turning it does nothing and shows the unlock hint, and when you unlock, the volume goes straight to where the knob is | Works |
 
 ### My radio (key 0)
 
@@ -208,15 +212,30 @@ When the keys lock by themselves and what still works while they are locked ([Ke
 
 <img src="../ux/screens/160x120i5/settings_advanced.png" width="200" alt="Settings, Advanced">
 
+#### NXDN radio default
+
+**Settings > Talk & listen > NXDN.** What the VFO and a channel in NXDN for now use. A saved NXDN channel keeps its
+own. The radio keeps these when switched off; a change applies at once.
+
+| Setting | Values | Default | What it does |
+|---|---|---|---|
+| Rate | 4800 bit/s, 9600 bit/s | 4800 bit/s | Also quick settings tile 8 in NXDN |
+| RX RAN | Any, 1 to 63 | Any | The radio access number heard. Any receives every RAN |
+| TX RAN | 0 to 63 | 1 | The RAN sent |
+| Talkgroup | 1 to 65519, All | 1 | The group **PTT** calls. **Up** past 65519 is All. Talk to a group (hold **OK**) sets it too |
+
+A new NXDN channel made on the radio starts with this rate and these RANs.
+
 #### Setting a TX level
 
-You need two radios. Do this once on a DMR channel and once on a YSF channel.
+You need two radios. Do this once on a DMR channel and once on a YSF channel. Turn **Digital AGC TX** Off on the
+transmitting radio and **Digital AGC RX** Off on the receiving one first.
 
 1. On the receiving radio, turn on **Settings > Display > RX audio levels** and that mode's **RX AGC**
    ([Digital receive audio levels](#digital-receive-audio-levels)). The row reads `AGC in > out dBFS`.
 2. Transmit from the other radio, speaking normally at your usual distance, for a few seconds.
 3. Read **in** on the receiving radio: the level it decoded. **out** is after its own AGC, so ignore it.
-4. Step the transmitting radio's **DMR TX level** or **YSF TX level** and repeat until **in** reads the level you
+4. Step the transmitting radio's **DMR TX level** or **YSF TX level** (or **P25** or **NXDN**) and repeat until **in** reads the level you
    want.
 5. Swap the radios and set the other one the same way.
 
@@ -348,9 +367,10 @@ values.
 
 ## Digital receive audio levels
 
-**Settings > Talk & listen** has separate **DMR RX AGC**, **P25 RX AGC**, **NXDN RX AGC** and **YSF RX AGC** targets
-for the modes included in the build. Off is the default. Try **-25 dBFS** to bring quiet and loud callers
-toward the same average level. Volume still controls the speaker. FM is unchanged.
+**Settings > Talk & listen** has **Digital AGC RX**, On by default: every digital mode uses the radio's own receive
+target ([which targets](../feature-matrix.md)), and the rows below it are dimmed and show it. Turn it Off to set
+separate **DMR RX AGC**, **P25 RX AGC**, **NXDN RX AGC** and **YSF RX AGC** targets for the modes included in the
+build (Off by default). Try **-25 dBFS** to bring quiet and loud callers toward the same average level. Volume still controls the speaker. FM is unchanged.
 
 The controller adjusts quickly over the first 300 ms of active audio, then tracks a speech-energy average over
 about 1.5 seconds. Gain increases gently, about 1 dB per second, but decreases quickly when a voice is too loud.

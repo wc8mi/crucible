@@ -264,7 +264,7 @@ export function columns(table, m, t, { features = null, power = null } = {}) {
 					return;
 				}
 				return freq(t)(r, k, v);
-			}, { format: (v) => (v ? mhz(v) : t("editor.aprs.channel_freq")), numeric: true }),
+			}, { format: (v) => (v ? mhz(v) : t("editor.aprs.radio_freq")), numeric: true }),
 		];
 	}
 	return [];

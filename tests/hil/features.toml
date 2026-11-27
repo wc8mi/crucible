@@ -97,6 +97,12 @@ switch = "TX_MIC_LIMITER"
 spec = "docs/spec/radio-features.md"
 source = ["core/dsp/tx_level.h", "core/dmr/ambe/ambeVoice.c", "core/p25/p25Voice.c"]
 
+[feature.digital_agc]
+requires = "TX_MIC_LIMITER"
+spec = "docs/crucible/adr/003-digital-agc.md"
+source = ["core/radio/digital_agc.h", "core/ui/ui_svc_radio.c", "core/ui/ui_svc_storage.c", "core/settings/settings.c"]
+manual = "With both switches On, receive and transmit DMR, NXDN, YSF and P25 and check each level sounds right on this radio."
+
 [feature.tx_dc_block]
 switch = "TX_DC_BLOCK"
 spec = "docs/spec/p25.md"
@@ -122,6 +128,13 @@ switch = "NXDN"
 spec = "docs/spec/nxdn.md"
 source = ["core/nxdn", "core/air", "core/fec", "core/radio/radio_nxdn.c", "core/radio/radio_nxdn.h",
           "core/radio/radio_air.h", "core/debuglink/debuglink_view_nxdn.c"]
+
+[feature.nxdn_default]
+requires = "NXDN"
+spec = "docs/crucible/adr/004-nxdn-radio-default.md"
+source = ["core/settings/settings.c", "core/radio/radio_nxdn.c", "core/ui/ui_svc_storage.c", "core/ui/ui_svc_radio.c",
+          "core/ui/ui_menus.c", "core/debuglink/debuglink_view_nxdn.c"]
+manual = "Set the NXDN radio default in Settings, restart the radio and check the VFO starts on it; Talk to in the NXDN VFO and Back."
 
 [feature.nxdn_scrambler]
 switch = "NXDN_SCRAMBLER"

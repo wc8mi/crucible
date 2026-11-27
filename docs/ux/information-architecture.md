@@ -149,6 +149,9 @@ Contacts, Recent and Messages are the "people" side, Zones, Channels and Tools t
 - Each tile shows its current value. The voice prompt reads "Power, high" etc.
 - `BACK` or `QUICK` again closes and returns to where the user was.
 
+In NXDN tile 8 is the rate (4800 / 9600 bit/s): OK flips the NXDN radio default's rate, which is stored. A stored
+NXDN channel keeps its own rate: the tile is dimmed ([nxdn.md](../spec/nxdn.md) 6.2).
+
 DMR channel with no codec installed (any DMR tile, and the VFO's Mode tile switching to DMR): the DMR tiles show "DMR needs the codec (see docs)" instead of failing silently.
 
 ---
@@ -159,7 +162,7 @@ Settings has a search field on top (T9). Groups, in this order:
 
 | Group | Contents |
 |---|---|
-| **Sound** | Key tones, tone volume, talk permit tone, voice prompts (on/off, speed, verbosity), message tone, call alert tone, vibrate (radios with a motor) |
+| **Sound** | Key tones, tone volume, talk permit tone, voice prompts (on/off, speed, verbosity), message tone, vibrate (radios with a motor) |
 | **Display** | Brightness, backlight timeout, theme (light/dark/high contrast/night), highlight color, filled status bar, large text, orientation (240x320 boards), hint row, Home secondary fields |
 | **Talk & listen** | Reply window, TX timeout, default squelch, VOX sensitivity and delay, mic gain, mic AGC, mic noise reduction, hear all default, talker alias show/send, name source (contacts, ID database, alias) |
 | **Privacy** | Basic Privacy keys (per channel and per contact), lock behavior (auto-lock, what stays active when locked: PTT, side keys), PIN for settings |

@@ -5,7 +5,7 @@
 # Contributing
 
 **Contribute to [RadioFoundry](https://github.com/radiofoundry/radiofoundry), not here.** Crucible is a downstream,
-opinionated build of RadioFoundry for four radios. A fix or feature that helps any radio belongs upstream: everyone
+opinionated build of RadioFoundry for five radios. A fix or feature that helps any radio belongs upstream: everyone
 gets it, it carries your name, and Crucible picks it up at the next merge. Start with RadioFoundry's
 [contributing guide](https://github.com/radiofoundry/radiofoundry/blob/main/docs/dev/contributing.md).
 

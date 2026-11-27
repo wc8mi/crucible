@@ -12,6 +12,7 @@
 #include "settings/settings.h"
 #include "config.h"
 #include "audio/rx_agc.h"
+#include "radio/digital_agc.h"
 #include "hal_dtmf.h"
 #include "codeplug/codeplug_modes.h"	// channel kinds (docs/spec/channel-modes.md): parked channels, in every build
 #include "codeplug/codeplug_tag.h"	// CODEPLUG_SYSTEM_NONE
@@ -36,6 +37,7 @@
 #include "radio/radio_aes.h"
 #endif
 #include "radio/beep.h"	// beep_t (beep_play only with CONFIG_BEEP)
+#include "radio/spk_aux.h"
 #include "radio/sigtone.h"
 #include "radio/vibe.h"	// vibe_t (vibe_play only with CONFIG_VIBRATE)
 #include "radio/tx_limit.h"	// the test TX limit (radio-features.md 3.1)
@@ -254,15 +256,22 @@ static uint8_t beep_level_now(const radio_sm_t *sm)
 {
 	uint8_t level = sm->set.beep_level;
 	const hal_radio_t *r = board.radio;
-	if (r == NULL || r->volume == NULL) {
+	if (r == NULL) {
 		return level;
 	}
-	if (!r->volume_pcm) {
-		return radio_beep_level(level, sm->volume_sent);
+	int16_t vol = sm->volume_sent;
+	if (r->volume == NULL) {
+		// An analog knob the MCU only reads: the knob scales the beep like the voice after it
+		if (r->volume_db10 == NULL) {
+			return level;
+		}
+		vol = sm->view.volume_knob;
+	} else if (!r->volume_pcm) {
+		return radio_beep_level(level, vol);
 	}
-	if (r->volume_db10 != NULL && sm->volume_sent > 0) {
+	if (r->volume_db10 != NULL && vol > 0) {
 		// The volume scales the beep in the speaker path: above the cap step, softer by the gain added there
-		level = radio_beep_pcm_level(level, r->volume_db10((uint8_t)sm->volume_sent),
+		level = radio_beep_pcm_level(level, r->volume_db10((uint8_t)vol),
 					     r->volume_db10(radio_volume_percent(RADIO_BEEP_VOLUME_STEP)));
 	}
 	return level;
@@ -812,7 +821,9 @@ static void outputs(radio_sm_t *sm)
 	bool bcast = false;
 #if CONFIG_BCAST_FM
 	bcast = sm->view.bcast;
-	bool bcast_play = bcast && !tx && bcast_listening(sm);
+	// A refused PTT silences the station as it closes an FM channel's open squelch (open above), unless a call goes on
+	// playing through it (deny_rx); Monitor still plays it (#1130)
+	bool bcast_play = bcast && !tx && bcast_listening(sm) && (sm->view.state != RS_TX_DENIED || sm->deny_rx);
 	if (sm->bcast_on && sm->bcast_audio_out != (int8_t)((open || bcast_play) && bcast)) {
 		sm->bcast_audio_out = (int8_t)((open || bcast_play) && bcast);
 		board.bcast->audio((open || bcast_play) && bcast);
@@ -1466,10 +1477,11 @@ static uint32_t band_wrap(uint32_t hz, int dir)
 static void vfo_step(radio_sm_t *sm, int dir, uint32_t now_ms)
 {
 	step_update(sm);
-#if CONFIG_AM_RX
-	int64_t hz = radio_am_step(sm->view.ch.rx_hz, dir, sm->view.vfo_step_hz);	// the 8.33 kHz grid kept exact
-#else
 	int64_t hz = (int64_t)sm->view.ch.rx_hz + (int64_t)dir * sm->view.vfo_step_hz;
+#if CONFIG_AM_RX
+	if (sm->view.vfo_step_hz == RADIO_AM_STEP_833) {
+		hz = radio_am_step_833(sm->view.ch.rx_hz, dir);	// the 8.33 kHz grid kept exact
+	}
 #endif
 #if CONFIG_BCAST_FM
 	if (sm->view.bcast) {
@@ -4573,7 +4585,7 @@ static void t3_tick(radio_sm_t *sm, uint32_t now_ms)
 	if (t3m.ring_src == 0) {
 		t3_ring_next = 0;
 	} else if (t3_ring_next == 0 || (int32_t)(now_ms - t3_ring_next) >= 0) {
-		beep(sm, BEEP_MESSAGE);
+		beep(sm, BEEP_CALL_ALERT);	// the ring a call alert plays: one sound for a page
 		t3_ring_next = now_ms + 2000u;
 	}
 	// Our grant came while PTT is held: talk now
@@ -7747,7 +7759,8 @@ static void apply_prefs(radio_sm_t *sm, const settings_t *st)
 {
 #if CONFIG_RX_AGC
 	for (unsigned mode = 0; mode < RX_AGC_MODES; mode++)
-		rx_agc_configure((rx_agc_mode_t)mode, settings_rx_agc(st, mode));
+		rx_agc_configure((rx_agc_mode_t)mode, dagc_rx((st->agc_manual & SETTINGS_AGC_RX_MANUAL) != 0,
+							      settings_rx_agc(st, mode), board.rx_agc_default_db));
 #endif
 	master_power = st->master_power;
 	sm->vol_step = radio_volume_step(st->volume);
@@ -8578,22 +8591,24 @@ static void host_audio_watch(radio_sm_t *sm, uint32_t now_ms)
 
 #endif
 #if CONFIG_BEEP || CONFIG_DMR || CONFIG_P25   // its only users; without them, it would be unused (a warning)
-// The PCM stream the radio's own users (beeps, DMR voice) take: the board's, shared with a host audio session
+// The PCM stream the radio's own users (beeps, DMR voice) take: the board's, its speaker blocks sent to the board's
+// second output while the stream's can't be heard (spk_aux.h), shared with a host audio session
 static const hal_audio_t *pcm_audio(void)
 {
 #if CONFIG_NET_USRP || CONFIG_APRS_RX
-	return audio_mux_wrap(board.audio);
+	return audio_mux_wrap(board.audio);	// the mux runs the second output's step itself
 #else
-	return board.audio;
+	return spk_aux_stream(board.audio);
 #endif
 }
 #endif
 
 #if CONFIG_DMR && CONFIG_BEEP
-// The mic gate of the AMBE voice path (ambeVoiceSetMicGate, DMR and NXDN): a beep's echo, unless a host audio
-// session's samples replace the mic (they never hear the speaker), or a board that holds beeps off the speaker while
-// DMR transmits (CAP_BEEP_NOT_ON_AIR) transmits DMR: its speaker sounds nothing the mic could hear. NXDN has no such
-// hold. Audio task
+// The mic gate of the AMBE voice path (ambeVoiceSetMicGate, DMR and NXDN): a beep's echo, or a sound on the speaker's
+// second output (it plays later than the stream's), unless a host audio session's samples replace the mic (they never
+// hear the speaker), or a board whose audio path drops the speaker audio while DMR is on air
+// (hal_audio_t.speaker_blocked) transmits DMR: its speaker sounds nothing the mic could hear. NXDN has no such hold.
+// Audio task
 static bool dmr_mic_gate(void)
 {
 #if CONFIG_NET_USRP
@@ -8601,7 +8616,7 @@ static bool dmr_mic_gate(void)
 		return false;
 	}
 #endif
-	if ((board.caps & CAP_BEEP_NOT_ON_AIR) != 0) {
+	if (board.audio != NULL && board.audio->speaker_blocked != NULL) {
 #if CONFIG_NXDN
 		if (!radio_nxdn_running()) {
 			return false;
@@ -8610,7 +8625,7 @@ static bool dmr_mic_gate(void)
 		return false;
 #endif
 	}
-	return beep_mic_echo();
+	return beep_mic_echo() || spk_aux_busy(board.audio);
 }
 #endif
 
@@ -8719,7 +8734,9 @@ void radio_sm_init(radio_sm_t *sm, uint32_t now_ms)
 #endif
 #endif
 #if CONFIG_NXDN
-	radio_nxdn_init();
+	// The stored NXDN radio default, here only: a settings reload or a detour's end keeps the RAM settings (a
+	// temporary talk target, the debug link's)
+	radio_nxdn_init((st.nxdn_flags & SETTINGS_NXDN_9600) != 0, st.nxdn_rx_ran, st.nxdn_tx_ran, st.nxdn_tg);
 #endif
 #if CONFIG_YSF
 	radio_ysf_init();
@@ -8989,7 +9006,6 @@ static void vfo_tx_request(radio_sm_t *sm, const radio_req_t *req, bool busy)
 #endif
 }
 
-#if CONFIG_AM_RX
 static void vfo_step_size_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 {
 	if ((req->arg == 0 || (req->arg >= 1000 && req->arg <= 1000000)) && (uint32_t)req->arg != sm->vfo_step_set) {
@@ -9000,7 +9016,6 @@ static void vfo_step_size_request(radio_sm_t *sm, const radio_req_t *req, uint32
 		changed(sm);
 	}
 }
-#endif
 
 static void ptt_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 {
@@ -9709,9 +9724,7 @@ void radio_sm_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 	case RREQ_MIC: mic_request(sm, req); break;
 	case RREQ_VFO_SET: vfo_set_request(sm, req, busy, now_ms); break;
 	case RREQ_VFO_TX: vfo_tx_request(sm, req, busy); break;
-#if CONFIG_AM_RX
 	case RREQ_VFO_STEP_SIZE: vfo_step_size_request(sm, req, now_ms); break;
-#endif
 #if CONFIG_P25_PARROT
 	case RREQ_P25_PARROT: parrot_request(sm, req, now_ms); break;
 #endif
@@ -9840,7 +9853,7 @@ bool radio_volume_soft(void)
 	       board.power->volume != NULL && board.power->volume() < 0;
 }
 
-bool radio_volume_knob(void)
+bool radio_volume_follows_knob(void)
 {
 	return board.radio != NULL && board.radio->volume != NULL && board.power != NULL &&
 	       board.power->volume != NULL && board.power->volume() >= 0;
@@ -9912,15 +9925,14 @@ uint8_t radio_volume_stored(uint8_t step)
 }
 
 // Follow a volume knob the MCU reads (soft volume): pass changes of 2 % or more, and the ends exactly. A radio with
-// no knob (volume() = -1) gets the stored step instead, and a knob radio the debug link's override
-// (radio-features.md 4.2)
+// no knob (volume() = -1) gets the stored step instead, and a knob radio the debug link's override. A radio that can
+// read its knob but can't set the volume only records where the knob is (radio-features.md 4.2)
 static void follow_volume(radio_sm_t *sm)
 {
-	if (board.radio->volume == NULL || board.power == NULL || board.power->volume == NULL) {
+	if (board.power == NULL || board.power->volume == NULL) {
 		return;
 	}
 	int v = board.power->volume();
-	uint8_t src = RVOL_KNOB;
 	if (v >= 0) {
 		// The knob's own position, with the same 2 % filter as the level below, in force or not: the UI shows the
 		// unlock hint when a held knob turns
@@ -9931,6 +9943,10 @@ static void follow_volume(radio_sm_t *sm)
 			changed(sm);
 		}
 	}
+	if (board.radio->volume == NULL) {
+		return;		// the firmware can't set the volume here: nothing more to do
+	}
+	uint8_t src = RVOL_KNOB;
 	if (v < 0) {
 		v = radio_volume_percent(sm->vol_step);
 		src = RVOL_SOFT;

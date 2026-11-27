@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The radio's own settings, kept across power cycles (docs/spec/settings-store.md): where the radio was (zone,
 // channel, VFO), the VFO's settings and the user's preferences. Stored as versioned records appended to a ring of
 // flash sectors (board.flash->map settings area): a record is valid only once its commit word is programmed, so a
@@ -249,7 +250,9 @@ typedef struct {
 	// SETTINGS_T3_KILLED set, no DMR at all until a factory reset
 	uint8_t t3_kill;
 	uint8_t satellite_index;	// reserved10[0]: selected TLE record; older records select the first
-	int8_t mic_input;		// was reserved10[0]: hal mic_input steps, the Mic input setting (0: the board's level)
+	uint8_t aprs_cp_freq;		// APRS: the frequency last taken from the codeplug APRS record or written there
+					// (aprs.md 11), as settings_aprs_freq_mark; 0 = none yet (was reserved10[1]: older
+					// records read none)
 	// Signaling tones (core/radio/sigtone.h), appended at the end so a record written before reads them as 0:
 	// per event (start of a transmission, its end, a reception's end) where it sounds in DMR and in FM (sig_out_t).
 	// 0 = the default output, as an older record reads. The event's chain of steps is only in its codeplug record
@@ -258,7 +261,7 @@ typedef struct {
 	uint8_t sig_dmr[3];
 	uint8_t sig_fm[3];
 	uint8_t caller_flags;		// was reserved11[0]: SETTINGS_CALLER_* (0: numeric P25 caller IDs)
-	uint8_t tx_level_dmr;		// was reserved11[0]: DMR/NXDN TX leveling, a tx_level_choice (0 Off: manual gain)
+	uint8_t tx_level_dmr;		// was reserved11[0]: DMR TX leveling, a tx_level_choice (0 Off: manual gain)
 	// DMR AES: the end of the MI positions reserved for our overs (dmrAesSeq_t, dmr-voice.md 5.1; appended: an older
 	// record reads 0, no position yet). A restart starts here, past every position sent
 	uint32_t aes_mi_res;
@@ -269,7 +272,41 @@ typedef struct {
 	int8_t rssi_correction[2];	// display-only dB offsets: VHF, UHF; older records read 0
 	uint8_t rx_agc_ysf;		// was reserved_rssi[0]: YSF's rx_agc choice (0 Off, as an older record reads)
 	uint8_t tx_level_ysf;		// was reserved_rssi[0]: YSF TX leveling, a tx_level_choice (0 Off)
+	// Digital AGC (Crucible, docs/crucible/adr/003-digital-agc.md; radio/digital_agc.h). A block of its own:
+	// agc_marker is SETTINGS_AGC_MARKER when this firmware wrote the four bytes. A record without it (shorter, or
+	// written by firmware that puts another field here) reads them as 0 at load: both switches On, P25 TX -20,
+	// NXDN TX following DMR. agc_manual: SETTINGS_AGC_*_MANUAL bits, set = the switch is Off. tx_level_p25 and
+	// tx_level_nxdn: a tx_level_choice + 1, 0 = unset (P25: the -20 choice, NXDN: tx_level_dmr's)
+	uint8_t agc_marker;
+	uint8_t agc_manual;
+	uint8_t tx_level_p25;
+	uint8_t tx_level_nxdn;
+	// NXDN radio default (Crucible, docs/crucible/adr/004-nxdn-radio-default.md): what the VFO and a channel in NXDN
+	// for now run on (radio_nxdn_init seeds the radio core with it at start-up). A second block of Crucible's own,
+	// after the Digital AGC one: nxdn_marker is SETTINGS_NXDN_MARKER when this firmware wrote the eight bytes. A
+	// record without it (shorter, or another firmware's field here) reads the defaults at load: 4800 bit/s, RX any
+	// RAN, TX RAN 1, group 1. A RAN past 63 or a group out of range reads its default
+	uint8_t nxdn_marker;
+	uint8_t nxdn_flags;		// SETTINGS_NXDN_9600
+	uint8_t nxdn_rx_ran;		// 0 (every RAN) to 63
+	uint8_t nxdn_tx_ran;		// 0 to 63
+	uint16_t nxdn_tg;		// the group PTT calls: 1 to 65519, or SETTINGS_NXDN_TG_ALL
+	// The Mic input setting: hal mic_input steps (0: the board's level; out of range reads 0). Crucible's own, so it
+	// sits here rather than in a byte upstream may take: a Crucible release kept it at 399, now aprs_cp_freq, and a
+	// record longer than upstream's 412 bytes without this marker has it read from there at load (ADR 004)
+	int8_t mic_input;
+	uint8_t nxdn_reserved[1];	// 0; later Crucible fields
 } settings_t;
+#define SETTINGS_AGC_MARKER	0xA6u
+#define SETTINGS_AGC_RX_MANUAL	0x01u	// Digital AGC RX is Off: each mode's RX AGC row is in force
+#define SETTINGS_AGC_TX_MANUAL	0x02u	// Digital AGC TX is Off: each mode's TX level row is in force
+#define SETTINGS_NXDN_MARKER	0xA8u	// 0xA8 since mic_input moved into the block (ADR 004)
+#define SETTINGS_NXDN_9600	0x01u	// nxdn_flags: 9600 bit/s, else 4800
+#define SETTINGS_NXDN_RAN_MAX	63u
+#define SETTINGS_NXDN_TX_RAN	1u	// the defaults: TX RAN 1, group 1 (RX RAN 0, 4800 bit/s)
+#define SETTINGS_NXDN_TG	1u
+#define SETTINGS_NXDN_TG_MAX	65519u	// a group ID; the IDs above are special (NXDN TS 1-B) ...
+#define SETTINGS_NXDN_TG_ALL	0xFFFFu	// ... but all groups (NXDN_ID_ALL)
 
 // Pages: settings_t is stored as records of SETTINGS_PAGE_BYTES each (settings-store.md 2.1). Only the pages its size
 // needs are written, each with its own length, so settings_t grows by appending fields; the record's page field
@@ -350,6 +387,17 @@ static inline void settings_set_vfo_talk(settings_t *s, uint32_t id, bool privat
 	s->vfo_bw = (uint8_t)((s->vfo_bw & 0x0Fu) | (((id >> 12) & 0x0Fu) << 4));
 	s->vfo_cc = (uint8_t)((s->vfo_cc & 0x0Fu) | (((id >> 16) & 0x0Fu) << 4));
 	s->vfo_ts = (uint8_t)((s->vfo_ts & 0x03u) | (((id >> 20) & 0x0Fu) << 2) | (private_call ? 0x80u : 0));
+}
+
+// settings_t.aprs_cp_freq for a frequency: a hash of its 10 Hz steps, 1-255; 0 for none. Two frequencies with one
+// mark only cost a CPS change to the second one being missed (the radio keeps its own)
+static inline uint8_t settings_aprs_freq_mark(uint32_t hz)
+{
+	if (hz == 0) {
+		return 0;
+	}
+	uint8_t m = (uint8_t)(((hz / 10u) * 2654435761u) >> 24);
+	return m != 0 ? m : 1u;
 }
 
 // settings_t.aprs_cp_path: the codeplug APRS record's path (bits 0-2) and SSID (bits 3-7) last taken, each + 1 so 0
@@ -536,8 +584,14 @@ void settings_read(settings_t *out);
 // fit; 0 for any other size or a range outside the struct. SETTINGS_FIELD(brightness) says it with the field's name and
 // type: a signed field comes back with its sign
 uint32_t settings_read_field(size_t offset, size_t size);
-#define SETTINGS_FIELD(f) ((__typeof__(((settings_t *)0)->f))settings_read_field(offsetof(settings_t, f), \
-							      sizeof(((settings_t *)0)->f)))
+
+// A field of another size (an array, a struct member) fails to compile instead of reading as 0
+#define SETTINGS_FIELD_SIZE_OK(f) (sizeof(((settings_t *)0)->f) == 1 || sizeof(((settings_t *)0)->f) == 2 || \
+				   sizeof(((settings_t *)0)->f) == 4)
+#define SETTINGS_FIELD(f) ((__typeof__(((settings_t *)0)->f))((void)sizeof(char[SETTINGS_FIELD_SIZE_OK(f) ? 1 : -1]), \
+							      settings_read_field(offsetof(settings_t, f), \
+										  sizeof(((settings_t *)0)->f))))
+
 // A 32-bit field equals value both in force and in the last saved record, checked under one lock.
 bool settings_u32_is_saved(size_t offset, uint32_t value);
 // A legacy or malformed reservation awaits owner recovery before AES transmission can resume.

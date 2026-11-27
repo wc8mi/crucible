@@ -123,6 +123,16 @@ msgid "All call"
 msgstr "Llamada a todos"
 
 #: core/ui/ui_app.c
+msgctxt "TALK_TOAST_NXDN_SET_IN_CHANNEL"
+msgid "NXDN: set in the channel"
+msgstr "NXDN: se ajusta en el canal"
+
+#: core/ui/ui_app.c core/ui/ui_menus.c
+msgctxt "CHAN_TOAST_NXDN_ID_MAX"
+msgid "NXDN IDs go up to 65519"
+msgstr "ID NXDN máximo es 65519"
+
+#: core/ui/ui_app.c
 msgctxt "TALK_TOAST_FOR_NOW_ONLY"
 msgid "For now only: save it in qdmr"
 msgstr "Por ahora: guárdalo en qdmr"
@@ -518,6 +528,11 @@ msgid "VOX: not on this radio yet"
 msgstr "VOX: aún no en esta radio"
 
 #: core/ui/ui_app.c
+msgctxt "QUICK_WHY_NXDN_RATE_NOT_ON_RADIO"
+msgid "This rate: not on this radio"
+msgstr "Velocidad: no en esta radio"
+
+#: core/ui/ui_app.c
 msgctxt "QUICK_TOAST_BANDWIDTH_25_KHZ"
 msgid "Bandwidth 25 kHz"
 msgstr "Ancho de banda 25 kHz"
@@ -571,6 +586,16 @@ msgstr "Timeslot 1 por ahora"
 msgctxt "QUICK_TOAST_TIMESLOT_2_FOR_NOW"
 msgid "Timeslot 2 for now"
 msgstr "Timeslot 2 por ahora"
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_NXDN_9600"
+msgid "NXDN 9600 bit/s"
+msgstr "NXDN 9600 bit/s"
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_NXDN_4800"
+msgid "NXDN 4800 bit/s"
+msgstr "NXDN 4800 bit/s"
 
 #: core/ui/ui_app.c
 msgctxt "QUICK_TOAST_PRIVACY_ON_FOR_NOW"
@@ -923,6 +948,16 @@ msgid "  Sent "
 msgstr "  Env. "
 
 #: core/ui/ui_aprs.c
+msgctxt "APRS_HINT_TYPING"
+msgid "0-9 type  OK set  Back"
+msgstr "0-9 teclear  OK fijar  Atrás"
+
+#: core/ui/ui_aprs.c
+msgctxt "HINT_0_9_PICK_BACK"
+msgid "0-9 pick  Back"
+msgstr "0-9 elegir  Atrás"
+
+#: core/ui/ui_aprs.c
 msgctxt "APRS_ROW_SEND_NOW"
 msgid "Send position now"
 msgstr "Enviar posición ya"
@@ -1021,11 +1056,6 @@ msgstr "Balizas off"
 msgctxt "APRS_WHY_CANT_RECEIVE"
 msgid "This radio can't receive APRS"
 msgstr "Esta radio no recibe APRS"
-
-#: core/ui/ui_aprs.c
-msgctxt "HINT_0_9_PICK_BACK"
-msgid "0-9 pick  Back"
-msgstr "0-9 elegir  Atrás"
 
 #: core/ui/ui_aprs.c
 msgctxt "APRS_TITLE_HEARD"
@@ -2257,7 +2287,7 @@ msgctxt "LABEL_MODE"
 msgid "Mode"
 msgstr "Modo"
 
-#: core/ui/ui_menus.c
+#: core/ui/ui_menus.c core/ui/ui_screens.c
 msgctxt "CHAN_LABEL_RATE"
 msgid "Rate"
 msgstr "Velocidad"
@@ -2416,11 +2446,6 @@ msgstr "Banda solo RX: usa FM"
 msgctxt "CHAN_WHY_PICK_TX_CONTACT"
 msgid "Pick a TX contact first"
 msgstr "Elige antes un contacto TX"
-
-#: core/ui/ui_menus.c
-msgctxt "CHAN_TOAST_NXDN_ID_MAX"
-msgid "NXDN IDs go up to 65519"
-msgstr "ID NXDN máximo es 65519"
 
 #: core/ui/ui_menus.c
 msgctxt "CHAN_TOAST_NO_CHANGES"
@@ -3994,13 +4019,13 @@ msgstr "RX doble vía"
 
 #: core/ui/ui_menus.c
 msgctxt "SET_VALUE_KEY_TYPE_8_BIT"
-msgid "8-bit (1-255)"
-msgstr "8 bits (1-255)"
+msgid "{8-bit (1-255)|8-bit}"
+msgstr "{8-bit (1-255)|8-bit}"
 
 #: core/ui/ui_menus.c
 msgctxt "SET_VALUE_KEY_TYPE_16_BIT"
-msgid "16-bit (0-65535)"
-msgstr "16 bits (0-65535)"
+msgid "{16-bit (0-65535)|16-bit}"
+msgstr "{16-bit (0-65535)|16-bit}"
 
 #: core/ui/ui_menus.c
 msgctxt "SIG_VALUE_SPEAKER"
@@ -4243,6 +4268,11 @@ msgid "SFR CW ID"
 msgstr "ID CW SFR"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_DIGITAL_AGC_RX"
+msgid "Digital AGC RX"
+msgstr "AGC digital RX"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_DMR_RX_AGC"
 msgid "DMR RX AGC"
 msgstr "AGC RX DMR"
@@ -4263,9 +4293,24 @@ msgid "YSF RX AGC"
 msgstr "AGC RX YSF"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_DIGITAL_AGC_TX"
+msgid "Digital AGC TX"
+msgstr "AGC digital TX"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_DMR_TX_LEVEL"
 msgid "DMR TX level"
 msgstr "Nivel TX DMR"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_P25_TX_LEVEL"
+msgid "P25 TX level"
+msgstr "Nivel TX P25"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_NXDN_TX_LEVEL"
+msgid "NXDN TX level"
+msgstr "Nivel TX NXDN"
 
 #: core/ui/ui_menus.c
 msgctxt "SET_LABEL_YSF_TX_LEVEL"
@@ -4431,6 +4476,21 @@ msgstr "Arr/Ab en Inicio"
 msgctxt "SET_ROW_DMR_ID_AND_NAME"
 msgid "DMR ID and name"
 msgstr "ID DMR y nombre"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_NXDN_RX_RAN"
+msgid "RX RAN"
+msgstr "RAN RX"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_NXDN_TX_RAN"
+msgid "TX RAN"
+msgstr "RAN TX"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_NXDN_TALKGROUP"
+msgid "Talkgroup"
+msgstr "Grupo"
 
 #: core/ui/ui_menus.c
 msgctxt "SET_ROW_RSSI_VHF"
@@ -4618,6 +4678,21 @@ msgid " steps"
 msgstr " pasos"
 
 #: core/ui/ui_menus.c
+msgctxt "NXDN_VALUE_ANY_RAN"
+msgid "Any"
+msgstr "Cualquiera"
+
+#: core/ui/ui_menus.c core/ui/ui_screens.c
+msgctxt "QUICK_VALUE_ALL"
+msgid "All"
+msgstr "Todos"
+
+#: core/ui/ui_menus.c
+msgctxt "WHY_NOT_ON_THIS_RADIO"
+msgid "Not on this radio"
+msgstr "No en esta radio"
+
+#: core/ui/ui_menus.c
 msgctxt "WHY_PERMIT_TONE_NOT_IN_BUILD"
 msgid "Talk permit tone: not in this build"
 msgstr "Tono de permiso: no disponible"
@@ -4648,6 +4723,11 @@ msgid "Mic gain: not in this build"
 msgstr "Ganancia mic: no disponible"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_WHY_P25_TX_LEVEL_SETS_LEVEL"
+msgid "P25 TX level sets the level"
+msgstr "El nivel TX P25 fija el nivel"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_WHY_MIC_AGC_SETS_LEVEL"
 msgid "Mic AGC sets the level"
 msgstr "El AGC mic fija el nivel"
@@ -4658,9 +4738,9 @@ msgid "Noise reduction: not in this build"
 msgstr "Reducción ruido: no disponible"
 
 #: core/ui/ui_menus.c
-msgctxt "WHY_NOT_ON_THIS_RADIO"
-msgid "Not on this radio"
-msgstr "No en esta radio"
+msgctxt "SET_WHY_DIGITAL_AGC_ON"
+msgid "Digital AGC sets the level"
+msgstr "El AGC digital fija el nivel"
 
 #: core/ui/ui_menus.c
 msgctxt "WHY_TX_LEVEL_NOT_IN_BUILD"
@@ -4716,6 +4796,11 @@ msgstr "Sin posición GPS actual"
 msgctxt "SET_TOAST_SAVED_AS_YOU_CHANGE"
 msgid "Settings are saved as you change them"
 msgstr "Los ajustes se guardan al cambiarlos"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_BODY_NXDN_DEFAULT"
+msgid "For the VFO and channels in NXDN for now. Stored NXDN channels keep their own."
+msgstr "Para el VFO y canales en NXDN por ahora. Los canales NXDN guardados usan los suyos."
 
 #: core/ui/ui_menus.c core/ui/ui_position.c
 msgctxt "HINT_OK_CHANGE_BACK"
@@ -6081,11 +6166,6 @@ msgstr "Copiar"
 msgctxt "QUICK_VALUE_OPEN"
 msgid "Open"
 msgstr "Abrir"
-
-#: core/ui/ui_screens.c
-msgctxt "QUICK_VALUE_ALL"
-msgid "All"
-msgstr "Todos"
 
 #: core/ui/ui_screens.c
 msgctxt "QUICK_HINT_SPLIT"

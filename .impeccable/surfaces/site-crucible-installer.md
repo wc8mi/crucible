@@ -29,7 +29,7 @@ pour, and checks the result. Advanced users connect, open Other versions, pick, 
 
 FIRST VIEWPORT: Home: the question as a large casting-mark heading; two equal door plates side by side, each a
 line-drawn radio, a two-word title, one sentence and a verb button, both buttons hot-core for equal weight (Install's mark is the only lit art); small links below;
-the four radios listed under it.
+the five radios listed under it.
 
 FORM: own grounded list, candidate 3 of 7 (the work card); seed:67fd2aeb5bd68219. Signature interaction: a step
 closes to one line with its result as the next one opens, and the pour bar above the list advances with it.

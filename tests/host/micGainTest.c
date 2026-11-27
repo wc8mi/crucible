@@ -20,7 +20,7 @@ static int8_t hook_db;
 static int8_t pcm_hook_db;
 static uint16_t ambe_q8;
 static uint8_t p25_step;
-static bool p25_agc;
+static uint16_t p25_target;
 
 static void hook(int8_t db)
 {
@@ -40,8 +40,8 @@ void p25VoiceSetMicGain(uint8_t step)
 	p25_step = step;
 }
 
-void p25VoiceSetAgc(bool on) { p25_agc = on; }
-bool p25VoiceAgc(void) { return CONFIG_P25_TX_AGC && p25_agc; }
+void p25VoiceSetTxTarget(uint16_t rms) { p25_target = rms; }
+bool p25VoiceAgc(void) { return CONFIG_P25_TX_AGC && p25_target != 0; }
 
 int main(void)
 {
@@ -96,6 +96,14 @@ int main(void)
 	radio_set_mic_gain(3);
 	radio_p25_mic_gain_apply();
 	CHECK(hook_db == 6 && pcm_hook_db == -4 && ambe_q8 == 161 && p25_step == 5);
+	// Mic AGC no longer turns P25 leveling on (Digital AGC: the P25 TX level does); with a target the ADC is unity
+	radio_set_mic_gain_with_agc(3, true);
+	radio_p25_mic_gain_apply();
+	CHECK(pcm_hook_db == -4);
+	p25VoiceSetTxTarget(3277);
+	radio_p25_mic_gain_apply();
+	CHECK(pcm_hook_db == (CONFIG_P25_TX_AGC ? 0 : -4));
+	p25VoiceSetTxTarget(0);
 
 	if (failures) {
 		printf("micGainTest: %d failures\n", failures);

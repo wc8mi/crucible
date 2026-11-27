@@ -16,7 +16,6 @@
 #include "dsp/speech_meter.h"
 #endif
 
-#define P25_TX_TARGET_RMS	3277u	// -20 dBFS relative to 32768
 
 // the call layer packs what a frame's codes corrected as the decoder reads it
 _Static_assert(P25_VOICE_ERRS(11, 2, 1) == IMBE_ERRS(11, 2, 1) && P25_VOICE_ERRS(15, 3, 1) != IMBE_ERRS_LOST,
@@ -47,7 +46,7 @@ static uint8_t rx_seq, rx_end_seq;
 // (head), its consumer the provider's task (tail). Frames of an earlier transmission are dropped by their count
 static uint8_t tx_gen;
 static uint8_t tx_head, tx_tail;
-static bool mic_agc;
+static uint16_t tx_target;	// p25VoiceSetTxTarget: the leveling target (RMS), 0 = the manual mic gain
 static tx_level_t input_level;
 #if CONFIG_TX_DC_BLOCK
 static dc_block_t input_dc;
@@ -662,7 +661,7 @@ static void tx_block(uint8_t g, const int16_t *mic, int16_t *scaled)
 		memset(scaled, 0, AUDIO_BLOCK_SAMPLES * sizeof scaled[0]);
 	} else {
 		uint32_t limited = input_level.limited_blocks;
-		uint16_t target = p25VoiceAgc() ? P25_TX_TARGET_RMS : 0;
+		uint16_t target = CONFIG_P25_TX_AGC ? LOAD(tx_target) : 0;
 		uint16_t peak = input_block(mic, scaled, LOAD(mic_gain_q8), target, NULL, true, NULL);
 		stats.tx_gain_q16 = input_level.gain_q16;
 		stats.tx_limited_blocks += input_level.limited_blocks - limited;
@@ -959,8 +958,9 @@ void p25VoiceTx(bool on)
 	}
 }
 
-void p25VoiceSetAgc(bool on) { STORE(mic_agc, on); }
-bool p25VoiceAgc(void) { return CONFIG_P25_TX_AGC && LOAD(mic_agc); }
+void p25VoiceSetTxTarget(uint16_t rms) { STORE(tx_target, rms); }
+bool p25VoiceAgc(void) { return CONFIG_P25_TX_AGC && LOAD(tx_target) != 0; }
+uint16_t p25VoiceTxTarget(void) { return CONFIG_P25_TX_AGC ? LOAD(tx_target) : 0; }
 
 void p25VoiceSetMicGain(uint8_t step)
 {

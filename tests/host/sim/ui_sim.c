@@ -14,12 +14,15 @@
 //   datatx / dataend    DMR data goes out without PTT (ARS, SMS, IP): the view says TX; it ends
 //   aprstx / aprsend    an APRS RF beacon keys the transmitter / returns to the selected channel
 //   dtmf:<digits>       during TX: the radio core has sent these DTMF digits (the TX screen's DTMF line)
-//   agc:<mode>,<choice>[,<amplitude>]  feed synthetic receive levels (modes 0 DMR, 1 P25, 2 NXDN)
+//   agc:<mode>,<choice>[,<amplitude>]  feed synthetic receive levels (modes 0 DMR, 1 P25, 2 NXDN, 3 YSF), Digital
+//                                       AGC RX Off so the choice is in force
 //   wait:<ms>           time passes
 //   reboot              power off and on: the screens start over, the settings stay
 //   receivers:2         a receiver per dual watch channel; rxa:/rxb:<src>,<dst>,g|p a call on A's / B's own,
 //                       rxaend / rxbend its end
 //   tune:a|b            dual watch: the receiver moves to channel A or B (a call there holds it)
+//   hop:a|b             the same just before the next key, with no UI pass between: the key reads the view as the
+//                       radio left it
 //   busy:a|b|none       dual watch: the radio's mark for a signal found on A / B in the wait after a call
 //   dlpos:<n>           another task (the debug link) asks the radio for position n of the zone
 //   dldual:<n>          the debug link's scan dual: the radio watches the channel it is on (A) and position n
@@ -769,17 +772,52 @@ int32_t ui_svc_setting_get(uint8_t id)
 	if (id >= UI_SET_RX_AGC_DMR && id <= UI_SET_RX_AUDIO_LEVELS)
 		return ui_svc_ram_get(id);
 #endif
+	if (id >= UI_SET_AGC_RX_AUTO && id <= UI_SET_TX_LEVEL_NXDN)	// Digital AGC: the stub keeps them as settings_t does
+		return ui_svc_ram_get(id);
 	return id >= UI_SET_RAM_COUNT && id < UI_SET_COUNT ? sim_late[id - UI_SET_RAM_COUNT] : ui_svc_ram_get(id);
 }
+
+#if CONFIG_NXDN
+static radio_view_t view;	// (defined again below: one object)
+static void changed(void);
+// The NXDN radio default (ui_svc_storage.c's nxdn_default_set): checked, stored, and in force at once where the radio
+// runs on the settings (the VFO, a channel in NXDN for now)
+static bool sim_nxdn_default(uint8_t id, int32_t value)
+{
+	if (id == UI_SET_NXDN_RATE ? value < 0 || value > 1 :
+	    id == UI_SET_NXDN_TG ? value < 1 || (value > (int32_t)RADIO_NXDN_UNIT_MAX && value != (int32_t)UI_NXDN_ID_ALL) :
+	    value < 0 || value > RADIO_NXDN_RAN_MAX)
+		return false;
+	sim_late[id - UI_SET_RAM_COUNT] = value;
+	if (id == UI_SET_NXDN_RATE)
+		view.nxdn.flags = (uint8_t)((view.nxdn.flags & ~RADIO_NXDN_9600) | (value ? RADIO_NXDN_9600 : 0));
+	else if (id == UI_SET_NXDN_RX_RAN)
+		view.nxdn.rx_ran = (uint8_t)value;
+	else if (id == UI_SET_NXDN_TX_RAN)
+		view.nxdn.tx_ran = (uint8_t)value;
+	else {
+		view.nxdn.talk = (uint16_t)value;
+		view.nxdn.flags &= (uint8_t)~RADIO_NXDN_TALK_UNIT;
+	}
+	changed();
+	return true;
+}
+#endif
 
 bool ui_svc_setting_set(uint8_t id, int32_t value)
 {
 	if ((id == UI_SET_RSSI_VHF || id == UI_SET_RSSI_UHF) && (value < -20 || value > 20))
 		return false;
+#if CONFIG_NXDN
+	if (id >= UI_SET_NXDN_RATE && id <= UI_SET_NXDN_TG)
+		return sim_nxdn_default(id, value);
+#endif
 #if CONFIG_RX_AGC
 	if (id >= UI_SET_RX_AGC_DMR && id <= UI_SET_RX_AUDIO_LEVELS)
 		return ui_svc_ram_set(id, value);
 #endif
+	if (id >= UI_SET_AGC_RX_AUTO && id <= UI_SET_TX_LEVEL_NXDN)
+		return ui_svc_ram_set(id, value);
 	if (id < UI_SET_RAM_COUNT || id >= UI_SET_COUNT)
 		return ui_svc_ram_set(id, value);
 	if (id == UI_SET_SIG_STEP) {	// a whole step: the firmware writes one record, here its two settings
@@ -2014,6 +2052,24 @@ bool ui_svc_zone_event(uint8_t kind, uint32_t id, ui_event_t *ev) { (void)kind; 
 
 bool ui_svc_talk_to(uint32_t id, bool private_call, uint8_t life)
 {
+#if CONFIG_NXDN
+	// NXDN (ui_svc_radio.c's nxdn_talk_to): on the radio default a group kept is the stored talk group, the rest for
+	// now; a stored NXDN channel keeps its record's target
+	if (ui_nxdn_stored_channel(&view))
+		return false;
+	if (ui_nxdn_on_settings(&view)) {
+		uint16_t dst = (uint16_t)ui_svc_setting_get(UI_SET_NXDN_TG);
+		if (life != UI_TALK_DEFAULT && !ui_nxdn_talk_id(id, &dst))
+			return false;
+		if (life == UI_TALK_PERMANENT && !private_call)
+			return ui_svc_setting_set(UI_SET_NXDN_TG, dst);
+		view.nxdn.talk = dst;
+		view.nxdn.flags = (uint8_t)((view.nxdn.flags & ~RADIO_NXDN_TALK_UNIT) |
+			(life != UI_TALK_DEFAULT && private_call ? RADIO_NXDN_TALK_UNIT : 0));
+		changed();
+		return true;
+	}
+#endif
 	to_selected();
 	if (view.vfo && life != UI_TALK_DEFAULT) {
 		vfo_talk = id;		// the VFO's own target, kept with it: nothing to write
@@ -2217,6 +2273,8 @@ bool ui_svc_scan_skip(void) { radio_req_channel_step(1); return true; }
 // keys act on it); `tune:a` / `tune:b` move it to a channel, as the alternating receiver does when a call holds it
 // Each channel keeps its changes for now while the receiver is on the other (as radio_sm.c's dual_keep)
 static uint8_t sim_at = 0xFF;		// the pane the receiver is on
+static int8_t hop_next = -1;		// hop:a|b: the pane the receiver moves to just before the next key (-1: none)
+static void sim_tune(int pane);
 static radio_view_t sim_keep[2];
 static uint32_t sim_keep_target[2];
 static bool sim_keep_ok[2];
@@ -2805,6 +2863,13 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	// The TX levels and mic input start fresh each run: a flow's stepping doesn't reach the next radio
 	sim_late[UI_SET_TX_LEVEL_DMR - UI_SET_RAM_COUNT] = sim_late[UI_SET_TX_LEVEL_YSF - UI_SET_RAM_COUNT] = 0;
 	sim_late[UI_SET_MIC_INPUT - UI_SET_RAM_COUNT] = 0;
+#if CONFIG_NXDN
+	// The NXDN radio default as a new radio starts (settings_defaults): 4800 bit/s, any RAN in, RAN 1 out, group 1
+	sim_late[UI_SET_NXDN_RATE - UI_SET_RAM_COUNT] = sim_late[UI_SET_NXDN_RX_RAN - UI_SET_RAM_COUNT] = 0;
+	sim_late[UI_SET_NXDN_TX_RAN - UI_SET_RAM_COUNT] = sim_late[UI_SET_NXDN_TG - UI_SET_RAM_COUNT] = 1;
+#endif
+	ui_svc_ram_set(UI_SET_AGC_RX_AUTO, 1);	// Digital AGC: both switches On, as a new radio starts
+	ui_svc_ram_set(UI_SET_AGC_TX_AUTO, 1);
 	emergency_on = false;
 	sim_foreign = sim_held = false;
 	disp.width = g->w;
@@ -2918,7 +2983,7 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 #endif
 #if CONFIG_NXDN
 	memset(&view.nxdn, 0, sizeof view.nxdn);
-	view.nxdn.flags = RADIO_NXDN_9600;	// the NXDN settings' defaults (radio_nxdn.c): 9600 bit/s, RAN 1, group 1
+	view.nxdn.flags = 0;	// the NXDN radio default's (settings_defaults): 4800 bit/s, any RAN in, RAN 1 out, group 1
 	view.nxdn.tx_ran = 1;
 	view.nxdn.talk = 1;
 #endif
@@ -2999,6 +3064,7 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	ui_svc_setting_set(UI_SET_DUAL_B, 0);
 	memset(sim_dual, 0, sizeof sim_dual);
 	sim_at = 0xFF;
+	hop_next = -1;
 	sim_keep_ok[0] = sim_keep_ok[1] = false;
 #endif
 	memset(&crash_sim, 0, sizeof crash_sim);
@@ -3100,6 +3166,10 @@ static bool press(const char *name, bool lng, char *err, size_t len)
 		}
 		input_event_t ev = { a, (uint8_t)(lng ? GESTURE_LONG : GESTURE_PRESS), 0 };
 		advance(lng ? LONG_MS : PRESS_MS / 2);
+		if (hop_next >= 0) {	// the radio moved while the UI task waited: the view it reads first (ui.c)
+			sim_tune(hop_next);
+			hop_next = -1;
+		}
 		ui_app_key(&ev);
 		advance(PRESS_MS / 2);
 		return true;
@@ -3289,6 +3359,7 @@ static bool check(const char *kv, char *err, size_t len)
 	else if (strcmp(key, "crash_have") == 0) snprintf(got, sizeof got, "%u", crash_sim.have);
 	else if (strcmp(key, "aprs_auto") == 0) snprintf(got, sizeof got, "%u", aprs_sim.cfg.tx_on);
 	else if (strcmp(key, "aprs_region") == 0) snprintf(got, sizeof got, "%u", aprs_sim.cfg.region);
+	else if (strcmp(key, "aprs_freq") == 0) snprintf(got, sizeof got, "%u", (unsigned)aprs_sim.cfg.freq_hz);
 	else if (strcmp(key, "aprs_interval") == 0) snprintf(got, sizeof got, "%u", aprs_sim.cfg.interval_s);
 	else if (strcmp(key, "aprs_smart") == 0) snprintf(got, sizeof got, "%u", aprs_sim.cfg.smart);
 	else if (strcmp(key, "aprs_via") == 0) snprintf(got, sizeof got, "%u", aprs_sim.cfg.via);
@@ -3668,6 +3739,10 @@ static bool run_token(char *t, char *err, size_t len)
 		advance(100);
 		return true;
 	}
+	if (strcmp(t, "hop") == 0 && arg != NULL && (arg[0] == 'a' || arg[0] == 'b')) {	// the same, just before the
+		hop_next = arg[0] == 'b';	// next key: the UI reads the view the radio left, with no pass between (ui.c)
+		return true;
+	}
 	if (strcmp(t, "busy") == 0 && arg != NULL) {	// dual watch: the looks in the wait found a signal there
 		view.dual_busy = arg[0] == 'a' ? 1 : arg[0] == 'b' ? 2 : 0;
 		changed();
@@ -3683,6 +3758,7 @@ static bool run_token(char *t, char *err, size_t len)
 			return false;
 		}
 		ui_svc_setting_set(UI_SET_RX_AUDIO_LEVELS, 1);
+		ui_svc_setting_set(UI_SET_AGC_RX_AUTO, 0);	// Digital AGC RX Off: the mode's own row is in force
 		ui_svc_setting_set((uint8_t)(UI_SET_RX_AGC_DMR + mode), (int32_t)choice);
 		rx_agc_t state;
 		rx_agc_begin(&state, (rx_agc_mode_t)mode, 9991234, 0);
@@ -4170,6 +4246,15 @@ static bool run_token(char *t, char *err, size_t len)
 			view.volume = level;
 			view.volume_src = soft_volume ? RVOL_SOFT : t[0] == 'k' ? RVOL_KNOB : RVOL_OVERRIDE;
 		}
+		changed();
+		step();
+		return true;
+	}
+	if (strcmp(t, "knobpos") == 0 && arg != NULL) {
+		// A knob the MCU reads on a radio that can't set the level: only the position, volume_src RVOL_NONE
+		view.volume_knob = (int8_t)atoi(arg);
+		view.volume = -1;
+		view.volume_src = RVOL_NONE;
 		changed();
 		step();
 		return true;

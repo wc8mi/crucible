@@ -52,6 +52,9 @@ ui_state_t ui_st;
 ui_target_t ui_target;
 static const radio_view_t *view;
 static const radio_view_t view_none;	// until the first tick (const: flash, not RAM)
+#if CONFIG_DUAL_WATCH
+static const radio_view_t *radio_view;	// the radio's view as the last tick had it (the UI task refreshes it in place)
+#endif
 // A discard question must not replace the pending editor even at the normal depth limit.
 static ui_frame_t stack[UI_STACK_MAX + CONFIG_CHANNEL_EDIT];
 static uint8_t sp;			// stack[sp] is on screen; stack[0] is Home
@@ -528,10 +531,33 @@ void ui_sb_age(char *buf, size_t len, uint32_t ms)
 
 // --- talking to a target ---
 
+#if CONFIG_NXDN
+// Why NXDN can't call t now, NULL if it can: a stored NXDN channel calls its own record's target, and NXDN has no call
+// to 0 or past 65519
+static const char *nxdn_talk_refused(const ui_target_t *t)
+{
+	uint16_t dst;
+	if (ui_nxdn_stored_channel(view))
+		return TR(TALK_TOAST_NXDN_SET_IN_CHANNEL, "NXDN: set in the channel");
+	if (ui_nxdn_on_settings(view) && !ui_nxdn_talk_id(t->id, &dst))
+		return TR(CHAN_TOAST_NXDN_ID_MAX, "NXDN IDs go up to 65519");
+	return NULL;
+}
+#endif
+
 void ui_talk(const ui_target_t *t, bool permanent)
 {
 	static char msg[48];
 	char name[32];
+#if CONFIG_NXDN
+	const char *why = nxdn_talk_refused(t);
+	if (why != NULL) {
+		ui_toast(why);
+		return;
+	}
+	if (ui_nxdn_on_settings(view) && !t->group)
+		permanent = false;	// the NXDN radio default holds a talk group: a unit is a call for now
+#endif
 	ui_sb_target(name, sizeof name, t);
 	if (permanent && !ui_svc_talk_to(t->id, !t->group, UI_TALK_PERMANENT)) {
 		// No codeplug writer yet: use it for now and say so
@@ -710,6 +736,7 @@ static void handle_event(const ui_event_t *ev)
 		sb_str(&b, TR(ALERT_BANNER_FROM, "Call alert from "));
 		station(&b, ev);
 		banner(UI_BANNER_CALL_ALERT, false, ev->id, title, TR(HINT_PTT_REPLIES, "PTT replies"));
+		ui_svc_beep(UI_BEEP_CALL_ALERT);	// always: a page that rings nowhere is missed (no setting of its own)
 		vibrate(UI_VIBE_CALL);
 		break;
 	case UI_EV_PRIVATE_CALL:
@@ -1031,6 +1058,10 @@ bool ui_try_save_channel(void)
 
 static bool target_manual(void)
 {
+#if CONFIG_NXDN
+	if (view->ch.mode == RADIO_MODE_NXDN)
+		return ui_nxdn_talk_temporary(view);
+#endif
 #if CONFIG_DMR
 	return view->dmr.target_manual;
 #else
@@ -1139,8 +1170,9 @@ void ui_scan_skip(void)
 
 #if CONFIG_DMR
 // Up / Down on Home set to "Talk target" (Settings > Keys): the channel's default talkgroup, then its listen list,
-// each a temporary talk target (the default ends it). False when there is nothing to step through
-static bool talk_step(int dir)
+// each a temporary talk target (the default ends it). False when there is nothing to step through. In dual watch the
+// view and the request are the selected channel's (ui_dual_view, RQ_SELECTED), so the dual watch Home uses it too
+bool ui_talk_step(int dir)
 {
 	static listen_list_t l;		// static: not on the task's stack
 	static uint16_t idx[CODEPLUG_LIST_LEN + 1];
@@ -1204,7 +1236,7 @@ bool ui_home_key(const input_event_t *ev)
 			return true;
 		}
 #if CONFIG_DMR
-		if (arrows && !view->vfo && ui_st.updown == 2 && view->ch.mode == RADIO_MODE_DMR && talk_step(nav_dir(ev)))
+		if (arrows && !view->vfo && ui_st.updown == 2 && view->ch.mode == RADIO_MODE_DMR && ui_talk_step(nav_dir(ev)))
 			return true;
 #endif
 		for (int i = steps(ev); i > 0; i--) {
@@ -1472,6 +1504,12 @@ static void quick_unavailable(uint8_t kind)
 	case QT_MODE: ui_toast(TR(WHY_VFO_ONE_MODE_IN_BUILD, "VFO: one mode in this build")); break;
 	case QT_TO_VFO: ui_toast(TR(WHY_VFO_NOT_IN_BUILD, "VFO: not in this build")); break;
 	case QT_VOX: ui_toast(TR(WHY_VOX_NOT_ON_RADIO_YET, "VOX: not on this radio yet")); break;
+#if CONFIG_NXDN
+	case QT_NXDN_RATE:
+		ui_toast(ui_nxdn_stored_channel(view) ? TR(TALK_TOAST_NXDN_SET_IN_CHANNEL, "NXDN: set in the channel") :
+			 TR(QUICK_WHY_NXDN_RATE_NOT_ON_RADIO, "This rate: not on this radio"));
+		break;
+#endif
 	default: ui_toast(TR(WHY_NOT_IN_BUILD, "Not in this build")); break;
 	}
 }
@@ -1606,6 +1644,19 @@ static void quick_activate(int tile)
 		ui_st.dgid_edit = view->ysf.tx_dgid;
 		ui_st.quick_edit = true;
 		break;
+#endif
+#if CONFIG_NXDN
+	case QT_NXDN_RATE: {
+		// The radio default's rate, stored: the VFO and channels in NXDN for now run on it (ui_quick_tile refused
+		// a stored NXDN channel and a rate the board can't run)
+		// From the rate shown (RAM), which can differ from the stored one after debug link op 43: the tile flips what runs
+		bool fast = (view->nxdn.flags & RADIO_NXDN_9600) == 0;
+		if (ui_svc_setting_set(UI_SET_NXDN_RATE, fast))
+			ui_toast(fast ? TR(QUICK_TOAST_NXDN_9600, "NXDN 9600 bit/s") : TR(QUICK_TOAST_NXDN_4800, "NXDN 4800 bit/s"));
+		else
+			quick_unavailable(kind);
+		break;
+	}
 #endif
 	case QT_HEAR_ALL:
 		quick_monitor(kind);
@@ -2039,6 +2090,9 @@ void ui_app_init(void)
 	roams_known = false;
 #endif
 	view = &view_none;
+#if CONFIG_DUAL_WATCH
+	radio_view = NULL;
+#endif
 	memset(&ui_st, 0, sizeof ui_st);
 	ui_st.volbar = -1;
 #if CONFIG_VOLUME_BAR
@@ -2233,6 +2287,13 @@ void ui_app_key(const input_event_t *ev)
 		select_ev.action = ACT_SELECT;
 		ev = &select_ev;
 	}
+#if CONFIG_DUAL_WATCH
+	// The UI task refreshes the radio's view before a key, in place: where the last tick left the view on it (the
+	// receiver was on the selected channel), the receiver may be on the other one now. The selected channel's
+	// settings again, so VFO digits typed on B don't open Find while the receiver is on A's channel (#1013)
+	if (radio_view != NULL)
+		view = ui_dual_view(radio_view);
+#endif
 	// A programmed home key (P1, P2: board.home_keys): its function on Home, its arrow everywhere else. Home is the
 	// bottom of the stack, not while a frequency is typed there
 	input_event_t home_ev;
@@ -2591,19 +2652,21 @@ static void knob_moved(const radio_view_t *v)
 	}
 	bool first = knob_last < 0;
 	knob_last = k;
-	if (!first && ui_st.locked && ui_st.knob_lock) {
+	// Turning the knob while locked shows how to unlock, because the radio is ignoring the knob. A radio that can only
+	// watch its knob can't ignore it (the volume still changes), so it shows nothing
+	if (!first && ui_st.locked && ui_st.knob_lock && (ui_svc_features() & UI_FEAT_VOLUME_KNOB)) {
 		ui_toast(locked_text(has_quick_key));
 	}
 }
 
-// The knob turned (#354): the level the radio core passed on changed, from the knob both times. Read from the radio's
-// own view, not dual watch's per-side one. The first level (power-up) and a change of source (the debug link taking
-// over or giving back) set the reference without a bar. The bar wakes the backlight: turning the knob is using the
-// radio
+// Shows the volume bar after the knob is turned (#354). The level is the one the radio core applied from the knob; on a
+// radio that can't set the level (RVOL_NONE) it is the knob's position, or -1 if the knob isn't read. The level is taken
+// from the radio's own view, not dual watch's per-side one. No bar for the first level after power-up, or when the debug
+// link takes over the volume or gives it back. The bar also turns the backlight on, since the user is using the radio
 #if CONFIG_VOLUME_BAR
 __attribute__((noinline)) static void knob_tick(const radio_view_t *v)
 {
-	int8_t lvl = v->volume_src == RVOL_KNOB ? v->volume : -1;
+	int8_t lvl = v->volume_src == RVOL_KNOB ? v->volume : v->volume_src == RVOL_NONE ? v->volume_knob : -1;
 	if (lvl >= 0 && knob_seen >= 0 && lvl != knob_seen) {
 		ui_st.volbar = (int8_t)radio_volume_step_of((uint8_t)lvl);
 		volbar_until = now + VOLUME_MS;
@@ -2624,6 +2687,7 @@ __attribute__((noinline)) bool ui_app_tick(const radio_view_t *v, uint32_t now_m
 	static uint32_t serial_seen;
 	static uint8_t battery_seen;
 #if CONFIG_DUAL_WATCH
+	radio_view = v;
 	view = ui_dual_view(v);	// in dual watch, the selected channel's settings wherever the receiver is
 #else
 	view = v;

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The nxdn section: NXDN conventional on the channel (docs/spec/nxdn.md 6, core/radio/radio_nxdn.h): the call heard,
 // the settings, what the board's provider gives the rate, the engine's counters. The voice path's are the DMR side's
 // (dmr_stats, ambe.*). "nxdn.built=0" without CONFIG_NXDN
@@ -7,6 +8,7 @@
 #include "debuglink/debuglink.h"
 #if CONFIG_NXDN
 #include "radio/radio_nxdn.h"
+#include "settings/settings.h"
 #endif
 
 void debuglink_view_nxdn(const radio_view_t *v, dl_text_t *t)
@@ -30,6 +32,11 @@ void debuglink_view_nxdn(const radio_view_t *v, dl_text_t *t)
 	dl_text(t, "nxdn.rate=%u\nnxdn.rx_ran=%u\nnxdn.tx_ran=%u\nnxdn.rx_gid=%u\nnxdn.unit_id=%u\n",
 		s.rate9600 ? 9600u : 4800u, s.rx_ran, s.tx_ran, s.rx_gid, s.unit_id);
 	dl_text(t, "nxdn.unit_call=%u\nnxdn.tx_dst=%u\nnxdn.tx_emergency=%u\n", s.unit_call, s.tx_dst, s.emergency);
+	// The stored radio default the settings start from (docs/crucible/adr/004-nxdn-radio-default.md): what a restart
+	// brings back; the settings above differ by what was set for now (Talk to, the debug link)
+	dl_text(t, "nxdn.default.rate=%u\nnxdn.default.rx_ran=%u\nnxdn.default.tx_ran=%u\nnxdn.default.tg=%u\n",
+		(SETTINGS_FIELD(nxdn_flags) & SETTINGS_NXDN_9600) != 0 ? 9600u : 4800u, SETTINGS_FIELD(nxdn_rx_ran),
+		SETTINGS_FIELD(nxdn_tx_ran), SETTINGS_FIELD(nxdn_tg));
 	if (radio_nxdn_in_force(&s)) {
 		// What the engine runs on: a stored NXDN channel's own, else the settings above
 		dl_text(t, "nxdn.run.rate=%u\nnxdn.run.rx_ran=%u\nnxdn.run.tx_ran=%u\nnxdn.run.rx_gid=%u\n",
