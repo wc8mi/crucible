@@ -326,7 +326,7 @@ def crucible_page(flash, project, assets, built):
     m = one(r'<header class="site-header">.*?</header>', page, 'site header')
     page = page[:m.start()] + band + page[m.end():]
     m = one(r'(<section class="wrap section page-head">\s*<h1>)(.*?)(</h1>\s*<p class="lead">)(.*?)(</p>)', page, 'page head')
-    first = (f'\n<p class="cx-first">{name} updates only a radio with RadioFoundry or {name}. For a radio with the '
+    first = (f'\n<p class="notice info cx-first">{name} updates only a radio with RadioFoundry or {name}. For a radio with the '
              f'manufacturer\'s firmware, <a href="{RF_FLASH}">install RadioFoundry</a> first.</p>')
     page = page[:m.start()] + m.group(1) + f'Update {name}' + m.group(3) + lead + m.group(5) + first + page[m.end():]
     m = one(r'<dialog id="beta-notice".*?</dialog>\s*', page, 'beta notice')

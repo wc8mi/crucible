@@ -114,12 +114,12 @@ p { margin: .6rem 0 0; text-wrap: pretty; }
 .door .btn { align-self: flex-start; margin-top: 1.2rem; }
 .first { padding: 1.5rem; border: 1px solid var(--line); border-radius: 4px; }
 .first h2 { font-size: 1.6rem; line-height: 1.05; }
-.first > p:not(.label) { color: var(--muted); }
+.first > p { color: var(--muted); }
 .steps { margin: .9rem 0 0; padding-left: 1.3rem; display: grid; gap: .45rem; }
 .steps li::marker { color: var(--hot); font-weight: 700; }
-.policy { margin-top: 1.6rem; padding: .2rem 0 .2rem 1.1rem; border-left: 3px solid var(--hot); max-width: 40rem; }
-.policy p:first-child { margin-top: 0; }
-.policy p:not(:first-child) { color: var(--muted); }
+.policy { margin-top: 2rem; max-width: 40rem; }
+.policy p:first-child { margin-top: 0; font-weight: 600; }
+.policy p + p { color: var(--muted); }
 .home-links { display: flex; flex-wrap: wrap; gap: .6rem 1.6rem; margin-top: 1.4rem; font-weight: 600; }
 .fits { margin-top: 2.6rem; }
 .fits ul { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }
