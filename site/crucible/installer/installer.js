@@ -78,11 +78,13 @@ async function showPost(id) {
 	const all = [...document.querySelectorAll("[data-screen]")];
 	const screen = route("home", { browserOk: canInstall(), termsOk: accepted(), screens: all.map((s) => s.dataset.screen) });
 	for (const s of all) s.classList.toggle("show", s.dataset.screen === screen);
-	if (!document.getElementById(id) && more) {
+	if (!document.getElementById(id) && more?.isConnected && !more.disabled) {
+		more.disabled = true;		// a press during these loads would add the same posts twice
 		try {
 			if (!feed) feed = await (await fetch(more.dataset.feed)).json();
 			for (let n = pressesFor(feed, list.querySelectorAll("article").length, id); n > 0 && more.isConnected; n--) await loadMore();
 		} catch (e) { /* the post stays unloaded; the page shows the newest */ }
+		more.disabled = false;
 	}
 	document.getElementById(id)?.scrollIntoView();
 }

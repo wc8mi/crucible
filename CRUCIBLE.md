@@ -188,8 +188,12 @@ The post body, in Markdown.
 | `release` | no | The release tag. The post links to that GitHub release. |
 | `seq` | no | The order of posts on the same date. The highest number shows first. |
 
-The body is CommonMark. Raw HTML is shown as text. The ADR 001 word rules apply to the title, not to the body. Keep
-radio model names out of the body (`tools/check_generic.py`); the radio list on the page names the radios.
+The body is CommonMark. Raw HTML is shown as text. The ADR 001 word rules apply to the title (no banned word), not to
+the body.
+
+To name a radio, write `{{boards/<id>}}` in the title or the body, with the radio's folder name under `boards/`. The
+build puts in the radio's maker and model as the front page's radio list shows them. An id that is not a Crucible radio fails the build. The title's 10 words are counted
+after the name is put in. Do not type a radio's name in a post: `tools/check_generic.py` refuses it.
 
 The build (`tools/crucible_site.py`) puts the newest five posts in `index.html`, so they show without JavaScript. It
 writes all the posts to `data/news.json` (`crucible-news/1`: `first`, then `posts` with `id`, `date`, `title`,

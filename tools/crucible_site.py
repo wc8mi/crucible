@@ -25,6 +25,7 @@ import subprocess
 import sys
 import tempfile
 import tomllib
+import urllib.parse
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -389,8 +390,12 @@ def satellite_page(tle, project, assets, built):
 def local_links(out):
     """Every href and src in the served pages that names a local file names one that is there."""
     bad = []
-    for f in sorted(out.rglob('*.html')):
-        text = re.sub(r'<script type="application/json" id="i18n">.*?</script>', '', f.read_text(), flags=re.S)
+    pages = [(f, re.sub(r'<script type="application/json" id="i18n">.*?</script>', '', f.read_text(), flags=re.S))
+             for f in sorted(out.rglob('*.html'))]
+    feed = out / 'data' / 'news.json'
+    if feed.exists():		# the posts More adds go into index.html
+        pages.append((out / 'index.html', '\n'.join(x['html'] for x in json.loads(feed.read_text())['posts'])))
+    for f, text in pages:
         for ref in re.findall(r'(?:href|src)="([^"]*)"', text):
             if not ref or re.match(r'^(?:[a-z][a-z0-9+.-]*:|//|#)', ref, re.I):
                 continue
@@ -422,11 +427,26 @@ def no_upstream_api(out):
 NEWS_FORMAT = 'crucible-news/1'
 NEWS_FIRST = 5			# posts in the page itself; More loads the next NEWS_FIRST from data/news.json
 NEWS_NAME = re.compile(r'^(\d{4}-\d{2}-\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)\.md$')
+# {{boards/<id>}} in a post is that radio's name (radio_names): a post names a radio without a radio id in its text
+NEWS_BOARD = re.compile(r'\{\{boards/([a-z0-9_]+)\}\}')
+# ADR 001's words: no banned term (titles, the front page, the update page)
+BANNED = r"\b(flash|bootloader|DFU|stock|codeplug|beta|upgrade|OEM)\b|n't"
 
 
-def parse_post(name, text):
+def radio_names(radios):
+    """{board id: 'Maker Model'} for the offered radios, as the front page's radio list names them."""
+    out = {}
+    for r in radios:
+        maker = r.get('maker', '')
+        model = r.get('model') or r['name'].removeprefix(maker + ' ')
+        out.setdefault(r.get('flash', {}).get('board') or r['id'], f'{maker} {model}'.strip())
+    return out
+
+
+def parse_post(name, text, names=None):
     """One post file: the SPDX comment, a front matter (date, title, optional release and seq) and a Markdown body.
-    {id, date, title, release, seq, body}; seq orders posts of one day (higher is newer)."""
+    {id, date, title, release, seq, body}; seq orders posts of one day (higher is newer). names (radio_names) fills
+    {{boards/<id>}}; an id not in it fails."""
     m = NEWS_NAME.match(name)
     if not m:
         raise SiteError(f'news/{name}: name it YYYY-MM-DD-slug.md (lowercase, digits, hyphens)')
@@ -442,6 +462,11 @@ def parse_post(name, text):
                 raise SiteError(f'news/{name}: front matter line {line!r} (date, title, release, seq)')
             meta[k.strip()] = v.strip()
     date, slug = m.groups()
+    def radio(t):
+        if (names or {}).get(t.group(1)) is None:
+            raise SiteError(f'news/{name}: {t.group(0)} is not a Crucible radio')
+        return names[t.group(1)]
+    meta = {k: NEWS_BOARD.sub(radio, v) for k, v in meta.items()}
     if meta.get('date') != date:
         raise SiteError(f'news/{name}: date {meta.get("date")!r} differs from the file name')
     try:
@@ -451,18 +476,20 @@ def parse_post(name, text):
     title, release = meta.get('title', ''), meta.get('release', '')
     if not title or len(title.split()) > 10:
         raise SiteError(f'news/{name}: a title of 1 to 10 words')
+    if re.search(BANNED, title, re.I):
+        raise SiteError(f'news/{name}: the title uses a word ADR 001 does not allow')
     if release and not SAFE.match(release):
         raise SiteError(f'news/{name}: unsafe release tag {release!r}')
-    body = rest[fm.end():].strip()
+    body = NEWS_BOARD.sub(radio, rest[fm.end():]).strip()
     if not body:
         raise SiteError(f'news/{name}: no text')
     return {'id': f'news-{date}-{slug}', 'date': date, 'title': title, 'release': release,
             'seq': int(meta.get('seq') or 0), 'body': body}
 
 
-def read_news(folder):
+def read_news(folder, names=None):
     """Every post in folder, newest first; ids unique."""
-    posts = [parse_post(f.name, f.read_text()) for f in sorted(Path(folder).glob('*.md'))]
+    posts = [parse_post(f.name, f.read_text(), names) for f in sorted(Path(folder).glob('*.md'))]
     ids = [x['id'] for x in posts]
     if len(set(ids)) != len(ids):
         raise SiteError('news: two posts with one name')
@@ -497,9 +524,12 @@ def news_atom(posts, items, project):
     base = project['flasher'].rstrip('/') + '/'
     esc = lambda v: html.escape(v, quote=True)
     updated = (posts[0]['date'] if posts else '2026-01-01') + 'T00:00:00Z'
+    def absolute(item):		# a feed reader has no page to be relative to: every link in a post is made absolute
+        return re.sub(r'((?:href|src)=")([^"]*)"',
+                      lambda m: m.group(1) + html.escape(urllib.parse.urljoin(base, html.unescape(m.group(2)))) + '"', item)
     entries = ''.join(
         f'<entry><id>{esc(base)}#{x["id"]}</id><title>{esc(x["title"])}</title><updated>{x["date"]}T00:00:00Z</updated>'
-        f'<link href="{esc(base)}#{x["id"]}"/><content type="html">{esc(item)}</content></entry>\n'
+        f'<link href="{esc(base)}#{x["id"]}"/><content type="html">{esc(absolute(item))}</content></entry>\n'
         for x, item in zip(posts, items))
     return (f'<?xml version="1.0" encoding="utf-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom">\n'
             f'<id>{esc(base)}news.xml</id><title>{esc(project["name"])} news</title><updated>{updated}</updated>\n'
@@ -569,7 +599,7 @@ def build(out, packages, github, site_out=None):
         (out / SAT_PAGE).write_text(satellite_page((site / SAT_PAGE).read_text(), project, assets, built))
         no_upstream_api(out)
         template = (ROOT / 'site' / 'crucible' / 'installer' / 'page.html').read_text()
-        posts = read_news(ROOT / 'site' / 'crucible' / 'news')
+        posts = read_news(ROOT / 'site' / 'crucible' / 'news', radio_names(radios['radios']))
         items = news_html(posts, project['repo'], markdown_renderer())
         feed = {'format': NEWS_FORMAT, 'first': NEWS_FIRST,
                 'posts': [{k: x[k] for k in ('id', 'date', 'title', 'release')} | {'html': item}
@@ -701,6 +731,16 @@ def self_test():
             raise AssertionError('a link to a folder without index.html passed')
         (out / 'a' / 'index.html').write_text('<a href="../index.html">up</a>')
         local_links(out)
+        (out / 'data').mkdir()
+        (out / 'data' / 'news.json').write_text(json.dumps({'posts': [{'html': '<a href="gone.html">g</a>'}]}))
+        try:
+            local_links(out)
+        except SiteError as e:
+            assert 'gone.html' in str(e)
+        else:
+            raise AssertionError('a missing link in a post only in news.json passed')
+        (out / 'data' / 'news.json').write_text(json.dumps({'posts': [{'html': '<a href="a/">a</a>'}]}))
+        local_links(out)
         js = out / 'static' / 'js' / 'flasher'
         js.mkdir(parents=True)
         for f in ('app.js', 'c7000ui.js'):
@@ -732,7 +772,7 @@ def self_test():
         else:
             raise AssertionError('a lost key or placeholder accepted')
     # ADR 001's words: no banned term, at most 20 words for a step, 25 for anything else (per sentence)
-    banned = r"\b(flash|bootloader|DFU|stock|codeplug|beta|upgrade|OEM)\b|n't"
+    banned = BANNED
     def sentences(text):
         return [x for x in re.split(r'(?<=[.?!])\s+', re.sub(r'<[^>]+>|\{\{\w+\}\}', 'X', text)) if x.strip()]
     offered = crucible.board_ids(ROOT)
@@ -768,7 +808,7 @@ def self_test():
     assert '<a href="https://discord.gg/c">D</a>' in front, 'the front page links the Discord community'
     assert f'<a href="{RF_FLASH}">R</a>' in front and RF_FLASH.startswith('https://radiofoundry.org/'), 'a plain link'
     # news: the repository's posts parse, newest first with unique anchors; a bad file is refused; raw HTML is escaped
-    posts = read_news(ROOT / 'site' / 'crucible' / 'news')
+    posts = read_news(ROOT / 'site' / 'crucible' / 'news', {b: b for b in crucible.board_ids(ROOT)})
     assert posts and [(x['date'], x['seq']) for x in posts] == sorted(((x['date'], x['seq']) for x in posts), reverse=True)
     assert len({x['id'] for x in posts}) == len(posts)
     head = '<!-- SPDX-License-Identifier: MIT -->\n<!-- c -->\n'
@@ -780,7 +820,9 @@ def self_test():
                        ('2026-01-02-a.md', '---\ndate: 2026-01-02\ntitle: ' + 'w ' * 11 + '\n---\nx'),
                        ('2026-01-02-a.md', '---\ndate: 2026-01-02\ntitle: T\nrelease: a/b\n---\nx'),
                        ('2026-01-02-a.md', '---\ndate: 2026-01-02\ntitle: T\nauthor: x\n---\nx'),
-                       ('2026-01-02-a.md', 'date: 2026-01-02\ntitle: T\nx')):
+                       ('2026-01-02-a.md', 'date: 2026-01-02\ntitle: T\nx'),
+                       ('2026-01-02-a.md', '---\ndate: 2026-01-02\ntitle: A beta build\n---\nx'),
+                       ('2026-01-02-a.md', '---\ndate: 2026-01-02\ntitle: T\n---\nThe {{boards/nope}} radio.')):
         try:
             parse_post(name, text)
         except SiteError:
@@ -798,6 +840,19 @@ def self_test():
         assert '&lt;script' in render('<script>x</script>') and 'href="javascript' not in render('[a](javascript:alert(1))')
     feed = news_atom([good], [item], {**proj, 'flasher': 'https://h/c/'})
     assert '<id>https://h/c/#news-2026-01-02-a-b</id>' in feed and '&lt;article' in feed
+    assert 'href=&quot;https://h/c/#news-2026-01-02-a-b&quot;' in feed and 'href=&quot;#' not in feed, 'feed links are absolute'
+    # {{boards/<id>}}: the radio's name, in the title (words counted after) and the body
+    names = radio_names([{'id': 'r1', 'maker': 'Acme', 'model': 'X-1', 'name': 'Acme X-1'},
+                         {'id': 'r2x', 'flash': {'board': 'r2'}, 'maker': 'Acme', 'name': 'Acme Y 2'}])
+    assert names == {'r1': 'Acme X-1', 'r2': 'Acme Y 2'}
+    named = parse_post('2026-01-02-n.md', '---\ndate: 2026-01-02\ntitle: The {{boards/r2}} joins\n---\nOn the {{boards/r1}}.', names)
+    assert named['title'] == 'The Acme Y 2 joins' and named['body'] == 'On the Acme X-1.'
+    try:
+        parse_post('2026-01-02-n.md', '---\ndate: 2026-01-02\ntitle: {{boards/r2}} ' + 'w ' * 8 + '\n---\nx', names)
+    except SiteError:
+        pass
+    else:
+        raise AssertionError('a title over 10 words after the radio name passed')
     front = front_page('{{news}}|{{news_more}}', proj, radios, '1', 'v', item, '<button>')
     assert front == item + '|<button>'
     print('crucible site: package checks, index, page shell, front page, news checks passed')
