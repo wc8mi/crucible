@@ -16,7 +16,7 @@ the next merge. "Crucible only" says why upstream won't take it: identity, the r
 
 <!-- Which radios this touches, from this list, or all (core only), or none (tools, docs):
 generated: tools/boards.py docs radios; edit boards/*/board.toml
-DM-32UV, DM-1701, MD-UV380, MD-9600
+DM-32UV, DM-1701, DB25-D PRO, MD-UV380, MD-9600
 end generated
 -->
 
