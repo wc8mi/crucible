@@ -8066,6 +8066,12 @@ static void clamp_settings(radio_settings_t *s)
 	if (s->dual_delay_ms > RADIO_DUAL_DELAY_MAX_MS) {
 		s->dual_delay_ms = RADIO_DUAL_DELAY_MAX_MS;
 	}
+	if (s->scan_resume > SCAN_RESUME_STOP) {
+		s->scan_resume = SCAN_RESUME_CARRIER;
+	}
+	if (s->scan_hold_s > RADIO_SCAN_HOLD_MAX_S) {
+		s->scan_hold_s = RADIO_SCAN_HOLD_MAX_S;	// scan_cfg_t.hold_ms is 16 bits: past 65 s it would wrap short
+	}
 	if (s->bcast_step > RADIO_BCAST_STEP_100) {
 		s->bcast_step = RADIO_BCAST_STEP_200_ODD;
 	}
@@ -8237,7 +8243,11 @@ static void use_settings(radio_sm_t *sm, const radio_settings_t *s, uint32_t now
 	apply_tot(sm);
 #if CONFIG_SCAN
 	if (scan_on(&sm->scan) && sm->scan.kind != SCAN_DUAL) {
-		sm->scan.cfg.delay_ms = sm->set.scan_delay_ms;	// a scan running now waits the new delay (dual watch has its own)
+		// A scan running now takes the new delay, hold and resume mode (dual watch has its own delay and never
+		// stops on a signal). A change to stop applies from the next signal the scan stops on
+		sm->scan.cfg.delay_ms = sm->set.scan_delay_ms;
+		sm->scan.cfg.hold_ms = (uint16_t)(sm->set.scan_hold_s * 1000u);
+		sm->scan.cfg.resume = sm->set.scan_resume;
 	}
 #endif
 #if CONFIG_DMR_ROAMING

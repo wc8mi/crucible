@@ -1356,6 +1356,81 @@ static void test_scan_delay(void)
 	CHECK(sm.set.scan_delay_ms == RADIO_SCAN_DELAY_MS);
 }
 
+static uint8_t scan_resume_set, scan_hold_set;
+static void set_scan_resume_hold(radio_settings_t *s)
+{
+	s->scan_resume = scan_resume_set;
+	s->scan_hold_s = scan_hold_set;
+}
+
+// Scan resume and Scan hold (Settings > Talk & listen; radio-features.md 1): carrier and 5 s by default; time mode moves
+// on after the hold while the signal lasts; stop ends the scan on a signal; a change reaches a scan already running;
+// both are stored with the radio core's settings and read back at start-up
+static void test_scan_resume_hold(void)
+{
+	start();
+	CHECK(sm.set.scan_resume == SCAN_RESUME_CARRIER && sm.set.scan_hold_s == RADIO_SCAN_HOLD_S &&
+	      RADIO_SCAN_HOLD_S == 5);
+	// Carrier: a signal on "Other" holds the scan for as long as it lasts, past the 5 s hold
+	req(RREQ_SCAN, RSCAN_ZONE);
+	signal_on(0, 145500000, 30, no_tone);
+	for (int i = 0; i < 200 && !(sm.view.zone_pos == 4 && sm.view.scan_phase == SCAN_PH_HOLD); i++) {
+		run(25);
+	}
+	CHECK(sm.view.zone_pos == 4 && sm.view.scan_phase == SCAN_PH_HOLD);
+	run(6000);
+	CHECK(sm.view.zone_pos == 4 && sm.view.scan_phase == SCAN_PH_HOLD);
+	// Time with a 10 s hold, set while holding: the scan running takes it, and 10 s on the signal moves it on
+	scan_resume_set = SCAN_RESUME_TIME;
+	scan_hold_set = 10;
+	settings(set_scan_resume_hold);
+	CHECK(sm.scan.cfg.resume == SCAN_RESUME_TIME && sm.scan.cfg.hold_ms == 10000);
+	run(3500);
+	CHECK(sm.view.zone_pos == 4);
+	run(600);
+	CHECK(sm.view.zone_pos != 4 && sm.view.scan == SCAN_ZONE);
+	// Back on it with a 3 s hold: on after 3 s, though the signal goes on
+	scan_hold_set = 3;
+	settings(set_scan_resume_hold);
+	for (int i = 0; i < 400 && !(sm.view.zone_pos == 4 && sm.view.scan_phase == SCAN_PH_HOLD); i++) {
+		run(25);
+	}
+	CHECK(sm.view.zone_pos == 4 && sm.view.scan_phase == SCAN_PH_HOLD);
+	run(2800);
+	CHECK(sm.view.zone_pos == 4);
+	run(300);
+	CHECK(sm.view.zone_pos != 4 && sm.view.scan == SCAN_ZONE && hw.sig[0].hz == 145500000);
+	// Stop, set while scanning: the next signal ends the scan there
+	scan_resume_set = SCAN_RESUME_STOP;
+	settings(set_scan_resume_hold);
+	CHECK(sm.scan.cfg.resume == SCAN_RESUME_STOP);
+	for (int i = 0; i < 400 && sm.view.scan != SCAN_OFF; i++) {
+		run(25);
+	}
+	CHECK(sm.view.scan == SCAN_OFF && sm.view.zone_pos == 4 && sm.view.state == RS_RX);
+	hw.sig[0].hz = 0;
+	// Out of range: a hold past the most is clamped (16-bit ms in the engine), an unknown mode is carrier
+	scan_resume_set = 7;
+	scan_hold_set = 200;
+	settings(set_scan_resume_hold);
+	CHECK(sm.set.scan_resume == SCAN_RESUME_CARRIER && sm.set.scan_hold_s == RADIO_SCAN_HOLD_MAX_S);
+	// Stored, and read back at start-up
+	scan_resume_set = SCAN_RESUME_TIME;
+	scan_hold_set = 15;
+	settings(set_scan_resume_hold);
+	settings_t st;
+	settings_read(&st);
+	CHECK(st.rs_stored == 1 && st.rs_scan_resume == SCAN_RESUME_TIME && st.rs_scan_hold_s == 15);
+	radio_sm_init(&sm, now);
+	CHECK(sm.set.scan_resume == SCAN_RESUME_TIME && sm.set.scan_hold_s == 15);
+	// A record that never held the radio core's settings: the defaults
+	settings_t *w = settings_begin();
+	w->rs_stored = 0;
+	settings_end(now);
+	radio_sm_init(&sm, now);
+	CHECK(sm.set.scan_resume == SCAN_RESUME_CARRIER && sm.set.scan_hold_s == RADIO_SCAN_HOLD_S);
+}
+
 static void test_scan_ptt_and_modes(void)
 {
 	start();
@@ -2382,6 +2457,11 @@ static void test_dual_wait(void)
 	scan_delay_set = 500;
 	settings(set_scan_delay);
 	CHECK(sm.scan.kind == SCAN_DUAL && sm.scan.cfg.delay_ms == RADIO_DUAL_DELAY_MS && sm.set.scan_delay_ms == 500);
+	// Nor are scan resume and hold: a signal holds dual watch, never ends it, and stays while it lasts
+	scan_resume_set = SCAN_RESUME_STOP;
+	scan_hold_set = 3;
+	settings(set_scan_resume_hold);
+	CHECK(sm.scan.kind == SCAN_DUAL && sm.scan.cfg.resume == SCAN_RESUME_CARRIER);
 	signal_on(0, 445900000, 30, no_tone);
 	CHECK(wait_on(far, 500));
 	run(300);
@@ -4984,6 +5064,7 @@ int main(void)
 	test_vibe_module();
 	test_zone_scan();
 	test_scan_delay();
+	test_scan_resume_hold();
 	test_scan_ptt_and_modes();
 	test_vfo_scan();
 	test_mixed_scan();

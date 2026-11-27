@@ -154,6 +154,10 @@ typedef struct {
 // delay). Crucible's default is 5 s (CRUCIBLE.md, our defaults); RadioFoundry's is 2 s
 #define RADIO_SCAN_DELAY_MS	5000u
 #define RADIO_SCAN_DELAY_MAX_MS	60000u
+// radio_settings_t.scan_hold_s (time mode's hold): the default and the most (Settings > Talk & listen > Scan hold). The
+// scan engine holds it in ms in 16 bits, so a longer one is clamped to the most
+#define RADIO_SCAN_HOLD_S	5u
+#define RADIO_SCAN_HOLD_MAX_S	60u
 
 typedef enum { RADIO_BATT_OK, RADIO_BATT_LOW, RADIO_BATT_CRITICAL } radio_batt_t;	// = batt_level_t
 
