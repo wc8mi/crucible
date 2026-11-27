@@ -226,7 +226,7 @@ CARD = {
              'items': [{'text': 'The programming cable of the radio', 'note': 'A charging cable cannot send data.'},
                        {'text': 'A charged battery', 'note': 'Charge the battery to more than half.'},
                        {'text': 'The TYT or Retevis firmware file',
-                        'note': 'Version 18.03 to 219.74. Files for 5 W and 10 W radios both operate. Step 5 shows each accepted version.'},
+                        'note': 'Version 18.03 to 219.74. A 5 W or a 10 W file gives the voice codec. Step 5 shows each accepted version.'},
                        {'text': "The manufacturer's programming software (CPS)",
                         'note': 'Step 4 uses the CPS to save your channels. Most CPS programs operate only on Windows.'}]},
             SAVE_CPS,
@@ -237,25 +237,25 @@ CARD = {
         # firmware with no keys; the keys ("mode") are the factory update mode, the way in when that fails. The check
         # step backs up the program memory and reads the voice codec from it. Tested on the DBB batch only
         'db25d': {'now': 'stock',
-                  'mode': ['Turn the radio off.', 'Connect the cable to the radio and to the computer.', 'Push and hold P1.',
+                  'mode': ['Set the radio to OFF.', 'Connect the cable to the radio and to the computer.', 'Push and hold P1.',
                            'Push the power key.', 'Release P1. The red LED is on and the screen stays blank. This is correct.'],
                   'steps': [
             {'id': 'radio', 'title': 'Radio'},
             {'id': 'build', 'title': 'Version',
-             'notice': 'CAUTION: Open the Version screen in the radio menu. '
-                       'Crucible is tested only on radios with a version that starts with 909E.DBB.'},
+             'notice': "CAUTION: Look at the radio's Version screen. If the code after 909E. is not DBB, "
+                       'Crucible is not tested on your radio. Do not continue.'},
             {'id': 'need', 'title': 'Things you need', 'kind': 'checklist', 'result': 'Ready',
              'lead': 'Get these items before you start.',
              'items': [{'text': 'The programming cable of the radio', 'note': 'The cable connects to the K1 jack of the radio.'},
-                       {'text': 'A 13.8 V power supply', 'note': 'The radio has no battery. The supply must stay on until the install is complete.'},
+                       {'text': 'A 13.8 V power supply', 'note': 'The radio has no battery. The install stops if the supply power stops.'},
                        {'text': 'The Radioddity firmware file',
                         'note': 'Version 018, from 2024-05-09 or later. The installer usually reads the voice codec from the radio '
                                 'and asks for this file only if it cannot.'},
                        {'text': "The manufacturer's programming software (CPS)",
                         'note': 'Step 4 uses the CPS to save your channels. Most CPS programs operate only on Windows.'}]},
             SAVE_CPS,
-            {'id': 'connect', 'title': 'Update mode', 'result': 'Ready'},
-            {'id': 'check', 'title': 'Backup', 'result': 'Saved'},
+            {'id': 'connect', 'title': 'Update mode'},
+            {'id': 'check', 'title': 'Backup', 'result': 'Checked'},
             {'id': 'write', 'title': 'Install', 'result': 'Installed'},
             {'id': 'done', 'title': 'Check'}]},
     },
@@ -651,17 +651,34 @@ def self_test():
     for key, v in card_texts():
         assert not re.search(r"\b(flash|bootloader|DFU|stock|codeplug|beta)\b|n't", v, re.I), v
         assert len(v.split()) <= (20 if key in ('do', 'mode') else 25), f'too long: {v}'
-    # every card radio: its board, the firmware it expects, its update-mode words, and its family's install steps
-    # (app.js STEPS.install, c7000ui.js INSTALL) in the card, ending in the write and the check
-    backend_steps = {'anyroad-dfu': {'build', 'codec', 'write', 'done'}, 'c7000-stub': {'build', 'connect', 'check', 'write', 'done'}}
+    # every card radio: offered by crucible.toml, its board, the firmware it expects, its update-mode words, and its
+    # backend's install steps in their order (the card sets "now" itself), ending in the write and the check. The
+    # backends' lists are read from their sources: app.js STEPS.install, c7000ui.js INSTALL
+    js = ROOT / 'site' / 'static' / 'js' / 'flasher'
+    def js_list(path, pattern):
+        return re.findall(r'"([a-z]+)"', re.search(pattern, path.read_text()).group(1))
+    backend_steps = {'anyroad-dfu': js_list(js / 'app.js', r'const STEPS = \{\n\tinstall: \[([^\]]*)\]'),
+                     'c7000-stub': js_list(js / 'c7000ui.js', r'const INSTALL = \[([^\]]*)\]')}
+    assert backend_steps['c7000-stub'][-2:] == ['write', 'done'] and 'codec' in backend_steps['anyroad-dfu'], backend_steps
+    def in_order(need, ids):
+        it = iter(ids)
+        return all(x in it for x in need)
+    assert not in_order(backend_steps['c7000-stub'], ['radio', 'build', 'connect', 'write', 'check', 'done'])
+    offered = crucible.board_ids(ROOT)
     for rid, r in CARD['radios'].items():
         toml = ROOT / 'boards' / rid / 'board.toml'
-        assert toml.is_file(), f'card radio {rid}: no board'
+        assert toml.is_file() and rid in offered, f'card radio {rid}: no board, or not in crucible.toml'
         assert r.get('now') == 'stock' and r.get('mode'), f'card radio {rid}: now and mode'
         ids = [s['id'] for s in r['steps']]
         assert 'now' not in ids and ids[0] == 'radio' and ids[-2:] == ['write', 'done'], f'card radio {rid}: {ids}'
         web = boards.FAMILIES[tomllib.loads(toml.read_text())['flash']['family']]['web']
-        assert backend_steps[web] <= set(ids), f'card radio {rid}: {web} needs {sorted(backend_steps[web] - set(ids))}'
+        need = [x for x in backend_steps[web] if x != 'now']
+        assert in_order(need, ids), f'card radio {rid}: {web} needs {need} in order, has {ids}'
+        # cardResult shows a shared step's fixed result whatever the step did: no result may claim an outcome the
+        # engine can skip (the HR_C7000 check step takes no backup on the factory update-mode route)
+        for st in r['steps']:
+            if st.get('kind') != 'checklist' and 'result' in st:
+                assert (st['id'], st['result']) in {('write', 'Installed'), ('check', 'Checked')}, f'card radio {rid}: {st}'
     for v in WORDS.values():
         assert not re.search(r"\b(flash|bootloader|DFU|stock|codeplug|beta)\b|n't", v, re.I), v
     tpl = '{{csp}}<h1>{{name}}</h1><ul>\n{{radios}}\n</ul><p>{{built}}</p><a href="{{issues}}">{{repo_slug}}</a>'
