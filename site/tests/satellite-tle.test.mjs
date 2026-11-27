@@ -29,6 +29,8 @@ test("the AMSAT button uses the page's same-origin proxy path, or the default", 
 		"data:text/plain,x", "/\\evil.example/x", "/\t/evil.example/x", "/\n/evil.example/x", "\\\\evil.example/x",
 		"http://tinker.example/crucible/api/amsat-tle", "https://tinker.example:8443/x"])
 		assert.equal(amsatEndpoint(other, page), AMSAT_API, JSON.stringify(other));
+	for (const ws of ["\u00a0", "\ufeff", "\u2028"])
+		assert.equal(amsatEndpoint(ws + "//evil.example/x", page), AMSAT_API, "a leading space that trim() strips");
 	assert.equal(amsatEndpoint("../../api/amsat-tle", undefined), AMSAT_API, "no page to compare with: the default");
 	const tool = await readFile(new URL("../static/js/tletool.js", import.meta.url), "utf8");
 	assert.match(tool, /amsatEndpoint\(document\.getElementById\("satellite-tle"\)\?\.dataset\.amsatApi\)/);

@@ -29,10 +29,12 @@ export const MAX_SELECTED_PROFILES = 10;
 export const AMSAT_API = "/api/amsat-tle";
 
 export function amsatEndpoint(value, base = globalThis.location?.href) {
-	if (typeof value !== "string" || !value.trim() || !base) return AMSAT_API;
+	const v = typeof value === "string" ? value.trim() : "";
+	if (!v || !base) return AMSAT_API;
 	try {
-		// the browser's own parse, so a tab, newline or backslash cannot turn the path into another host
-		return new URL(value, base).origin === new URL(base).origin ? value.trim() : AMSAT_API;
+		// the browser's own parse of the very string returned, so a tab, newline, backslash or a space that trim()
+		// strips cannot turn the path into another host
+		return new URL(v, base).origin === new URL(base).origin ? v : AMSAT_API;
 	} catch {
 		return AMSAT_API;
 	}
