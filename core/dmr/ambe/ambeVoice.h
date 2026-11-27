@@ -101,6 +101,7 @@ void ambeVoiceSetMixer(ambe_voice_mixer_t mixer);
 // they are. A muted block skips the encoder input leveling, which keeps its state. NULL = none
 typedef bool (*ambe_voice_mic_gate_t)(void);
 void ambeVoiceSetMicGate(ambe_voice_mic_gate_t gate);
+ambe_voice_mic_gate_t ambeVoiceMicGate(void);	// the gate set, for the host tests
 // Microphone gain for AMBE transmissions, Q8 (256 = as the board delivers it). CONFIG_TX_MIC_LIMITER protects
 // peaks before the vocoder when enabled. Any task; a transmission starts at the gain set then and follows changes
 // from the next block. radio_set_mic_gain adds the manual step where software applies it to the board's mic_pcm_db.
