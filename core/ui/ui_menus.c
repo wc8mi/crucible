@@ -8421,7 +8421,8 @@ static bool group_key(const input_event_t *ev)
 	}
 	if (ev->action == ACT_SELECT && (ev->gesture == GESTURE_PRESS || ev->gesture == GESTURE_LONG)) {
 		set_editing = false;
-		bool all = CONFIG_NXDN && s->id == UI_SET_NXDN_TG && set_value == 0xFFFF;	// the talkgroup's All
+		// The talkgroup's All, reached with Up past the top (typed digits start over past 65519, so never reach it)
+		bool all = CONFIG_NXDN && s->id == UI_SET_NXDN_TG && set_value == 0xFFFF;
 		if (!all && (set_value < lo || set_value > hi || (s->step > 1 && (set_value - lo) % s->step != 0))) {
 			// A typed value outside the range or between the steps: say what fits instead of guessing
 			static char msg[40];

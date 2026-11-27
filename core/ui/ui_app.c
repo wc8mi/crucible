@@ -1647,6 +1647,7 @@ static void quick_activate(int tile)
 	case QT_NXDN_RATE: {
 		// The radio default's rate, stored: the VFO and channels in NXDN for now run on it (ui_quick_tile refused
 		// a stored NXDN channel and a rate the board can't run)
+		// From the rate shown (RAM), which can differ from the stored one after debug link op 43: the tile flips what runs
 		bool fast = (view->nxdn.flags & RADIO_NXDN_9600) == 0;
 		if (ui_svc_setting_set(UI_SET_NXDN_RATE, fast))
 			ui_toast(fast ? TR(QUICK_TOAST_NXDN_9600, "NXDN 9600 bit/s") : TR(QUICK_TOAST_NXDN_4800, "NXDN 4800 bit/s"));
