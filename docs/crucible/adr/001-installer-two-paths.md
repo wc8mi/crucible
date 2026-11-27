@@ -208,8 +208,9 @@ support upgrading from a RadioFoundry base."
 |---|---|---|
 | 1 | The home screen has one door, **Update**. Beside it, three steps send a first install to RadioFoundry's flash page (`https://radiofoundry.org/flash/index.html`, a plain link) | A first install from the manufacturer's firmware is RadioFoundry's job. A radio that works on RadioFoundry is a known base for Crucible. |
 | 2 | A policy note on the home screen: Crucible's features are opinionated and some are not tested; Crucible takes in RadioFoundry's changes and removes its own feature on a conflict or when RadioFoundry does it better; to return, install RadioFoundry and reset the settings (ADR 003, ADR 004) | The user decides with the facts in front of them. |
-| 3 | The work card, `data/install-card.json` and the release page's `#install` route are removed. The shared flasher (`app.js`) and its tests are back to their state before phase 2 | No code path is left that a user cannot reach. The shared engine stays as upstream's. |
+| 3 | The work card, `data/install-card.json` and the release page's `#install` route are removed. The shared flasher (`app.js`) and its tests are back to their state before phase 2 (only Crucible's release-page additions are taken out). On a release page, Troubleshooting offers no reinstall, only the restores; the update task keeps its update-mode retry | A release page builds no image, so a reinstall there stops at an empty step. Other changes to the shared flasher stay as they were. |
 | 4 | The update page names RadioFoundry for a first install, and its "not RadioFoundry" stop says to install RadioFoundry first | The words had said "Use Install". |
+| 5 | Under Update, a Satellites door opens the shared Satellite TLE page. It loads new satellite data on a radio with RadioFoundry or Crucible, without a firmware update | The flasher offers that page after an update, and it was not built. |
 
 The Update path does not change. It reads the radio over the debug link and accepts any firmware that answers with a
 board name of a Crucible radio, RadioFoundry's or Crucible's. The screens of the Install path above (4 to 17) are kept

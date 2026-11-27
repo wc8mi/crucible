@@ -1026,7 +1026,8 @@ function updateView() {
 			out.replaceChildren(panel(t(RELEASES ? "flash.release.title" : "flash.update.title"), h("p", {}, t(RELEASES ? "flash.release.lead" : "flash.update.lead")),
 				h("ol", { class: "steps" }, h("li", {}, t("flash.update.step_on")), h("li", {}, t("flash.update.step_cable")),
 					h("li", {}, t("flash.update.step_choose"))),
-				RELEASES ? h("p", { class: "small muted" }, t("flash.release.first_install"))
+				// a release page says where a first install goes in its own page head, once
+				RELEASES ? null
 					: h("p", { class: "small muted" }, t("flash.update.first_install"), " ",
 						h("a", { href: "#", onclick: (e) => { e.preventDefault(); S.task = "install"; S.step = 0; render(); } }, t("flash.update.to_install"))),
 				status));
@@ -3269,14 +3270,18 @@ function fixChooser(st, go) {
 	// a backend's own ways back (the DB25-D's update mode) come after the reinstall
 	const extra = rec.extra?.(S.radio, fb()) || [];
 	for (const x of extra) opts[x.id] = [t(x.title), t(x.text)];
-	const order = { novoice: ["codec", "backup", "stock"], channels: ["backup"], revert: ["backup", "stock"],
+	// a release page only updates a radio that runs the firmware (it builds no image and installs nothing): the ways
+	// back that reinstall (again, codec, a backend's own) are not offered there; the update task's own update-mode
+	// retry still is
+	const reinstalls = new Set(["again", "codec", ...extra.map((x) => x.id)]);
+	const order = ({ novoice: ["codec", "backup", "stock"], channels: ["backup"], revert: ["backup", "stock"],
 		iap: ["updatemode", "backup"] }[st.symptom]
-		|| ["again", ...extra.map((x) => x.id), "backup", "stock"];
+		|| ["again", ...extra.map((x) => x.id), "backup", "stock"]).filter((id) => !RELEASES || !reinstalls.has(id));
 	const start = () => {
 		const pick = st.pick;
 		const own = extra.find((x) => x.id === pick);
 		if (pick === "stock" && rec.stock === "file") return go("stock");
-		if (pick === "again" || pick === "codec" || own) {
+		if (!RELEASES && (pick === "again" || pick === "codec" || own)) {
 			S.task = "install";
 			S.recovering = true;
 			S.step = 0;

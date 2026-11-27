@@ -1081,6 +1081,23 @@ test("the backup after a first install reads through the loader the new build of
 	assert.match(done.slice(0, done.indexOf("backupNow(")), /afterOffer: f4Board\(\) \? await Stub\.rfoundryOffer\(link\) : null/);
 });
 
+// A release page installs nothing: Troubleshooting there offers no reinstall (it would reach a build step that
+// builds nothing), only the restores; the update task keeps its own update-mode retry
+test("a release page's troubleshooting offers no reinstall", () => {
+	const src = readFileSync(new URL("../static/js/flasher/app.js", import.meta.url), "utf8");
+	const fix = src.slice(src.indexOf("function fixChooser("), src.indexOf("function stuckInUpdateMode("));
+	assert.match(fix, /const reinstalls = new Set\(\["again", "codec", \.\.\.extra\.map\(\(x\) => x\.id\)\]\);/);
+	assert.match(fix, /\.filter\(\(id\) => !RELEASES \|\| !reinstalls\.has\(id\)\)/, "the reinstall choices are left out");
+	assert.match(fix, /if \(!RELEASES && \(pick === "again" \|\| pick === "codec" \|\| own\)\) \{\s*S\.task = "install";/,
+		"and a stale pick cannot start an install");
+	for (const m of src.matchAll(/S\.task = "install"/g)) {
+		const before = src.slice(Math.max(0, m.index - 400), m.index);
+		assert.ok(/RELEASES/.test(before), `install reached on a release page: ${src.slice(m.index - 80, m.index + 20)}`);
+	}
+	assert.match(src, /if \(RELEASES && !shortRegister\(\)\) return h\("div", \{ class: "flasher" \}, notice\(t\("flash\.release\.bootloader"\)/,
+		"the update task's update-mode retry stays");
+});
+
 // app.js needs the DOM, so its source is checked: a release page (data-releases) never asks the build service, on any
 // route (Troubleshooting's Reinstall reaches the build step with the release dropped)
 test("a release page never calls the build service", () => {
