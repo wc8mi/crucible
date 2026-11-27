@@ -390,8 +390,6 @@ def local_links(out):
     """Every href and src in the served pages that names a local file names one that is there."""
     bad = []
     for f in sorted(out.rglob('*.html')):
-        if f.parent.name == 'soon':
-            continue		# crucible/soon/: the placeholder page, served on its own with its files beside it
         text = re.sub(r'<script type="application/json" id="i18n">.*?</script>', '', f.read_text(), flags=re.S)
         for ref in re.findall(r'(?:href|src)="([^"]*)"', text):
             if not ref or re.match(r'^(?:[a-z][a-z0-9+.-]*:|//|#)', ref, re.I):
