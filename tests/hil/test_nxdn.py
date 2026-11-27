@@ -224,11 +224,21 @@ def test_nxdn_default_rate_tile(radio):
             radio.wait_for(lambda x: x.get("nxdn.default.rate") == want and x.get("nxdn.rate") == want, 3.0,
                            sections=("nxdn",), what=f"the radio default at {want} bit/s")
     finally:
+        # snapshot/restore don't hold the stored rate: put it back with the tile while still in NXDN
         radio.go_home()
+        if radio.view(["nxdn"]).get("nxdn.default.rate") != rate0:
+            radio.press("quick")
+            radio.press("8")
+            try:
+                radio.wait_for(lambda x: x.get("nxdn.default.rate") == rate0, 3.0, sections=("nxdn",),
+                               what=f"the stored rate put back at {rate0} bit/s")
+            finally:
+                radio.go_home()
         if snap["vfo"] == "1":
             radio.link.dmr_fields(mode=mode0)
         radio.restore(snap)
-    assert radio.view(["nxdn"]).get("nxdn.default.rate") == rate0, "the stored rate not put back"
+    assert radio.view(["nxdn"]).get("nxdn.default.rate") == rate0, \
+        f"the stored NXDN rate not put back to {rate0} bit/s: set it in Settings > Talk & listen > NXDN"
 
 
 # --- A stored NXDN channel (nxdn-codeplug.md, channel-modes.md 2) ---
