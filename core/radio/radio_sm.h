@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The radio core's state machine, without the RTOS: it takes requests and the time, polls board.radio and keeps
 // the view. radio_task.c runs it in a task; the host tests run it against a fake board.
 #ifndef RADIO_SM_H
@@ -110,7 +111,6 @@
 #define RADIO_RX2_TUNE_MS	1500
 #define RADIO_RX2_RETRY_MS	10000
 #define RADIO_SCAN_HOLD_S	5
-#define RADIO_SCAN_DELAY_MS	2000
 
 // Battery monitor: one reading a second, none while transmitting and for a while after (the load sags the voltage)
 #define RADIO_BATT_PERIOD_MS	1000

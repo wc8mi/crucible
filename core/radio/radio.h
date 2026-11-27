@@ -150,6 +150,10 @@ typedef struct {
 // scan dwell after each dwell back on the signal's
 #define RADIO_DUAL_DELAY_MS	1000u
 #define RADIO_DUAL_DELAY_MAX_MS	10000u
+// radio_settings_t.scan_delay_ms: the default and the most the settings screen sets (Settings > Talk & listen > Scan
+// delay). Crucible's default is 5 s (CRUCIBLE.md, our defaults); RadioFoundry's is 2 s
+#define RADIO_SCAN_DELAY_MS	5000u
+#define RADIO_SCAN_DELAY_MAX_MS	60000u
 
 typedef enum { RADIO_BATT_OK, RADIO_BATT_LOW, RADIO_BATT_CRITICAL } radio_batt_t;	// = batt_level_t
 
