@@ -28,10 +28,19 @@ If dual watch is running, starting a scan stops it. The radio stays on the selec
 - Turn on [digital monitor](09-dmr.md) before you start the scan to stop on a call to any talkgroup, not only
   the channel's talkgroup and RX group list. It stays on at every channel and on the one the scan ends on. Pressing
   **Monitor** on a DMR channel during the scan turns it off or on for the rest of the scan.
-- On a signal the scan holds. It moves on 5 s after the signal ends, and stays if the signal comes back. Change the
+- On a signal the scan holds. By default it moves on 5 s after the signal ends, and stays if the signal comes back. Change the
   wait with **Settings > Talk & listen > Scan delay** (1 to 15 s; [Settings](17-settings.md)). A radio updated from
   older firmware keeps its old 2 s if a setting such as Key tones, TX timeout or Backlight was changed since its last
   factory reset: set it there.
+- **Settings > Talk & listen > Scan resume** chooses when the scan leaves a signal:
+
+  | Scan resume | The scan moves on |
+  |---|---|
+  | Carrier (default) | Scan delay after the signal ends. It stays as long as the signal lasts |
+  | Time | After **Scan hold** (3 to 30 s, default 5 s) on the signal, even if it goes on; sooner if the signal ends (after Scan delay) |
+  | Stop | Never: the scan ends on the first signal and the radio stays on that channel. Scan delay isn't used |
+
+  A change takes effect at once, in a scan already running too. Dual watch always waits for the signal to end.
 - Holding **Monitor** pauses the scan.
 
 ## While scanning
