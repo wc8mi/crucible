@@ -93,10 +93,85 @@ WORDS = {
     'flash.f4.go': 'Update',
     'flash.c7.write.title': 'Update',
     'flash.c7.write.go': 'Update',
-    'flash.stay_on_page': 'CAUTION: Keep this page open and the computer screen on until the update is complete.',
+    'flash.stay_on_page': 'CAUTION: Keep this page open and the computer screen on until this step is complete.',
     'flash.start_over': 'Start again',
     'flash.step.check': 'Backup',
+    'flash.codec.title': 'Firmware file',
+    'flash.codec.lead': "Crucible uses the voice codec from the manufacturer's firmware file. The file stays on your computer.",
+    'flash.codec.action_title': "Select the manufacturer's firmware file",
+    'flash.codec.stock_title': "The manufacturer's firmware file",
+    'flash.codec.stock_pick': 'Select the file',
+    'flash.codec.ready_title': 'The installer accepts this file',
+    'flash.codec.mode.merge': "Use the voice codec from the manufacturer's firmware file",
+    'flash.codec.why.unverified_stock': 'the radio cannot show its voice codec',
+    'flash.codec.need_key': 'The installer uses this file to open update mode.',
+    'flash.codec.need_codec': 'Crucible uses the voice codec from this file.',
+    'flash.codec.stock_files': 'Files the installer accepts: {files}.',
+    'flash.codec.key_saved': 'This browser keeps the update key of the radio.',
+    'flash.codec.image': 'Crucible: {what}, {size} bytes.',
+    'flash.codec.why_not.unknown': "The installer cannot read the voice codec of a radio with the manufacturer's firmware.",
+    'flash.codec.or_connect': 'If the radio has Crucible or RadioFoundry, use Update.',
 }
+
+# The install card (ADR 001, decision 4 and amendment 1): the install as one numbered list on the shared install steps
+# (data-card). A radio not listed installs only after its card is written (phase 3). "now": the firmware the card
+# expects on the radio, so the shared step that asks is left out. Words as WORDS; the self-test checks the lengths
+SAVE_CPS = {
+    'id': 'save', 'title': 'Save your channels', 'kind': 'checklist', 'result': 'Saved',
+    'lead': 'Save your channels in a file before the install. Crucible changes the channel memory of the radio.',
+    'do': ['Set the radio to ON.', 'Connect the radio to the computer with the programming cable.', 'Open the CPS.',
+           'In the CPS, click Read. The CPS copies the channels from the radio.', 'Save the file on your computer.'],
+    'confirm': 'I saved my channels in a file.',
+    'alt': {'summary': 'I do not have the CPS', 'result': 'Not saved', 'confirm': 'I continue without a channel file.',
+            'caution': 'CAUTION: Without a channel file, you cannot restore your channels. You must enter them again.'},
+}
+CARD = {
+    'page': {'install': {'title': 'Install Crucible', 'lead': "Install Crucible on a radio with the manufacturer's firmware."},
+             'update': {'title': 'Update Crucible', 'lead': 'Your voice codec, channels and settings stay on the radio.'}},
+    'count': 'Step {n} of {total}',
+    'start': {'steps': [{'id': 'radio', 'title': 'Radio'}, {'id': 'build', 'title': 'Version'},
+                        {'id': 'need', 'title': 'Things you need'}, {'id': 'save', 'title': 'Save your channels'},
+                        {'id': 'codec', 'title': 'Firmware file'}, {'id': 'write', 'title': 'Install'},
+                        {'id': 'done', 'title': 'Check', 'result': 'Installed'}]},
+    'radios': {
+        'dm1701': {'now': 'stock',
+                   'mode': ['Turn the volume knob to OFF.', 'Connect the cable to the radio and to the computer.',
+                            'Push and hold PTT and SK1. SK1 is the key above PTT.', 'Turn the volume knob to ON.',
+                            'Release the keys. The screen stays dark. This is correct.'],
+                   'steps': [
+            {'id': 'radio', 'title': 'Radio'},
+            {'id': 'build', 'title': 'Version'},
+            {'id': 'need', 'title': 'Things you need', 'kind': 'checklist', 'result': 'Ready',
+             'lead': 'Get these items before you start.',
+             'items': [{'text': 'The programming cable of the radio', 'note': 'A charging cable cannot send data.'},
+                       {'text': 'A charged battery', 'note': 'Charge the battery to more than half.'},
+                       {'text': 'The Baofeng firmware file', 'note': 'Version V02.06, or Radioddity V02.01 to V02.03.'},
+                       {'text': "The manufacturer's programming software (CPS)",
+                        'note': 'Step 4 uses the CPS to save your channels. Most CPS programs operate only on Windows.'}]},
+            SAVE_CPS,
+            {'id': 'codec', 'title': 'Firmware file'},
+            {'id': 'write', 'title': 'Install', 'result': 'Installed'},
+            {'id': 'done', 'title': 'Check'}]},
+    },
+}
+
+
+def card_texts(card=CARD):
+    """Every string of the card a user reads, with whether it is an instruction (at most 20 words) or not (25)."""
+    out = []
+    def walk(v, key=''):
+        if isinstance(v, dict):
+            for k, x in v.items():
+                if k not in ('id', 'kind', 'now'):
+                    walk(x, k)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x, key)
+        elif isinstance(v, str):
+            out.append((key, v))
+    walk(card)
+    return out
+
 
 # Crucible sends nothing to RadioFoundry or any other service: the browser allows requests and scripts from this
 # site only (inline scripts: the theme and terms lines in the head), whatever a shared module tries
@@ -274,7 +349,7 @@ def crucible_page(flash, project, assets, built):
     page = page[:m.start()] + head + page[m.end():]
     m = one(r'<body [^>]*>', page, 'body tag')
     page = page[:m.start()] + ('<body class="page-flash" data-root="" data-home="" data-gl-more="More" '
-                               'data-releases="releases/index.json" data-reporting="off">') + page[m.end():]
+                               'data-releases="releases/index.json" data-card="data/install-card.json" data-reporting="off">') + page[m.end():]
     band = ('<header class="cx-band">\n\t<div class="wrap">\n'
             f'\t\t<a class="cx-brand" href="./">{MARK}<span class="cx-word">{name}</span></a>\n'
             f'\t\t<button class="theme-toggle" type="button" aria-label="Switch light and dark" title="Switch light and dark">{THEME_ICON}</button>\n'
@@ -354,6 +429,10 @@ def build(out, packages, github, site_out=None):
         radios = json.loads((site / 'data' / 'radios.json').read_text())
         radios['radios'] = [r for r in radios['radios'] if r.get('id') in boards or r.get('flash', {}).get('board') in boards]
         radios['planned'] = []
+        for r in radios['radios']:		# the card's update-mode steps (its words) replace the shared ones
+            mode = CARD['radios'].get(r.get('id'), {}).get('mode')
+            if mode:
+                r['flash']['bootloader'] = mode
         (out / 'data' / 'radios.json').write_text(json.dumps(radios))
         info = json.loads((site / 'data' / 'site.json').read_text())
         commit = subprocess.run(['git', 'rev-parse', '--short=8', 'HEAD'], cwd=ROOT, capture_output=True,
@@ -361,6 +440,7 @@ def build(out, packages, github, site_out=None):
         info.update({'version': f'crucible-{commit}', 'branch': '', 'repo': project['repo'], 'community': '', 'release': '', 'beta': '', 'reports': {'sentry_dsn': ''}})
         info.pop('tool', None)
         (out / 'data' / 'site.json').write_text(json.dumps(info, indent=1))
+        (out / 'data' / 'install-card.json').write_text(json.dumps(CARD, indent=1) + '\n')
         shutil.copytree(ROOT / 'site' / 'crucible', out / 'crucible', ignore=shutil.ignore_patterns('page.html'))
         brand = ROOT / 'docs' / 'crucible' / 'brand'
         for size in (32, 180, 512):
@@ -462,6 +542,10 @@ def self_test():
             pass
         else:
             raise AssertionError('a lost key or placeholder accepted')
+    for key, v in card_texts():
+        assert not re.search(r"\b(flash|bootloader|DFU|stock|codeplug|beta)\b|n't", v, re.I), v
+        assert len(v.split()) <= (20 if key in ('do', 'mode') else 25), f'too long: {v}'
+    assert all(s['id'] != 'now' for r in CARD['radios'].values() for s in r['steps']) and CARD['radios']['dm1701']['now'] == 'stock'
     for v in WORDS.values():
         assert not re.search(r"\b(flash|bootloader|DFU|stock|codeplug|beta)\b|n't", v, re.I), v
     tpl = '{{csp}}<h1>{{name}}</h1><ul>\n{{radios}}\n</ul><p>{{built}}</p><a href="{{issues}}">{{repo_slug}}</a>'

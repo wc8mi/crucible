@@ -156,6 +156,9 @@ const API = "https://api.radiofoundry.org/v1/";
 // build service; with data-reporting="off" it sends nothing to the project's services either (a fork's own page): no
 // flash log, no problem report or stock file upload (the report dialog saves a file instead), no build lookup
 const RELEASES = document.body.dataset.releases || "";
+// A page's install card (data-card, its JSON): the install as one numbered list, the current step open, done steps one
+// line with their result, the steps and their words the page's (cardFor). Without it the stepper
+const CARD = document.body.dataset.card || "";
 // A page of prebuilt releases updates by default; #install starts a first install from the same releases
 const releaseTask = () => (/(?:^#|&)install(?:&|$)/.test(location.hash) ? "install" : "update");
 const NO_REPORTING = document.body.dataset.reporting === "off";
@@ -390,10 +393,57 @@ const RECOVER_INSTALL = ["build", "codec", "write", "done"];
 // The radio's backend (backends.js) decides a task's steps; the shared ones otherwise. An update whose build the user
 // edits (or whose build the radio doesn't say) takes the build step after its first
 function stepsFor() {
+	const c = cardFor();
+	if (c) return c.steps.map((x) => x.id);
 	const s = (S.radio && backendOf(S.radio).steps(S.task, { recovering: !!S.recovering })) || STEPS[S.task];
 	return S.task === "update" && S.editBuild ? [s[0], "build", ...s.slice(1)] : s;
 }
 const backend = () => backendOf(S.radio);
+
+// The install card for the picked radio ({now, steps: [{id, title, kind?, ...}]}), the card's start before a radio is
+// picked; none for a radio the card leaves out (the stepper then), a help task's install or any other task
+const cardFor = () => {
+	const c = S.task === "install" && !S.recovering ? S.data?.card : null;
+	return !c ? null : S.radio ? c.radios?.[S.radio.id] || null : c.start || null;
+};
+const cardStep = (id) => cardFor()?.steps.find((x) => x.id === id) || null;
+
+// A card's own step (kind "checklist"): what to have or do before the install, and the box that says it is done. An
+// alternative (alt) is a second box behind its own caution, for the user who continues without (no channel file)
+function checklistView(def) {
+	const out = h("div", { class: "flasher card-check" });
+	const marks = (S.cardChecks ||= {});
+	const alt = `${def.id}.alt`;
+	const draw = () => {
+		const box = (key, text) => h("label", { class: "accept" },
+			h("input", { type: "checkbox", checked: marks[key] === true, onchange: (e) => { marks[key] = e.target.checked; draw(); } }), h("span", {}, text));
+		const ok = !def.confirm || marks[def.id] || (def.alt && marks[alt]);
+		out.replaceChildren(...[
+			def.lead ? h("p", {}, def.lead) : null,
+			def.items ? h("ul", { class: "need" }, def.items.map((i) => h("li", {}, h("span", {}, i.text, i.note ? h("small", {}, i.note) : null)))) : null,
+			def.do ? h("ol", { class: "do" }, def.do.map((x) => h("li", {}, x))) : null,
+			def.confirm ? box(def.id, def.confirm) : null,
+			def.alt ? h("details", { class: "fold", open: !!(marks[alt] || marks[`${alt}.open`]),
+				ontoggle: (e) => { marks[`${alt}.open`] = e.target.open; } },
+			h("summary", {}, def.alt.summary), notice(def.alt.caution, "warn"), box(alt, def.alt.confirm)) : null].filter(Boolean));
+		S.forward(button(t("flash.nav.to_now"), next, { primary: true, disabled: !ok }));
+	};
+	draw();
+	return out;
+}
+
+// What a done step of the card closes to: the radio, the release, the firmware file's version, a checklist's result
+function cardResult(id) {
+	const def = cardStep(id), marks = S.cardChecks || {};
+	if (def?.kind === "checklist") return !def.confirm || marks[id] ? def.result || "" : marks[`${id}.alt`] ? def.alt?.result || "" : "";
+	if (id === "radio") return S.radio?.name || "";
+	if (id === "build") {
+		const opts = Object.entries(S.buildOptions || {}).map(([k, v]) => buildOptions().find((o) => o.name === k)?.values.find((x) => x.id === v)?.title || v);
+		return [S.firmware?.source, ...opts].filter(Boolean).join(" · ");
+	}
+	if (id === "codec") return S.stock?.info?.known?.match(/V\d+(?:\.\d+)+/)?.[0] || S.stock?.name || def?.result || "";
+	return def?.result || "";
+}
 // A radio without a display: what the page tells the user to look at can't be its screen
 const noScreen = () => hasNoScreen(S.radio);
 
@@ -406,15 +456,18 @@ async function loadData() {
 	const vars = variants.variants.map((v) => ({ ...v, title: tOr(`variant.${v.id}.title`, v.title), summary: tOr(`variant.${v.id}.summary`, v.summary) }));
 	// the prebuilt releases this page offers (releases.js), their paths relative to the index
 	const index = RELEASES ? { ...rel.parseIndex(await (await fetch(new URL(RELEASES, location.href))).json()), base: new URL(RELEASES, location.href) } : null;
+	const card = CARD ? await (await fetch(new URL(CARD, location.href))).json() : null;
 	return { radios: radios.radios, features: feats, groups: features.groups, reported: features.reported || [],
-		variants: vars, fb, releases: releases.releases, site, index };
+		variants: vars, fb, releases: releases.releases, site, index, card };
 }
 
 const fb = () => (S.sim ? S.sim.fb : S.data.fb);
 // Every image comes from the build service, so a radio needs only a backend the page has for it (backends.js)
 // In the practice mode only the simulated radio: S.sim (its key, stock file, fake radio) is that radio's, and another
 // one picked on the radio step met a missing stock file at the codec step (OPENDIGITALRADIO-22)
-const available = (r, task) => (!S.sim?.radio || r.id === S.sim.radio) && backendOf(r).available(r, fb(), task);
+// A page with an install card installs only the radios the card has steps for
+const available = (r, task) => (!S.sim?.radio || r.id === S.sim.radio) && backendOf(r).available(r, fb(), task)
+	&& (task !== "install" || !S.data?.card || !!S.data.card.radios?.[r.id]);
 
 // The STM32 radios: stock firmware is reached through the AnyRoad bootloader (dfu.js), which takes
 // the key from the stock file; a radio running RadioFoundry with stub entry also updates and backs up through the STM32F4
@@ -791,7 +844,7 @@ async function getKey(board) {
 
 // The steps that never talk to the radio: everything else may have a transfer running
 const NO_TRANSFER = new Set(["radio", "build", "bundle", "symptom", "recover", "done"]);
-const transferStep = () => !!S.task && !NO_TRANSFER.has(stepsFor()[S.step]);
+const transferStep = () => !!S.task && !NO_TRANSFER.has(stepsFor()[S.step]) && cardStep(stepsFor()[S.step])?.kind !== "checklist";
 const trail = stepHistory(window, {
 	busy: () => barsRunning() && transferStep(),
 	show: (place) => {
@@ -813,15 +866,33 @@ function render() {
 	const label = (s) => (S.radio && backend().stepLabel?.(s, S.task)) || s;
 	const stepper = () => h("ol", { class: "stepper" }, stepsFor().map((s, i) =>
 		h("li", { class: i < S.step ? "done" : "", "aria-current": i === S.step ? "step" : false }, t(`flash.step.${label(s)}`))));
-	let shown = stepper();
+	// the page's words for the task (the card's page: {install: {title, lead}, update: ...})
+	const words = S.data?.card?.page?.[S.task];
+	if (words) {
+		const head = document.querySelector(".page-head");
+		if (head?.querySelector("h1")) head.querySelector("h1").textContent = words.title;
+		if (head?.querySelector(".lead")) head.querySelector(".lead").textContent = words.lead || "";
+	}
+	// a card puts the step's view and its buttons inside the open step; the stepper puts them under it
+	const card = cardFor();
+	let host = app;
+	const cardList = () => h("div", { class: "workcard" },
+		h("p", { class: "card-count" }, (S.data.card.count || "{n} / {total}").replace("{n}", S.step + 1).replace("{total}", card.steps.length)),
+		h("div", { class: "mould" }, h("span", { style: `width: ${Math.max(4, Math.round((100 * S.step) / card.steps.length))}%` })),
+		h("ol", { class: "card-steps" }, card.steps.map((x, i) => h("li", { class: `card-step${i < S.step ? " done" : i === S.step ? " now" : ""}`,
+			"aria-current": i === S.step ? "step" : false },
+		h("span", { class: "n" }, String(i + 1)), h("span", { class: "t" }, x.title),
+		i < S.step ? h("span", { class: "v" }, cardResult(x.id)) : null,
+		i === S.step ? (host = h("div", { class: "body" })) : null))));
+	let shown = card ? cardList() : stepper();
 	app.append(shown);
-	render.stepper = () => { const n = stepper(); shown.replaceWith(n); shown = n; };
-	if (S.sim) app.append(h("p", { class: "small muted sim-line" }, t("flash.sim.banner")));
-	if (VERSION_REF && S.task === "install") app.append(versionBanner());
-	else if (S.task === "install" && S.step === 0) app.append(...[betaNotice()].filter(Boolean));
-	if (S.radio && S.radio.status !== "supported" && S.step > 0) app.append(prereleaseNotice());
+	render.stepper = card ? () => {} : () => { const n = stepper(); shown.replaceWith(n); shown = n; };
+	if (S.sim) host.append(h("p", { class: "small muted sim-line" }, t("flash.sim.banner")));
+	if (VERSION_REF && S.task === "install") host.append(versionBanner());
+	else if (S.task === "install" && S.step === 0) host.append(...[betaNotice()].filter(Boolean));
+	if (S.radio && S.radio.status !== "supported" && S.step > 0) host.append(prereleaseNotice());
 	// a hardware variant in development, once the page read it or the user picked it (board.toml [hardware] variants)
-	if (S.radio && S.variant && S.step > 0) app.append(...[variantWarning(variantVerdict(S, S.radio.flash.board))].filter(Boolean));
+	if (S.radio && S.variant && S.step > 0) host.append(...[variantWarning(variantVerdict(S, S.radio.flash.board))].filter(Boolean));
 	// One bar of buttons under every step: back, start over, and the step's own next action, which the view sets (and
 	// changes when it redraws) through S.forward. The main action is always there, at the right; a step never puts a
 	// second one in its panel. S.forward also takes [alternative, ..., main].
@@ -839,11 +910,12 @@ function render() {
 	S.reportStep = here;
 	// a step this browser can't run (no WebUSB or Web Serial): the manual install kit in its place
 	const missing = S.radio && !S.sim && missingApi(S.radio, S.task, step, { usb: usbSupported(), serial: serialSupported(), stub: stubRoute() });
-	const view = (missing && (() => kitView(missing))) || (step === "restore" && bundleBackend(S.bundle)?.views.restore) || (S.radio && backend().views[step])
+	const own = cardStep(step)?.kind === "checklist" ? () => checklistView(cardStep(step)) : null;
+	const view = (missing && (() => kitView(missing))) || own || (step === "restore" && bundleBackend(S.bundle)?.views.restore) || (S.radio && backend().views[step])
 		|| { update: updateView, radio: radioView, build: buildView, bundle: bundleView, symptom: symptomView, recover: recoverView, restart: restartView }[step];
-	if (!missing && transferStep()) app.append(h("p", { class: "notice bad" }, h("strong", {}, t("flash.stay_on_page"))));
-	app.append(view());
-	app.append(h("div", { class: "nav-bar" },
+	if (!missing && transferStep()) host.append(h("p", { class: "notice bad" }, h("strong", {}, t("flash.stay_on_page"))));
+	host.append(view());
+	host.append(h("div", { class: "nav-bar" },
 		h("div", { class: "nav-back" },
 			S.step > 0 ? button("← " + t("flash.back"), () => { S.step--; render(); }) : null,
 			h("button", { class: "btn btn-quiet", type: "button", onclick: () => reset() }, t("flash.start_over")),
@@ -1302,6 +1374,10 @@ function selectRadio(r) {
 	S.buildOptions = {};
 	S.variant = null;	// the hardware variant is read from the radio again
 	S.stockRead = null;
+	S.cardChecks = {};
+	// a card for radios with the manufacturer's firmware answers the current-firmware question itself (no "now" step)
+	const c = cardFor();
+	if (c?.now) S.now = nowFor(c.now);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
