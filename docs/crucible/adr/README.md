@@ -10,7 +10,7 @@ record's supporting material (prototypes, screens) goes in a folder with the sam
 |---|---|---|
 | [001](001-installer-two-paths.md) | The installer page: two paths, a work card, plain words | Accepted |
 | [002](002-tx-level-on-air.md) | TX level: one on-air target, a trim per radio | Superseded by 003 |
-| [003](003-digital-agc.md) | Digital AGC: two switches, defaults per radio | Proposed |
+| [003](003-digital-agc.md) | Digital AGC: two switches, defaults per radio | Accepted |
 
 ## How to add one
 

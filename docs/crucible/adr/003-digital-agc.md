@@ -5,7 +5,7 @@
 
 | | |
 |---|---|
-| Status | Proposed (2026-11-26). KF8S accepts. |
+| Status | Accepted (2026-11-27, KF8S) |
 | Date | 2026-11-26 |
 | Decides | How the digital receive and transmit audio levels are set on each radio |
 | Supersedes | [002](002-tx-level-on-air.md) |
