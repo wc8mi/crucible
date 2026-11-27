@@ -61,6 +61,7 @@ is `tools/bringup.py list --radio <id>`.
 | `p25_parrot` | off | off | off | off | off | off | off | off |
 | `p25_trunk` | off | off | off | off | not written | off | off | off |
 | `nxdn` | not recorded | not recorded | not recorded | not recorded | not written | not recorded | not recorded | partial, needs re-run |
+| `nxdn_default` | not recorded | not recorded | not recorded | not recorded | not written | not recorded | not recorded | not recorded |
 | `nxdn_scrambler` | not recorded | not recorded | not recorded | not recorded | not written | not recorded | not recorded | not recorded |
 | `ysf` | not recorded | not recorded | not recorded | not recorded | not written | not recorded | not recorded | not recorded |
 | `dmr_voice` | pass (seed) | pass (seed) | pass (seed) | pass (seed) | pass (seed) | not recorded | partial, needs re-run | partial, needs re-run |
@@ -400,13 +401,14 @@ The levels each radio uses while **Digital AGC RX** and **Digital AGC TX** are O
 |---|---|---|---|
 | DM-32UV | -30 | -26 | -20 |
 | DM-1701 | -30 | -30 | -20 |
+| DB25-D PRO | -30 | -30 | -20 |
 | MD-UV380 | -30 | -30 | -20 |
 | MD-9600 | -25 | -30 | -20 |
 | Other radios | -30 | -30 | -20 |
 
 The DM-32UV and DM-1701 TX values come from on-air measurements (Yaesu receiver, body mic, one voice): those
 encoder targets gave about -34 dBFS on air, 8 and 4 dB above the setting ([ADR 002](crucible/adr/002-tx-level-on-air.md)).
-The MD-UV380 and MD-9600 were not measured.
+The MD-UV380, MD-9600 and DB25-D PRO were not measured.
 
 ## DMR data
 
