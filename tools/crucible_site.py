@@ -80,10 +80,66 @@ WORDS = {
     'flash.write.finished': 'The update is complete. The radio starts again.',
     'flash.write.failed': 'STOP: The update stopped ({error}). Put the radio in update mode and do the update again.',
     'flash.write.unexpected': 'STOP: The radio reports “{what}”. This is not the radio you selected.',
-    'flash.done.title': 'Check the update',
-    'flash.done.lead': 'When the radio shows its screen again, click Check the update.',
-    'flash.done.lead_noscreen': 'When the radio starts again, click Check the update.',
-    'flash.done.check': 'Check the update',
+    'flash.done.title': 'Check the radio',
+    'flash.done.lead': 'When the radio shows its screen again, click Check the radio.',
+    'flash.done.lead_noscreen': 'When the radio starts again, click Check the radio.',
+    'flash.done.check': 'Check the radio',
+    # The Check step: the check, the backup after the install and the channel transfer. No "codeplug", "stock" or
+    # Codeplug Editor (the Crucible site has no editor)
+    'flash.done.pick_port': 'The radio now has Crucible. The browser shows it as a new device. Click Check the radio '
+                            'again and select {radio} in the list. If the list is empty, wait until the radio starts.',
+    'flash.done.no_codec': "STOP: The radio has no voice codec. DMR voice is not available. FM operates. Go back to "
+                           "Firmware file and select the manufacturer's firmware file.",
+    'flash.backup.title_after': 'Make a backup of the radio',
+    'flash.backup.after_lead': 'The radio has its original channels and calibration. Make a backup of them now.',
+    'flash.backup.after_channels': 'After the backup, the installer changes your channels, zones and contacts for '
+                                   'Crucible and writes them to the radio. The backup keeps the original channels.',
+    'flash.backup.opt.all_text': 'Firmware, voice codec, calibration, channels and all other data in the memory chip.',
+    'flash.backup.opt.firmware_text': 'The firmware, the voice codec and the factory calibration.',
+    'flash.backup.opt.codeplug': 'Channels and calibration',
+    'flash.backup.opt.codeplug_text': 'Channels, contacts, zones, settings and the factory calibration.',
+    'flash.backup.opt.calibration_text': 'Only the factory calibration. This is the tuning data of the radio.',
+    'flash.backup.run': 'Make the backup',
+    'flash.backup.saved': 'The backup is saved as “{name}” ({size} KB). Keep it in a safe place.',
+    'flash.nav.finish_no_backup': 'Finish without a backup',
+    'flash.nav.finish_no_channels': 'Finish without channels',
+    'report.something_wrong': 'Is there a problem?',
+    'flash.channels.reading': 'Reading the channels',
+    'flash.channels.writing': 'Writing the channels',
+    'flash.channels.done': 'Your channels are on the radio: {counts}.',
+    'flash.channels.found': 'The radio has your channels from the manufacturer\'s firmware: {counts}. The installer can '
+                            'change them for Crucible and write them to the radio.',
+    'flash.channels.no_backup': 'CAUTION: You do not have a backup of your channels. If the write stops, you cannot '
+                                'restore them.',
+    'flash.channels.go': 'Write the channels',
+    'flash.channels.none': 'The radio has no channels to write.',
+    'flash.channels.no_storage': 'The memory chip of this radio is too small for Crucible channels. The installer did '
+                                 'not write them.',
+    'flash.channels.read_failed': 'The installer cannot read the channels. Crucible operates without them. The backup '
+                                  'has your channels.',
+    'flash.channels.convert_failed': 'The installer cannot change the channels for Crucible. Crucible operates without '
+                                     'them. The backup has your channels.',
+    'flash.channels.write_failed': 'STOP: The channel write stopped. Crucible operates without channels. The backup has '
+                                   'your channels. Report the problem.',
+    'flash.channels.check_failed': 'STOP: The radio did not accept the channels. It expected {want} and has {have}. The '
+                                   'backup has your channels. Report the problem.',
+    'flash.channels.read_failed_no_backup': 'The installer cannot read the channels. Crucible operates without them. '
+                                            'The channels are still in the radio. Make a backup to keep them.',
+    'flash.channels.convert_failed_no_backup': 'The installer cannot change the channels for Crucible. Crucible '
+                                               'operates without them. Make a backup to keep them.',
+    'flash.channels.write_failed_no_backup': 'STOP: The channel write stopped. Part of your channels can be lost. '
+                                             'Report the problem.',
+    'flash.channels.check_failed_no_backup': 'STOP: The radio did not accept the channels. It expected {want} and has '
+                                             '{have}. Report the problem.',
+    'flash.c7.channels.replace': 'The radio has Crucible channels: {have}. The original channels ({want}) replace them.',
+    'flash.c7.channels.keep': 'Keep these channels',
+    'flash.c7.channels.go': 'Write the original channels',
+    'flash.c7.channels.failed': 'STOP: The channel write stopped. The original channels are on the radio. They did not '
+                                'change.',
+    'flash.c7.channels.check_failed': 'STOP: The radio did not accept the channels. It expected {want} and has {have}. '
+                                      'The original channels are on the radio. Report the problem.',
+    'flash.c7.check.title': 'Back up and check the radio',
+    'flash.c7.check.run': 'Back up and check',
     'flash.done.ready': 'Crucible operates. DMR voice is available.',
     'flash.step.update': 'Find',
     'flash.step.write': 'Update',
