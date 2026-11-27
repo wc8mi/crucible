@@ -100,6 +100,14 @@ WORDS = {
     'flash.step.check': 'Backup',
 }
 
+# Crucible sends nothing to RadioFoundry or any other service: the browser allows requests and scripts from this
+# site only (inline scripts: the theme and terms lines in the head), whatever a shared module tries
+CSP = ('<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; connect-src \'self\'; '
+       'script-src \'self\' \'unsafe-inline\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data:; '
+       'font-src \'self\'; object-src \'none\'; base-uri \'self\'; form-action \'none\'">')
+# The shared flasher's build service; the copy Crucible serves has none (no_upstream_api)
+UPSTREAM_API = 'const API = "https://api.radiofoundry.org/v1/";'
+
 # The update page sends a visitor who has not accepted the terms on this computer to the front page (ADR 001)
 TERMS_FIRST = '<script>try{if(localStorage.getItem("crucible-terms")!=="1")location.replace("./#terms")}catch(e){}</script>'
 
@@ -252,7 +260,7 @@ def crucible_page(flash, project, assets, built):
     name = html.escape(project['name'])
     title = f'{name} · Update'
     lead = 'Your voice codec, channels and settings stay on the radio.'
-    head = (f'<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+    head = (f'<head>\n<meta charset="utf-8">\n{CSP}\n<meta name="viewport" content="width=device-width, initial-scale=1">\n'
             f'<title>{title}</title>\n<meta name="description" content="{html.escape(project["tagline"])}">\n'
             f'<meta name="theme-color" content="#ff7738">\n<meta name="robots" content="noindex">\n'
             f'<link rel="icon" href="crucible/icon-32.png?v={assets}" type="image/png" sizes="32x32">\n'
@@ -296,6 +304,21 @@ def crucible_page(flash, project, assets, built):
     return page
 
 
+def no_upstream_api(out):
+    """Take the build service's address out of the served flasher, then fail if any RadioFoundry service is left."""
+    app = out / 'static' / 'js' / 'flasher' / 'app.js'
+    src = app.read_text()
+    if src.count(UPSTREAM_API) != 1:
+        raise SiteError('flash page: the API line of app.js changed (the shared page changed?)')
+    app.write_text(src.replace(UPSTREAM_API, 'const API = "";	// Crucible: no build service (tools/crucible_site.py)'))
+    site = out / 'data' / 'site.json'
+    if site.exists() and (json.loads(site.read_text()).get('reports') or {}).get('sentry_dsn'):
+        raise SiteError('data/site.json: error reporting is on (reports.sentry_dsn)')
+    for f in out.rglob('*'):
+        if f.suffix in ('.js', '.html', '.json') and re.search(r'api\.radiofoundry\.org', f.read_text(errors='replace')):
+            raise SiteError(f'{f.relative_to(out)}: names a RadioFoundry service')
+
+
 def front_page(template, project, radios, assets, built):
     """Crucible's front page (site/crucible/installer/page.html): the browser gate, the terms and the two doors."""
     items = []
@@ -305,7 +328,7 @@ def front_page(template, project, radios, assets, built):
         small = html.escape(maker + (f' · also {also}' if also else ''))
         items.append(f'\t\t\t<li>{html.escape(model)} <small>{small}</small></li>')
     fill = {k: html.escape(project[k]) for k in ('name', 'tagline', 'repo', 'issues', 'upstream', 'maintainer')}
-    fill.update(assets=html.escape(assets), built=html.escape(built), radios='\n'.join(items),
+    fill.update(csp=CSP, assets=html.escape(assets), built=html.escape(built), radios='\n'.join(items),
                 repo_slug=html.escape(project['repo'].removeprefix('https://github.com/')))
     page = re.sub(r'\{\{(\w+)\}\}', lambda m: fill[m.group(1)], template)
     if not items:
@@ -348,6 +371,7 @@ def build(out, packages, github, site_out=None):
         assets = re.search(r'\?v=([0-9a-f]+)', flash).group(1)
         built = f'{project["name"]} {commit} · page built {info.get("built", "")}'
         (out / 'update.html').write_text(crucible_page(flash, project, assets, built))
+        no_upstream_api(out)
         template = (ROOT / 'site' / 'crucible' / 'installer' / 'page.html').read_text()
         (out / 'index.html').write_text(front_page(template, project, radios['radios'], assets, built))
     releases = [local_release(p) for p in packages]
@@ -416,6 +440,20 @@ def self_test():
     assert 'data-releases="releases/index.json"' in page and 'data-reporting="off"' in page
     assert '"Your radio"' in page and '<h1>Update Crucible</h1>' in page and 'Runs Crucible' in page and 'beta-notice' not in page and 'site-header' not in page
     assert '"static/js/flasher/app.js' in page and '../' not in page and 'not affiliated' in page
+    assert CSP in page and "connect-src 'self'" in CSP, 'the update page allows requests to this site only'
+    with tempfile.TemporaryDirectory() as d:
+        js = Path(d) / 'static' / 'js' / 'flasher'
+        js.mkdir(parents=True)
+        (js / 'app.js').write_text(f'x\n{UPSTREAM_API}\ny\n')
+        no_upstream_api(Path(d))
+        assert 'radiofoundry' not in (js / 'app.js').read_text()
+        (Path(d) / 'data.json').write_text('"https://api.radiofoundry.org/v1/samples"')
+        try:
+            no_upstream_api(Path(d))
+        except SiteError:
+            pass
+        else:
+            raise AssertionError('a RadioFoundry service left in the output')
     assert 'location.replace("./#terms")' in page, 'the update page asks for the terms first'
     shared = json.loads((ROOT / 'site' / 'i18n' / 'en.json').read_text())
     assert words(shared) is WORDS, 'every Crucible word replaces a shared key with the same placeholders'
@@ -428,11 +466,11 @@ def self_test():
             raise AssertionError('a lost key or placeholder accepted')
     for v in WORDS.values():
         assert not re.search(r"\b(flash|bootloader|DFU|stock|codeplug|beta)\b|n't", v, re.I), v
-    tpl = '<h1>{{name}}</h1><ul>\n{{radios}}\n</ul><p>{{built}}</p><a href="{{issues}}">{{repo_slug}}</a>'
+    tpl = '{{csp}}<h1>{{name}}</h1><ul>\n{{radios}}\n</ul><p>{{built}}</p><a href="{{issues}}">{{repo_slug}}</a>'
     radios = [{'name': 'TYT X-2', 'maker': 'TYT', 'model': 'X-2', 'also': ['TYT X-3', 'Other Y'], 'order': 2},
               {'name': 'B Z-1', 'maker': 'B', 'model': 'Z-1', 'also': [], 'order': 1}]
     front = front_page(tpl, proj, radios, '1', 'v <b>')
-    assert '{{' not in front and '<h1>Crucible</h1>' in front and 'v &lt;b&gt;' in front
+    assert front.startswith(CSP) and '{{' not in front and '<h1>Crucible</h1>' in front and 'v &lt;b&gt;' in front
     assert front.index('Z-1') < front.index('X-2'), 'radios in their order'
     assert '<li>X-2 <small>TYT · also X-3, Other Y</small></li>' in front and '>o/r</a>' in front
     print('crucible site: package checks, index, page shell, front page checks passed')
