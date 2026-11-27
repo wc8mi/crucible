@@ -30,7 +30,7 @@ quick changes therefore never reads back a value from before its own last change
 | `tx_inhibit` | off | refuse every transmission (`tx_deny=inhibit`) |
 | `scan_resume` | carrier | time (move on after `scan_hold_s` on a signal, or when it ends), carrier (move on `scan_delay_ms` after it ends), stop (the scan ends on the first signal) |
 | `scan_hold_s` | 5 | time mode's hold |
-| `scan_delay_ms` | 2000 | wait after a signal ends before moving on (a pause between overs) |
+| `scan_delay_ms` | 5000 (`RADIO_SCAN_DELAY_MS`) | wait after a signal ends before moving on (a pause between overs). Settings > Talk & listen > Scan delay offers 1, 2, 3, 5, 10 and 15 s and accepts 0 to `RADIO_SCAN_DELAY_MAX_MS` (60000); the debug link sets any u16. A change applies at once, to a scan already running too (not to dual watch, which waits `dual_delay_ms`). A record with `rs_stored` 1 keeps the value it holds, so firmware from before the 5 s default left 2000 there |
 | `scan_dwell_ms` | 150 | listen time per channel with nothing heard (at least 50) |
 | `scan_priority` | off | zone scan: the start channel again after every 2 others |
 | `scan_beep` | off | a short beep when the scan stops on a signal |
