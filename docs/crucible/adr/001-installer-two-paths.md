@@ -161,7 +161,7 @@ KF8S answered the open questions on 2026-11-26.
 
 | | |
 |---|---|
-| Status | Proposed (2026-11-26). KF8S accepts. |
+| Status | Accepted (KF8S, 2026-11-26) |
 | Changes | Decision 4 and the phase 2 plan. The rest of this record stays. |
 
 Phase 2 built the work card on the shared flasher engine (site/static/js/flasher/app.js), not as its own page. The
