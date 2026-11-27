@@ -466,9 +466,9 @@ def crucible_page(flash, project, assets, built):
     page = page[:m.start()] + m.group(1) + f'Update {name}' + m.group(3) + lead + m.group(5) + page[m.end():]
     m = one(r'<dialog id="beta-notice".*?</dialog>\s*', page, 'beta notice')
     page = page[:m.start()] + page[m.end():]
-    repo, issues, upstream = (html.escape(project[k]) for k in ('repo', 'issues', 'upstream'))
+    repo, issues, upstream, community = (html.escape(project[k]) for k in ('repo', 'issues', 'upstream', 'community'))
     foot = ('<footer class="cx-foot">\n\t<div class="wrap">\n'
-            f'\t\t<p><strong>Help:</strong> <a href="{issues}">open an issue on {html.escape(project["repo"].removeprefix("https://github.com/"))}</a>. '
+            f'\t\t<p><strong>Help:</strong> ask in the <a href="{community}">Crucible Community on Discord</a>, or <a href="{issues}">open an issue on {html.escape(project["repo"].removeprefix("https://github.com/"))}</a>. '
             'Report a Problem saves a file. Attach the file to the issue. This page sends nothing to a server.</p>\n'
             f'\t\t<p>{name} is maintained by {html.escape(project["maintainer"])}. It is based on '
             f'<a href="{upstream}">RadioFoundry</a> (MIT) and is not affiliated with it. Do not ask RadioFoundry about {name}. '
@@ -506,7 +506,7 @@ def front_page(template, project, radios, assets, built):
         also = ', '.join(a.removeprefix(maker + ' ') for a in r.get('also', []))
         small = html.escape(maker + (f' · also {also}' if also else ''))
         items.append(f'\t\t\t<li>{html.escape(model)} <small>{small}</small></li>')
-    fill = {k: html.escape(project[k]) for k in ('name', 'tagline', 'repo', 'issues', 'upstream', 'maintainer')}
+    fill = {k: html.escape(project[k]) for k in ('name', 'tagline', 'repo', 'issues', 'upstream', 'maintainer', 'community')}
     fill.update(csp=CSP, assets=html.escape(assets), built=html.escape(built), radios='\n'.join(items),
                 repo_slug=html.escape(project['repo'].removeprefix('https://github.com/')))
     page = re.sub(r'\{\{(\w+)\}\}', lambda m: fill[m.group(1)], template)
@@ -619,11 +619,12 @@ def self_test():
              json.loads((ROOT / 'site' / 'i18n' / 'en.json').read_text()).items() if k in WORDS}}) + '</script>'
              '<script type="module" src="../static/js/flasher/app.js?v=1"></script></body></html>')
     proj = {'name': 'Crucible', 'tagline': 't', 'repo': 'https://github.com/o/r', 'issues': 'https://github.com/o/r/issues',
-            'upstream': 'https://github.com/u/u', 'maintainer': 'M'}
+            'upstream': 'https://github.com/u/u', 'maintainer': 'M', 'community': 'https://discord.gg/c'}
     page = crucible_page(flash, proj, '1', 'v')
     assert 'data-releases="releases/index.json"' in page and 'data-reporting="off"' in page
     assert '"Your radio"' in page and '<h1>Update Crucible</h1>' in page and 'Runs Crucible' in page and 'beta-notice' not in page and 'site-header' not in page
     assert '"static/js/flasher/app.js' in page and '../' not in page and 'not affiliated' in page
+    assert 'href="https://discord.gg/c">Crucible Community on Discord</a>' in page, 'the update page links the Discord community'
     assert CSP in page and "connect-src 'self'" in CSP, 'the update page allows requests to this site only'
     with tempfile.TemporaryDirectory() as d:
         js = Path(d) / 'static' / 'js' / 'flasher'
@@ -681,13 +682,14 @@ def self_test():
                 assert (st['id'], st['result']) in {('write', 'Installed'), ('check', 'Checked')}, f'card radio {rid}: {st}'
     for v in WORDS.values():
         assert not re.search(r"\b(flash|bootloader|DFU|stock|codeplug|beta)\b|n't", v, re.I), v
-    tpl = '{{csp}}<h1>{{name}}</h1><ul>\n{{radios}}\n</ul><p>{{built}}</p><a href="{{issues}}">{{repo_slug}}</a>'
+    tpl = '{{csp}}<h1>{{name}}</h1><ul>\n{{radios}}\n</ul><p>{{built}}</p><a href="{{issues}}">{{repo_slug}}</a><a href="{{community}}">D</a>'
     radios = [{'name': 'TYT X-2', 'maker': 'TYT', 'model': 'X-2', 'also': ['TYT X-3', 'Other Y'], 'order': 2},
               {'name': 'B Z-1', 'maker': 'B', 'model': 'Z-1', 'also': [], 'order': 1}]
     front = front_page(tpl, proj, radios, '1', 'v <b>')
     assert front.startswith(CSP) and '{{' not in front and '<h1>Crucible</h1>' in front and 'v &lt;b&gt;' in front
     assert front.index('Z-1') < front.index('X-2'), 'radios in their order'
     assert '<li>X-2 <small>TYT · also X-3, Other Y</small></li>' in front and '>o/r</a>' in front
+    assert '<a href="https://discord.gg/c">D</a>' in front, 'the front page links the Discord community'
     print('crucible site: package checks, index, page shell, front page checks passed')
 
 
