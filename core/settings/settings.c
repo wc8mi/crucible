@@ -35,6 +35,8 @@ _Static_assert(offsetof(settings_t, aes_migration) == 416, "AES migration marker
 _Static_assert(offsetof(settings_t, agc_marker) == 424, "Digital AGC block offset (Crucible)");
 _Static_assert(offsetof(settings_t, nxdn_marker) == 428, "NXDN radio default block offset (Crucible)");
 _Static_assert(offsetof(settings_t, nxdn_tg) == 432, "NXDN talk group offset (Crucible)");
+_Static_assert(offsetof(settings_t, mic_input) == 434, "Mic input offset (Crucible)");
+_Static_assert(offsetof(settings_t, aprs_cp_freq) == 399, "upstream's APRS codeplug frequency mark offset");
 _Static_assert(sizeof(settings_t) == 436, "settings_t changed size: update docs/spec/settings-store.md 3 and this");
 
 static settings_t live;			// under the quick lock
@@ -179,6 +181,7 @@ static void nxdn_block_check(settings_t *s, size_t bytes)
 		s->nxdn_rx_ran = 0;
 		s->nxdn_tx_ran = SETTINGS_NXDN_TX_RAN;
 		s->nxdn_tg = SETTINGS_NXDN_TG;
+		s->mic_input = 0;
 		memset(s->nxdn_reserved, 0, sizeof s->nxdn_reserved);
 		return;
 	}
