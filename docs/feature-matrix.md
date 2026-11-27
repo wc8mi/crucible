@@ -55,6 +55,7 @@ is `tools/bringup.py list --radio <id>`.
 | `caller_details` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `p25_id_lookup` | not recorded | not recorded | not recorded | not recorded | off | not recorded | not recorded | not recorded |
 | `tx_mic_limiter` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
+| `digital_agc` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `tx_dc_block` | not recorded | not recorded | not recorded | not recorded | off | not recorded | not recorded | not recorded |
 | `p25_tx_agc` | not recorded | not recorded | not recorded | not recorded | off | not recorded | not recorded | not recorded |
 | `p25_parrot` | off | off | off | off | off | off | off | off |
