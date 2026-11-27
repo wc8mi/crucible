@@ -339,6 +339,7 @@ static bool nxdn_tx_prepare(void)
 {
 	if (eng == NULL || !nxdn_engine_tx_prepare(eng))
 		return false;
+	ambeVoiceTxProfile(AMBE_TX_NXDN);	// its own leveling target (ambeVoice.h); begin() takes it
 	radio_air_voice_tx(true);
 	return true;
 }

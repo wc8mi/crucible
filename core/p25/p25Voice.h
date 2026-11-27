@@ -101,9 +101,11 @@ void p25VoicePoll(void);
 void p25VoiceTx(bool on);
 // The mic samples' gain step (radio/mic_gain.h: the Mic gain setting; the board's mic_pcm_db is DMR's only). Any task
 void p25VoiceSetMicGain(uint8_t step);
-// Set the P25 AGC setting and read whether it applies in this build. Any task.
-void p25VoiceSetAgc(bool on);
+// The transmit leveling target, an RMS (dsp/tx_level.h: tx_level_choice_rms; the P25 TX level setting, Digital AGC),
+// 0 = none: the manual mic gain. p25VoiceAgc: whether leveling is on in this build. Any task
+void p25VoiceSetTxTarget(uint16_t rms);
 bool p25VoiceAgc(void);
+uint16_t p25VoiceTxTarget(void);
 #if CONFIG_P25_PARROT
 // Radio task controls; codec state and recording belong only to the audio callback.
 // Borrow two frame buffers totaling 500 entries until p25VoiceEnd; they must not overlap the voice workspace.

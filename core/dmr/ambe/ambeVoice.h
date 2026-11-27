@@ -108,12 +108,12 @@ void ambeVoiceSetMicGainQ8(uint16_t q8);
 // Manual gain step alone (0..10, 2 dB per step, 5 is unity).
 void ambeVoiceSetMicGain(uint8_t step);
 
-// Encoder input leveling per transmit profile (CONFIG_TX_MIC_LIMITER; docs/spec/radio-features.md 3.6). DMR and NXDN
-// transmit as AMBE_TX_DMR, YSF as AMBE_TX_YSF. A profile's target is an RMS level relative to 32768: the mic is then
+// Encoder input leveling per transmit profile (CONFIG_TX_MIC_LIMITER; docs/spec/radio-features.md 3.6). DMR transmits
+// as AMBE_TX_DMR, YSF as AMBE_TX_YSF, NXDN as AMBE_TX_NXDN. A profile's target is an RMS level relative to 32768: the mic is then
 // leveled to it (tx_level.h, the same leveler as P25's mic AGC, peaks still held under the ceiling) and the codec's
 // own input AGC is left off, since two AGCs in a row work against each other. 0 = the manual gain with the peak
 // limiter, as before. Any task; a running transmission follows a change from its next block
-typedef enum { AMBE_TX_DMR, AMBE_TX_YSF, AMBE_TX_PROFILES } ambe_tx_profile_t;
+typedef enum { AMBE_TX_DMR, AMBE_TX_YSF, AMBE_TX_NXDN, AMBE_TX_PROFILES } ambe_tx_profile_t;
 void ambeVoiceSetTxTarget(ambe_tx_profile_t profile, uint16_t target_rms);
 uint16_t ambeVoiceTxTarget(ambe_tx_profile_t profile);
 // The profile of the next transmission, set just before the source's begin(); begin() takes it and sets AMBE_TX_DMR

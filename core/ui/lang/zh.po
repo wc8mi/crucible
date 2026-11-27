@@ -4245,6 +4245,11 @@ msgid "SFR CW ID"
 msgstr "单频中继 CW ID"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_DIGITAL_AGC_RX"
+msgid "Digital AGC RX"
+msgstr "数字 AGC 接收"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_DMR_RX_AGC"
 msgid "DMR RX AGC"
 msgstr "DMR 接收 AGC"
@@ -4265,9 +4270,24 @@ msgid "YSF RX AGC"
 msgstr "YSF 接收 AGC"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_DIGITAL_AGC_TX"
+msgid "Digital AGC TX"
+msgstr "数字 AGC 发射"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_DMR_TX_LEVEL"
 msgid "DMR TX level"
 msgstr "DMR 发射电平"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_P25_TX_LEVEL"
+msgid "P25 TX level"
+msgstr "P25 发射电平"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_NXDN_TX_LEVEL"
+msgid "NXDN TX level"
+msgstr "NXDN 发射电平"
 
 #: core/ui/ui_menus.c
 msgctxt "SET_LABEL_YSF_TX_LEVEL"
@@ -4650,6 +4670,11 @@ msgid "Mic gain: not in this build"
 msgstr "麦克风增益：本版本无"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_WHY_P25_TX_LEVEL_SETS_LEVEL"
+msgid "P25 TX level sets the level"
+msgstr "P25 发射电平设定电平"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_WHY_MIC_AGC_SETS_LEVEL"
 msgid "Mic AGC sets the level"
 msgstr "麦克风 AGC 设定电平"
@@ -4663,6 +4688,11 @@ msgstr "降噪：本版本无"
 msgctxt "WHY_NOT_ON_THIS_RADIO"
 msgid "Not on this radio"
 msgstr "本机不支持"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_WHY_DIGITAL_AGC_ON"
+msgid "Digital AGC sets the level"
+msgstr "数字 AGC 设定电平"
 
 #: core/ui/ui_menus.c
 msgctxt "WHY_TX_LEVEL_NOT_IN_BUILD"
