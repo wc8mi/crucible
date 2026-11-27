@@ -25,6 +25,7 @@
 #endif
 #endif
 #include "radio/digital_agc.h"
+#include "radio/scan.h"
 #include "dsp/tx_level.h"	// the TX level choices (CONFIG_TX_MIC_LIMITER) and the P25 calibration's
 #include "dmr/dmrDataService.h"
 #include "config.h"
@@ -7209,6 +7210,13 @@ static const tr_id_t n_dual_wait[] = { TRX(VALUE_0_5_S, "0.5 s"), TRX(VALUE_1_S,
 static const int16_t v_scan_wait[] = { 1000, 2000, 3000, 5000, 10000, 15000 };	// ms
 static const tr_id_t n_scan_wait[] = { TRX(VALUE_1_S, "1 s"), TRX(VALUE_2_S, "2 s"), TRX(VALUE_3_S, "3 s"),
 	TRX(VALUE_5_S, "5 s"), TRX(VALUE_10_S, "10 s"), TRX(VALUE_15_S, "15 s") };
+// Carrier first: the default, and one OK from it is Time, the mode Scan hold needs
+static const int16_t v_scan_resume[] = { SCAN_RESUME_CARRIER, SCAN_RESUME_TIME, SCAN_RESUME_STOP };
+static const tr_id_t n_scan_resume[] = { TRN(SET_VALUE_SCAN_RESUME_CARRIER, "Carrier"),
+	TRN(SET_VALUE_SCAN_RESUME_TIME, "Time"), TRN(SET_VALUE_SCAN_RESUME_STOP, "Stop") };
+static const int16_t v_scan_hold[] = { 3, 5, 10, 15, 30 };	// s
+static const tr_id_t n_scan_hold[] = { TRX(VALUE_3_S, "3 s"), TRX(VALUE_5_S, "5 s"), TRX(VALUE_10_S, "10 s"),
+	TRX(VALUE_15_S, "15 s"), TRX(VALUE_30_S, "30 s") };
 #endif
 static const int16_t v_autooff[] = { 0, 30, 60, 120 };
 static const tr_id_t n_autooff[] = { TRN(VALUE_OFF, "Off"), TRN(VALUE_30_MIN, "30 min"), TRX(VALUE_1_H, "1 h"),
@@ -7372,8 +7380,12 @@ static const set_item_t s_talk[] = {
 		UI_SET_HEAR_ALL_DEFAULT),
 	TOGGLE(TRN(SET_LABEL_SHOW_TALKER_ALIAS, "Show talker alias"), NULL, UI_SET_ALIAS_SHOW),
 #if CONFIG_SCAN
+	LIST(TRN(SET_LABEL_SCAN_RESUME, "Scan resume"), "carrier time stop move on signal", UI_SET_SCAN_RESUME,
+		v_scan_resume, n_scan_resume),
 	LIST(TRN(SET_LABEL_SCAN_DELAY, "Scan delay"), "resume wait hold signal ends carrier", UI_SET_SCAN_DELAY_MS,
 		v_scan_wait, n_scan_wait),
+	LIST(TRN(SET_LABEL_SCAN_HOLD, "Scan hold"), "resume time move on signal continues", UI_SET_SCAN_HOLD_S,
+		v_scan_hold, n_scan_hold),
 #endif
 #if CONFIG_DUAL_WATCH
 	TOGGLE(TRN(SET_LABEL_DUAL_TALK_BACK, "Dual watch talk back"), "reply other channel A B", UI_SET_DUAL_TALK_BACK),
@@ -8063,6 +8075,11 @@ static void set_value_text(const set_item_t *s, int32_t v, char *out, size_t len
 			sb_str(&b, " s");
 			break;
 		}
+		if (s->id == UI_SET_SCAN_HOLD_S && v >= 0) {	// likewise, a hold in seconds
+			sb_u32(&b, (uint32_t)v, 1);
+			sb_str(&b, " s");
+			break;
+		}
 		sb_i32(&b, v);
 		break;
 	case ST_NUMBER:
@@ -8228,6 +8245,16 @@ static const char *set_why_not(const set_item_t *s)
 		return board_has_gps() ? NULL : TR(SET_WHY_NO_GPS_ON_RADIO, "No GPS on this radio");
 	case UI_SET_POS_DMR_CALLS:
 		return CONFIG_DMR_GPS ? NULL : TR(WHY_DMR_POSITION_NOT_IN_BUILD, "DMR position: not in this build");
+#if CONFIG_SCAN
+	// Scan hold is time mode's only (radio/scan.c moves on after it only there); the delay follows a signal that
+	// ended, and in stop mode the scan has ended on the signal
+	case UI_SET_SCAN_HOLD_S:
+		return ui_svc_setting_get(UI_SET_SCAN_RESUME) == SCAN_RESUME_TIME ? NULL :
+			TR(SET_WHY_SCAN_HOLD_TIME_ONLY, "Only with Scan resume Time");
+	case UI_SET_SCAN_DELAY_MS:
+		return ui_svc_setting_get(UI_SET_SCAN_RESUME) != SCAN_RESUME_STOP ? NULL :
+			TR(SET_WHY_SCAN_DELAY_NOT_STOP, "Not used with Scan resume Stop");
+#endif
 	default:
 		return NULL;
 	}

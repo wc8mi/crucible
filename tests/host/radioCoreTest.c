@@ -5537,6 +5537,27 @@ static void test_ui_glue(void)
 	ui_svc_apply(UI_SET_SCAN_DELAY_MS, RADIO_SCAN_DELAY_MS);
 	run(20);
 	CHECK(sm.set.scan_delay_ms == RADIO_SCAN_DELAY_MS);
+	// Scan resume and hold too (rs_scan_resume, rs_scan_hold_s): carrier and 5 s by default, only the modes and 0 to
+	// RADIO_SCAN_HOLD_MAX_S taken
+	CHECK(ui_svc_setting_get(UI_SET_SCAN_RESUME) == SCAN_RESUME_CARRIER);
+	CHECK(ui_svc_setting_get(UI_SET_SCAN_HOLD_S) == RADIO_SCAN_HOLD_S);
+	CHECK(!ui_svc_setting_set(UI_SET_SCAN_RESUME, -1));
+	CHECK(!ui_svc_setting_set(UI_SET_SCAN_RESUME, SCAN_RESUME_STOP + 1));
+	CHECK(!ui_svc_setting_set(UI_SET_SCAN_HOLD_S, -1));
+	CHECK(!ui_svc_setting_set(UI_SET_SCAN_HOLD_S, (int32_t)RADIO_SCAN_HOLD_MAX_S + 1));
+	CHECK(ui_svc_setting_set(UI_SET_SCAN_RESUME, SCAN_RESUME_TIME));
+	ui_svc_apply(UI_SET_SCAN_RESUME, SCAN_RESUME_TIME);
+	CHECK(ui_svc_setting_set(UI_SET_SCAN_HOLD_S, 30));
+	ui_svc_apply(UI_SET_SCAN_HOLD_S, 30);
+	run(20);
+	CHECK(sm.set.scan_resume == SCAN_RESUME_TIME && sm.set.scan_hold_s == 30);
+	CHECK(ui_svc_setting_get(UI_SET_SCAN_RESUME) == SCAN_RESUME_TIME && ui_svc_setting_get(UI_SET_SCAN_HOLD_S) == 30);
+	settings_read(&sv);
+	CHECK(sv.rs_stored == 1 && sv.rs_scan_resume == SCAN_RESUME_TIME && sv.rs_scan_hold_s == 30);
+	ui_svc_apply(UI_SET_SCAN_RESUME, SCAN_RESUME_CARRIER);
+	ui_svc_apply(UI_SET_SCAN_HOLD_S, RADIO_SCAN_HOLD_S);
+	run(20);
+	CHECK(sm.set.scan_resume == SCAN_RESUME_CARRIER && sm.set.scan_hold_s == RADIO_SCAN_HOLD_S);
 	CHECK(ui_svc_setting_get(UI_SET_EMERGENCY_TONE) == 1);
 	CHECK(ui_svc_setting_set(UI_SET_EMERGENCY_TONE, 0));
 	run(20);

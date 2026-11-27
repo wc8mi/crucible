@@ -22,6 +22,7 @@
 #include "radio/ref_trim.h"
 #include "dsp/tx_level.h"
 #include "radio/digital_agc.h"
+#include "radio/scan.h"
 #include "storage/storage.h"
 #include "codeplug/codeplug.h"
 #include "codeplug/codeplug_kv.h"
@@ -203,6 +204,12 @@ static __attribute__((noinline)) int32_t setting_get_radio(uint8_t id)
 	case UI_SET_SCAN_DELAY_MS:
 		radio_get_settings(&rs);
 		return rs.scan_delay_ms;
+	case UI_SET_SCAN_RESUME:
+		radio_get_settings(&rs);
+		return rs.scan_resume;
+	case UI_SET_SCAN_HOLD_S:
+		radio_get_settings(&rs);
+		return rs.scan_hold_s;
 #endif
 #if CONFIG_BCAST_FM
 	case UI_SET_BCAST_STEP:
@@ -604,6 +611,10 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 #if CONFIG_SCAN
 	case UI_SET_SCAN_DELAY_MS:	// as those, in range only: the menu offers 1 to 15 s, a value past the most is refused
 		return value >= 0 && value <= (int32_t)RADIO_SCAN_DELAY_MAX_MS;
+	case UI_SET_SCAN_RESUME:
+		return value >= SCAN_RESUME_TIME && value <= SCAN_RESUME_STOP;
+	case UI_SET_SCAN_HOLD_S:
+		return value >= 0 && value <= (int32_t)RADIO_SCAN_HOLD_MAX_S;
 #endif
 	case UI_SET_LARGE_TEXT:
 	case UI_SET_HINTS:

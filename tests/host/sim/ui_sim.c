@@ -58,6 +58,7 @@
 //   pttlocked:on|off    turns Settings > Key lock > PTT when locked on or off
 //   autolock:<s>        Settings > Keys > Auto lock: s seconds, 0 off
 //   scandelay:<ms>      the scan's wait after a signal is ms, as the debug link sets it (any value in range)
+//   scanhold:<s>        the scan's hold in time mode is s seconds, as the debug link sets it (any value in range)
 //   battery:<pct>       the battery reads pct; offfailed: auto power off couldn't switch off
 //   foreign             the codeplug is another firmware's: a channel write asks first (codeplug-foreign)
 //   aeskeys             system 3 is a DMR AES one holding traffic keys 0 and 7 (the channel editor's AES key row)
@@ -101,6 +102,7 @@
 #include "stubentry/stub_entry.h"
 #include "ui/ui_svc_aprs.h"
 #include "codeplug/codeplug_tag.h"
+#include "radio/scan.h"
 #if CONFIG_P25
 #include "p25/p25_codeplug.h"
 #include "radio/radio_p25.h"
@@ -811,6 +813,10 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 		return false;
 	if (id == UI_SET_SCAN_DELAY_MS && (value < 0 || value > (int32_t)RADIO_SCAN_DELAY_MAX_MS))
 		return false;	// ui_svc_storage.c's range
+	if (id == UI_SET_SCAN_RESUME && (value < SCAN_RESUME_TIME || value > SCAN_RESUME_STOP))
+		return false;
+	if (id == UI_SET_SCAN_HOLD_S && (value < 0 || value > (int32_t)RADIO_SCAN_HOLD_MAX_S))
+		return false;
 #if CONFIG_NXDN
 	if (id >= UI_SET_NXDN_RATE && id <= UI_SET_NXDN_TG)
 		return sim_nxdn_default(id, value);
@@ -2872,6 +2878,8 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	sim_late[UI_SET_NXDN_TX_RAN - UI_SET_RAM_COUNT] = sim_late[UI_SET_NXDN_TG - UI_SET_RAM_COUNT] = 1;
 #endif
 	sim_late[UI_SET_SCAN_DELAY_MS - UI_SET_RAM_COUNT] = RADIO_SCAN_DELAY_MS;	// the radio core's default
+	sim_late[UI_SET_SCAN_RESUME - UI_SET_RAM_COUNT] = SCAN_RESUME_CARRIER;		// its defaults too
+	sim_late[UI_SET_SCAN_HOLD_S - UI_SET_RAM_COUNT] = RADIO_SCAN_HOLD_S;
 	ui_svc_ram_set(UI_SET_AGC_RX_AUTO, 1);	// Digital AGC: both switches On, as a new radio starts
 	ui_svc_ram_set(UI_SET_AGC_TX_AUTO, 1);
 	emergency_on = false;
@@ -3348,6 +3356,8 @@ static bool check(const char *kv, char *err, size_t len)
 	else if (strncmp(key, "set", 3) == 0 && key[3] >= '0' && key[3] <= '9')	// set<N>: ui_setting_t N's value
 		snprintf(got, sizeof got, "%d", (int)ui_svc_setting_get((uint8_t)atoi(key + 3)));
 	else if (strcmp(key, "scan_delay") == 0) snprintf(got, sizeof got, "%d", (int)ui_svc_setting_get(UI_SET_SCAN_DELAY_MS));
+	else if (strcmp(key, "scan_resume") == 0) snprintf(got, sizeof got, "%d", (int)ui_svc_setting_get(UI_SET_SCAN_RESUME));
+	else if (strcmp(key, "scan_hold") == 0) snprintf(got, sizeof got, "%d", (int)ui_svc_setting_get(UI_SET_SCAN_HOLD_S));
 	else if (strcmp(key, "radio_tot") == 0) snprintf(got, sizeof got, "%u", (unsigned)sim_rec.tot_s);
 	else if (strcmp(key, "radio_backlight") == 0) snprintf(got, sizeof got, "%ld", (long)sim_rec.backlight_s);
 	else if (strcmp(key, "count") == 0) snprintf(got, sizeof got, "%u", s.count);
@@ -3487,6 +3497,14 @@ static bool run_token(char *t, char *err, size_t len)
 	if (strcmp(t, "scandelay") == 0 && arg != NULL) {	// the debug link's SETTING 8: any wait, not only the menu's
 		if (!ui_svc_setting_set(UI_SET_SCAN_DELAY_MS, atoi(arg))) {
 			snprintf(err, len, "scandelay: out of range, %s", arg);
+			return false;
+		}
+		advance(200);
+		return true;
+	}
+	if (strcmp(t, "scanhold") == 0 && arg != NULL) {	// the debug link's SETTING 7
+		if (!ui_svc_setting_set(UI_SET_SCAN_HOLD_S, atoi(arg))) {
+			snprintf(err, len, "scanhold: out of range, %s", arg);
 			return false;
 		}
 		advance(200);

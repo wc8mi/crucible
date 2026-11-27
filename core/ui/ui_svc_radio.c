@@ -640,6 +640,12 @@ void ui_svc_apply(uint8_t id, int32_t value)
 	case UI_SET_SCAN_DELAY_MS:	// checked by ui_svc_setting_set; a running scan takes it at once
 		rs.scan_delay_ms = v16;
 		break;
+	case UI_SET_SCAN_RESUME:	// as the delay, and the hold
+		rs.scan_resume = (uint8_t)v16;
+		break;
+	case UI_SET_SCAN_HOLD_S:
+		rs.scan_hold_s = (uint8_t)v16;
+		break;
 #endif
 	case UI_SET_BACKLIGHT_S:		// dims after this, goes off after four times as long (0 = always on; < 0: dims
 		if (value < 0) {		// after -value, never goes off)

@@ -3993,6 +3993,21 @@ msgid "Channel"
 msgstr "Canal"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_VALUE_SCAN_RESUME_CARRIER"
+msgid "Carrier"
+msgstr "Porteuse"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_VALUE_SCAN_RESUME_TIME"
+msgid "Time"
+msgstr "Durée"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_VALUE_SCAN_RESUME_STOP"
+msgid "Stop"
+msgstr "Arrêt"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_VALUE_MSGFMT_AUTOMATIC"
 msgid "Automatic"
 msgstr "Automatique"
@@ -4248,9 +4263,19 @@ msgid "Show talker alias"
 msgstr "Afficher l'alias"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_SCAN_RESUME"
+msgid "Scan resume"
+msgstr "Reprise balayage"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_SCAN_DELAY"
 msgid "Scan delay"
 msgstr "Délai balayage"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_SCAN_HOLD"
+msgid "Scan hold"
+msgstr "Maintien balayage"
 
 #: core/ui/ui_menus.c
 msgctxt "SET_LABEL_DUAL_TALK_BACK"
@@ -4781,6 +4806,16 @@ msgstr "Pas de GPS sur radio"
 msgctxt "WHY_DMR_POSITION_NOT_IN_BUILD"
 msgid "DMR position: not in this build"
 msgstr "Pos. DMR non dispo."
+
+#: core/ui/ui_menus.c
+msgctxt "SET_WHY_SCAN_HOLD_TIME_ONLY"
+msgid "Only with Scan resume Time"
+msgstr "Seulement en reprise Durée"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_WHY_SCAN_DELAY_NOT_STOP"
+msgid "Not used with Scan resume Stop"
+msgstr "Inutile en reprise Arrêt"
 
 #: core/ui/ui_menus.c
 msgctxt "WHY_DIAGNOSTICS_NOT_IN_BUILD"
