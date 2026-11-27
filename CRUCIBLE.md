@@ -132,7 +132,8 @@ version` is the release the next builds lead to; it changes only by a commit.
   1.0.0 a minor may also change settings or codeplugs; say so in the notes.
 - Tags are `v` and the version, nothing else: no build metadata (`+...`), because the radio shows the name.
   Upstream's calendar tags (`v26.11`) never look like ours, and `tools/crucible.py tag` checks one.
-- The dated test labels from before 0.1.0 (`crucible-<hash>-<hash>-<yymmdd>-<n>`) stay published as pre-releases.
+- The dated test releases from before 0.1.0 (`crucible-<hash>-<hash>-<yymmdd>-<n>`) were deleted once
+  `v0.1.0-beta.1` was out; their tags stay, so a report from one of those builds still finds its source.
 
 ## Publishing a release
 
