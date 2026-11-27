@@ -19,6 +19,7 @@ DEST=/var/www/tinker/crucible/
 PREFIX=tinker.wc8mi.net/crucible/
 SITE=https://tinker.wc8mi.net/crucible/
 ENV=${CRUCIBLE_CF_ENV:-$HOME/.config/crucible/cloudflare.env}
+KEEP=5				# deploy backups kept on the server
 OUT=$(cd "$(dirname "$0")/.." && pwd)/build/crucible-site
 
 purge() {
@@ -48,7 +49,9 @@ if grep -rqs 'api\.radiofoundry\.org' --include='*.js' --include='*.html' --incl
 fi
 
 stamp=$(date +%Y%m%d-%H%M%S)
-ssh "$HOST" "sudo mkdir -p /var/www/tinker-backups && sudo cp -a $DEST /var/www/tinker-backups/crucible-$stamp"
+# Keep the last $KEEP deploy backups (named by time, so sorted oldest first); other backups there are left alone
+ssh "$HOST" "sudo mkdir -p /var/www/tinker-backups && sudo cp -a $DEST /var/www/tinker-backups/crucible-$stamp &&
+	cd /var/www/tinker-backups && ls -1d crucible-[0-9]* | head -n -$KEEP | xargs -r sudo rm -rf"
 rsync -az --delete "$OUT/" "$HOST:/tmp/crucible-deploy/"
 ssh "$HOST" "sudo rsync -a --delete --chown=root:root --chmod=D755,F644 /tmp/crucible-deploy/ $DEST && rm -rf /tmp/crucible-deploy"
 echo "deploy: uploaded $(du -sh "$OUT" | cut -f1), old version in /var/www/tinker-backups/crucible-$stamp"
