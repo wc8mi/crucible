@@ -38,9 +38,13 @@ static bool start(audio_block_cb_t cb, void *ctx)
 	return stm32_i2s_pcm_start(&i2s_cfg, cb, ctx);
 }
 
+// spk_aux: while DMR is on air the codec output has no level; the beeps go through the PC8 PWM (spkaux_md380.c)
 const hal_audio_t md380_audio = { .start = start, .stop = stm32_i2s_pcm_stop, .speaker_pcm = speaker_pcm,
 #if CONFIG_P25_PARROT
 				  .spk_pending = stm32_i2s_pcm_spk_pending,
+#endif
+#if CONFIG_BEEP
+				  .spk_aux = &md380_spk_aux,
 #endif
 				  .stream_stats = stm32_i2s_pcm_stream_stats };
 
