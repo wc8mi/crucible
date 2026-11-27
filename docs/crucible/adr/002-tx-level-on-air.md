@@ -18,15 +18,9 @@ microphone at **before the encoder**: Off, or -30 to -12 dBFS in 2 dB steps (`co
 On the air, with a Yaesu receiver as the meter, body mic and one voice, the maintainer
 found these settings give about -34 dBFS, the level Yaesu receivers handle well:
 
-| Radio | Encoder target for -34 on air | Difference to the setting |
-|---|---|---|
-| DM-32UV | -26 dBFS | +8 dB |
-| DM-1701 | -30 dBFS | +4 dB |
-| MD-UV380 | not measured | |
-| MD-9600 | not measured | |
-
-So the same setting gives a different on-air level on each radio: the DM-32UV is about 4 dB quieter than the DM-1701
-at the same setting.
+Two radios were measured: one needed an encoder target 8 dB above the setting, the other 4 dB (the values per radio
+are in the feature matrix, [Digital AGC defaults](../../feature-matrix.md#digital-agc-defaults)). The other two were not measured. So the same setting
+gives a different on-air level on each radio: one is about 4 dB quieter than the other at the same setting.
 
 What the code says about the cause:
 
@@ -43,7 +37,7 @@ operator wants one thing: a level that suits the receiver.
 
 Two more facts:
 
-- The DM-1701's -30 is the **lowest choice** in the menu. A radio that needs less cannot get it today.
+- On the radio that needs +4, -30 is the **lowest choice** in the menu. A radio that needs less cannot get it today.
 - The decoder also runs the receiving radio's codec build. A meter reading depends on which radio receives.
 
 ## Decision
@@ -53,9 +47,9 @@ Two more facts:
 2. **A trim per radio, per profile.** `board_t` gets `int8_t tx_level_trim_db[AMBE_TX_PROFILES]` (DMR, YSF), in whole
    dB, 0 when not given. The encoder target is the on-air setting plus the trim. `core/` reads the field and never
    names a radio (AGENTS.md rule 4).
-3. **Starting trims** from the measurements above (body mic, one voice, Yaesu receiver): DM-32UV DMR +8, DM-1701
-   DMR +4. They are provisional until the method below adds a second voice and the hand mic. YSF, the MD-UV380 and
-   the MD-9600 stay 0 until measured. A radio's bring-up record says "untested" for a trim not yet measured on the air.
+3. **Starting trims** from the measurements above (body mic, one voice, Yaesu receiver): DMR +8 and +4 on the two
+   radios measured. They are provisional until the method below adds a second voice and the hand mic. YSF and the
+   radios not measured stay 0 until measured. A radio's bring-up record says "untested" for a trim not yet measured on the air.
 4. **The range moves.** On-air choices: Off, -40 to -22 dBFS in 2 dB steps (10 choices, as now). The encoder target
    (setting plus trim) is clamped to -42 to -10 dBFS, so the leveler table covers 1 dB steps across that span.
 5. **The reference receiver is a Yaesu radio.** Trims are measured against one Yaesu receiver, named in
@@ -71,7 +65,7 @@ Two more facts:
 
 | Option | For | Against | Verdict |
 |---|---|---|---|
-| A. Leave it. Publish the right setting for each radio. | No code. | Every operator must find and remember a number for their radio. A codeplug moved between radios sounds different. The DM-1701 is already at the floor. | Rejected |
+| A. Leave it. Publish the right setting for each radio. | No code. | Every operator must find and remember a number for their radio. A codeplug moved between radios sounds different. One radio is already at the floor. | Rejected |
 | **B. On-air setting plus a board trim** | One number for everyone. The radio's difference sits with the radio, where `board_t` keeps other calibration. Small code. | Needs a measurement for each radio and each profile. Saved levels shift once. | **Chosen** |
 | C. Trim by scaling PCM in each vocoder driver | No new `board_t` field. | Hides calibration inside a driver. The leveler's ceiling and limiter would see the wrong level. Two places to change, not one. | Rejected |
 | D. Use the codec's own AGC (`VOCODER_OPT_AGC`) for leveling | The codec knows its own input. | Opaque, and different per codec build: the cause of the problem, not a fix. Two AGCs in a row fight (`ambeVoice.h`). | Rejected |
@@ -108,8 +102,8 @@ Record each radio's readings and trim on its bring-up page. Nothing transmits in
 | Phase | Work | Needs |
 |---|---|---|
 | 1 | `board_t.tx_level_trim_db`; leveler table in 1 dB steps, -42 to -10; target = setting + trim, clamped; host tests for the sum and the clamp; spec and user docs | Code only |
-| 2 | DM-32UV and DM-1701 DMR trims (+8, +4), confirmed by the method above | The maintainer at the bench |
-| 3 | YSF trims; MD-UV380 and MD-9600 trims | The maintainer at the bench |
+| 2 | The two measured radios' DMR trims (+8, +4), confirmed by the method above | The maintainer at the bench |
+| 3 | YSF trims; the other radios' trims | The maintainer at the bench |
 | 4 | Default -34 dBFS on air | Phases 2 and 3 |
 
 ## Maintainer answers

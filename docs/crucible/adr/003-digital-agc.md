@@ -18,7 +18,7 @@ Each digital mode has its own audio level settings (Settings > Talk & listen):
 - **TX level** for DMR and YSF: Off, or a target from -30 to -12 dBFS before the encoder. NXDN uses the DMR value.
 - **P25 TX**: a fixed -20 dBFS target. The Mic AGC toggle turns it on or off.
 
-A good level differs by radio: the DM-32UV needs a louder TX target than the others, and the MD-9600 a louder RX
+A good level differs by radio: one radio needs a louder TX target than the others, and another a louder RX
 target. ADR 002 kept one on-air setting and added a trim per board, but the trims were never merged. Most users want
 good levels without setting eight values. Tinkerers still want every value.
 
@@ -26,14 +26,9 @@ good levels without setting eight values. Tinkerers still want every value.
 
 1. **Two switches.** **Digital AGC RX** and **Digital AGC TX**, each On or Off, in Settings > Talk & listen above the
    per-mode rows.
-2. **On: the radio's defaults.** Each mode uses the radio's default target:
-
-   | Radio | RX: DMR, P25, NXDN, YSF | TX: DMR, NXDN, YSF | TX: P25 |
-   |---|---|---|---|
-   | DM-32UV | -30 | -26 | -20 |
-   | DM-1701 | -30 | -30 | -20 |
-   | MD-UV380 | -30 | -30 | -20 |
-   | MD-9600 | -25 | -30 | -20 |
+2. **On: the radio's defaults.** Each mode uses the radio's default target, in the feature matrix table
+   [Digital AGC defaults](../../feature-matrix.md#digital-agc-defaults). The four radios use -30 for RX except one at
+   -25, and -30 for TX (DMR, NXDN, YSF) except one at -26.
 
    Values are dBFS targets at the encoder input (TX) or the speaker path (RX), as the settings meant before ADR 002.
    P25 TX is -20 on every radio.

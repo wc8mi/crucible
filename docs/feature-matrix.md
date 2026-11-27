@@ -403,6 +403,10 @@ The levels each radio uses while **Digital AGC RX** and **Digital AGC TX** are O
 | MD-9600 | -25 | -30 | -20 |
 | Other radios | -30 | -30 | -20 |
 
+The DM-32UV and DM-1701 TX values come from on-air measurements (Yaesu receiver, body mic, one voice): those
+encoder targets gave about -34 dBFS on air, 8 and 4 dB above the setting ([ADR 002](crucible/adr/002-tx-level-on-air.md)).
+The MD-UV380 and MD-9600 were not measured.
+
 ## DMR data
 
 | Feature | Switch | Bytes DM-1701 | Bytes MD-380 | Notes |
