@@ -291,15 +291,16 @@ typedef struct {
 	uint8_t nxdn_rx_ran;		// 0 (every RAN) to 63
 	uint8_t nxdn_tx_ran;		// 0 to 63
 	uint16_t nxdn_tg;		// the group PTT calls: 1 to 65519, or SETTINGS_NXDN_TG_ALL
-	// The Mic input setting: hal mic_input steps (0: the board's level). Crucible's own, so it sits here rather than in
-	// a byte upstream may take (ADR 004)
+	// The Mic input setting: hal mic_input steps (0: the board's level; out of range reads 0). Crucible's own, so it
+	// sits here rather than in a byte upstream may take: a Crucible release kept it at 399, now aprs_cp_freq, and a
+	// record with the Digital AGC block but not this marker has it read from there at load (ADR 004)
 	int8_t mic_input;
 	uint8_t nxdn_reserved[1];	// 0; later Crucible fields
 } settings_t;
 #define SETTINGS_AGC_MARKER	0xA6u
 #define SETTINGS_AGC_RX_MANUAL	0x01u	// Digital AGC RX is Off: each mode's RX AGC row is in force
 #define SETTINGS_AGC_TX_MANUAL	0x02u	// Digital AGC TX is Off: each mode's TX level row is in force
-#define SETTINGS_NXDN_MARKER	0xA7u
+#define SETTINGS_NXDN_MARKER	0xA8u	// 0xA8 since mic_input moved into the block (ADR 004)
 #define SETTINGS_NXDN_9600	0x01u	// nxdn_flags: 9600 bit/s, else 4800
 #define SETTINGS_NXDN_RAN_MAX	63u
 #define SETTINGS_NXDN_TX_RAN	1u	// the defaults: TX RAN 1, group 1 (RX RAN 0, 4800 bit/s)

@@ -14,6 +14,7 @@
 #include <stddef.h>
 #include <string.h>
 #include "config.h"
+#include "hal_radio.h"
 #include "settings/settings.h"
 #include "storage/storage.h"
 
@@ -158,11 +159,17 @@ static uint8_t slot_buf[SLOT_SIZE];
 static uint16_t rec_page(const uint8_t *r) { return (uint16_t)((r[8] | (r[9] << 8)) >> SETTINGS_PAGE_SHIFT); }
 static uint16_t rec_layout(const uint8_t *r) { return (uint16_t)((r[8] | (r[9] << 8)) & 0x0FFFu); }
 
-// The Digital AGC block (settings.h) of a record without this firmware's marker: the defaults, marked in RAM so the
-// next ordinary save carries it (no save is forced)
+// Whether a record of this many bytes carries the Digital AGC block (settings.h) as this firmware writes it
+static bool agc_block_present(const settings_t *s, size_t bytes)
+{
+	return bytes >= offsetof(settings_t, agc_marker) + 4u && s->agc_marker == SETTINGS_AGC_MARKER;
+}
+
+// The Digital AGC block of a record without this firmware's marker: the defaults, marked in RAM so the next ordinary
+// save carries it (no save is forced)
 static void agc_block_check(settings_t *s, size_t bytes)
 {
-	if (bytes >= offsetof(settings_t, agc_marker) + 4u && s->agc_marker == SETTINGS_AGC_MARKER)
+	if (agc_block_present(s, bytes))
 		return;
 	s->agc_marker = SETTINGS_AGC_MARKER;
 	s->agc_manual = 0;
@@ -170,18 +177,28 @@ static void agc_block_check(settings_t *s, size_t bytes)
 	s->tx_level_nxdn = 0;
 }
 
+static int8_t mic_input_in_range(int8_t v) { return v >= HAL_MIC_INPUT_MIN && v <= HAL_MIC_INPUT_MAX ? v : 0; }
+
 // The NXDN radio default block (settings.h): a record without this firmware's marker reads the defaults, marked in
-// RAM like the Digital AGC block; a marked one has each value out of range read as its default
-static void nxdn_block_check(settings_t *s, size_t bytes)
+// RAM like the Digital AGC block; a marked one has each value out of range read as its default. mic_input moved here
+// from offset 399 when upstream took that byte for aprs_cp_freq (ADR 004): a record with the Digital AGC block but
+// not this marker was written by a Crucible release that kept it at 399, so it comes across and the APRS mark reads
+// none yet. agc_block: the record had the Digital AGC block (asked before agc_block_check marks it)
+static void nxdn_block_check(settings_t *s, size_t bytes, bool agc_block)
 {
 	if (bytes < offsetof(settings_t, nxdn_reserved) + sizeof s->nxdn_reserved ||
 	    s->nxdn_marker != SETTINGS_NXDN_MARKER) {
+		int8_t mic = 0;
+		if (agc_block) {
+			mic = (int8_t)s->aprs_cp_freq;
+			s->aprs_cp_freq = 0;
+		}
 		s->nxdn_marker = SETTINGS_NXDN_MARKER;
 		s->nxdn_flags = 0;
 		s->nxdn_rx_ran = 0;
 		s->nxdn_tx_ran = SETTINGS_NXDN_TX_RAN;
 		s->nxdn_tg = SETTINGS_NXDN_TG;
-		s->mic_input = 0;
+		s->mic_input = mic_input_in_range(mic);
 		memset(s->nxdn_reserved, 0, sizeof s->nxdn_reserved);
 		return;
 	}
@@ -192,6 +209,7 @@ static void nxdn_block_check(settings_t *s, size_t bytes)
 		s->nxdn_tx_ran = SETTINGS_NXDN_TX_RAN;
 	if (s->nxdn_tg == 0 || (s->nxdn_tg > SETTINGS_NXDN_TG_MAX && s->nxdn_tg != SETTINGS_NXDN_TG_ALL))
 		s->nxdn_tg = SETTINGS_NXDN_TG;
+	s->mic_input = mic_input_in_range(s->mic_input);
 }
 
 static void aes_migration_check(settings_t *s, size_t bytes)
@@ -312,8 +330,9 @@ settings_load_t settings_init(void)
 		stats.load = whole ? SETTINGS_LOADED : SETTINGS_UPGRADED;
 		power_levels_check(&live);
 		aes_migration_check(&live, SETTINGS_PAGE_BYTES + page1_bytes);
+		bool agc_block = agc_block_present(&live, SETTINGS_PAGE_BYTES + page1_bytes);
 		agc_block_check(&live, SETTINGS_PAGE_BYTES + page1_bytes);
-		nxdn_block_check(&live, SETTINGS_PAGE_BYTES + page1_bytes);
+		nxdn_block_check(&live, SETTINGS_PAGE_BYTES + page1_bytes, agc_block);
 	}
 	storage_unlock();
 	saved = live;

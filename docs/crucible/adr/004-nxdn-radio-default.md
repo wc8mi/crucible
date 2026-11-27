@@ -56,11 +56,12 @@ Owners reported four problems:
 ## Consequences
 
 - **Settings record.** A second Crucible block of eight bytes is appended (settings_t 428 to 436 bytes, still two
-  pages): a marker (0xA7, offset 428), flags (bit 0: 9600 bit/s), RX RAN, TX RAN, the talkgroup (u16, offset 432) and
-  two reserved bytes. A record shorter than 436 bytes, or with another marker, reads as the defaults. Values out of
-  range read as their default; All (0xFFFF) is kept. No save is forced.
+  pages): a marker (0xA8, offset 428), flags (bit 0: 9600 bit/s), RX RAN, TX RAN, the talkgroup (u16, offset 432),
+  the Mic input (offset 434, see [Revision 1](#revision-1-mic-input-moves-into-the-block)) and one reserved byte. A
+  record shorter than 436 bytes, or with another marker, reads as the defaults. Values out of range read as their
+  default; All (0xFFFF) is kept. No save is forced.
 - **Upstream collision.** As for ADR 003's block: if RadioFoundry appends its own field at byte 428, a Crucible radio
-  sees a wrong marker and uses the defaults. There is a 1 in 256 chance that a foreign byte equals 0xA7, so its other
+  sees a wrong marker and uses the defaults. There is a 1 in 256 chance that a foreign byte equals 0xA8, so its other
   bytes are read as NXDN values (then clamped to range). Upstream fields taken into Crucible later go after
   Crucible's blocks, never between them. A user who installs RadioFoundry after Crucible should reset the settings.
 - **Existing radios.** After the update, the VFO's NXDN starts at 4800 bit/s, any RAN in, RAN 1 out, talkgroup 1.
@@ -68,6 +69,24 @@ Owners reported four problems:
 - **Debug link.** `nxdn.default.rate rx_ran tx_ran tg` show the stored values; `nxdn.rate` and the others still show
   the RAM settings. Op 43 changes RAM only. A change in Settings and op 43 at the same time can lose one of them.
 - **Scope.** P25 in the VFO has the same talk target gap. It is not changed here.
+
+## Revision 1: Mic input moves into the block
+
+The Mic input setting (`mic_input`, a signed step) went into byte 399, a byte upstream had reserved. Upstream then took
+byte 399 for `aprs_cp_freq`, the APRS codeplug frequency mark ([aprs.md](../../spec/aprs.md) 11). This is the
+collision [ADR 003](003-digital-agc.md) warned about, from the other side: a Crucible field in an upstream reserved
+byte, not an upstream field in a Crucible block.
+
+- **Upstream keeps its offsets.** `aprs_cp_freq` stays at 399. `mic_input` moves to offset 434, the first of this
+  block's two reserved bytes. settings_t stays 436 bytes.
+- **New marker.** The block's marker changes from 0xA7 to 0xA8, so a record in the new layout can be told apart.
+  0xA7 was never released: the released Crucible firmware has only the Digital AGC block.
+- **Load.** A record with the Digital AGC block (at least 428 bytes, 0xA6 at 424) and without 0xA8 at 428 was written
+  with `mic_input` at 399. Its byte 399 is read as `mic_input` (outside -7..+8 reads 0) and `aprs_cp_freq` reads 0,
+  none yet. The NXDN values read their defaults as before. A record without the Digital AGC block (RadioFoundry's, or
+  older) keeps its `aprs_cp_freq` and reads `mic_input` 0. A record with 0xA8 is read as stored. No save is forced:
+  the next ordinary save writes the new layout.
+- **Rule.** A Crucible field goes in a Crucible block, never in a byte upstream reserved.
 
 ## Plan
 
