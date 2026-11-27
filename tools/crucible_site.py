@@ -40,6 +40,66 @@ MARK = ('<svg viewBox="0 0 70 80" aria-hidden="true" focusable="false"><path fil
 THEME_ICON = ('<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7.5" fill="none" '
               'stroke="currentColor" stroke-width="1.8"/><path d="M10 2.5a7.5 7.5 0 0 1 0 15z" fill="currentColor"/></svg>')
 
+# The update page's words in ASD-STE100 (ADR 001, "Words"): one term for one thing, imperative steps, CAUTION and
+# STOP alerts. They replace the shared page's English after RadioFoundry is renamed; each key must be in the shared
+# catalog with the same {placeholders} (self_test)
+WORDS = {
+    'flash.release.title': 'Your radio',
+    'flash.release.lead': 'The installer reads the radio and finds the correct update.',
+    'flash.release.first_install': 'Use this page for a radio with Crucible or RadioFoundry. For a radio with the manufacturer\'s firmware, use Install.',
+    'flash.release.running': 'On the radio now',
+    'flash.release.choose': 'Select a version',
+    'flash.release.installed': 'On your radio',
+    'flash.release.test': 'Test release',
+    'flash.release.notes': 'What changes in {name}',
+    'flash.release.older_title': 'CAUTION: This version is older than the firmware on your radio.',
+    'flash.release.older_text': 'Make a backup first. An older version can erase settings from a newer version. It can also make AES transmit keys unusable.',
+    'flash.release.older_ok': 'I have a backup and I accept the risk',
+    'flash.release.older_first': 'Select the checkbox for the older version first.',
+    'flash.release.unknown_age': 'The radio does not show the date of its firmware. The installer cannot tell if this version is older.',
+    'flash.release.none': 'STOP: No version is available for the {radio}.',
+    'flash.release.show_tests': 'Show test releases',
+    'flash.release.show_tests_text': 'Test releases have less testing.',
+    'flash.release.loading': 'Wait',
+    'flash.release.go': 'Update to {name}',
+    'flash.release.reinstall': 'Update again',
+    'flash.release.missing': 'STOP: The firmware file is not on this site (HTTP {status}).',
+    'flash.release.bootloader': 'This radio cannot get the update through the cable now. Do the steps below to put the radio in update mode.',
+    'flash.update.step_on': 'Set the radio to ON. Do not hold a key.',
+    'flash.update.step_cable': 'Connect the programming cable to the radio and to the computer.',
+    'flash.update.step_choose': 'Click Connect and select the radio in the list.',
+    'flash.update.first_install': 'Radio with the manufacturer\'s firmware?',
+    'flash.update.to_install': 'Go to Install',
+    'flash.update.not_rfoundry': 'STOP: The radio does not have Crucible or RadioFoundry. You cannot update it. Use Install.',
+    'flash.update.backup': 'Make a backup first',
+    'flash.update.backup_text': 'Optional. An update keeps the channels, settings, calibration and voice codec.',
+    'flash.write.title': 'Update',
+    'flash.write.bootloader_title': 'Put the radio in update mode',
+    'flash.write.then_connect': 'Click Connect.',
+    'flash.write.found': 'The radio is in update mode.',
+    'flash.write.go': 'Update',
+    'flash.write.writing': 'Do not disconnect the cable',
+    'flash.write.finished': 'The update is complete. The radio starts again.',
+    'flash.write.failed': 'STOP: The update stopped ({error}). Put the radio in update mode and do the update again.',
+    'flash.write.unexpected': 'STOP: The radio reports “{what}”. This is not the radio you selected.',
+    'flash.done.title': 'Check the update',
+    'flash.done.lead': 'When the radio shows its screen again, click Check the update.',
+    'flash.done.lead_noscreen': 'When the radio starts again, click Check the update.',
+    'flash.done.check': 'Check the update',
+    'flash.done.ready': 'Crucible operates. DMR voice is available.',
+    'flash.step.update': 'Find',
+    'flash.step.write': 'Update',
+    'flash.step.done': 'Check',
+    'flash.step.c7_done': 'Check',
+    'flash.f4.title': 'Update',
+    'flash.f4.go': 'Update',
+    'flash.c7.write.title': 'Update',
+    'flash.c7.write.go': 'Update',
+    'flash.stay_on_page': 'CAUTION: Keep this page open and the computer screen on until the update is complete.',
+    'flash.start_over': 'Start again',
+    'flash.step.check': 'Backup',
+}
+
 # The update page sends a visitor who has not accepted the terms on this computer to the front page (ADR 001)
 TERMS_FIRST = '<script>try{if(localStorage.getItem("crucible-terms")!=="1")location.replace("./#terms")}catch(e){}</script>'
 
@@ -169,19 +229,29 @@ def one(pattern, text, what, flags=re.S):
     return re.search(pattern, text, flags)
 
 
+def words(catalog):
+    """WORDS, each checked against the shared catalog: the key is there and keeps its {placeholders}."""
+    for k, v in WORDS.items():
+        if k not in catalog:
+            raise SiteError(f'flash page: {k} is not in the shared catalog (renamed upstream?)')
+        if set(re.findall(r'\{\w+\}', v)) != set(re.findall(r'\{\w+\}', catalog[k])):
+            raise SiteError(f'flash page: {k} changes the placeholders of "{catalog[k]}"')
+    return WORDS
+
+
 def crucible_page(flash, project, assets, built):
     """The shared flasher page with Crucible's head, shell, words and switches."""
     page = flash
     i18n = one(r'(<script type="application/json" id="i18n">)(.*?)(</script>)', page, 'string catalog')
     strings = json.loads(i18n.group(2))
     strings = {k: v.replace('RadioFoundry', project['name']) for k, v in strings.items()}
-    strings['flash.release.title'] = strings.get('flash.release.title', 'Update')
+    strings.update(words(strings))
     catalog = json.dumps(strings, ensure_ascii=False).replace('</', '<\\/')
     page = page[:i18n.start(2)] + catalog + page[i18n.end(2):]
 
     name = html.escape(project['name'])
-    title = f'{name} · Update your radio'
-    lead = 'Install a Crucible release over USB. Your codec, channels and settings stay.'
+    title = f'{name} · Update'
+    lead = 'Your voice codec, channels and settings stay on the radio.'
     head = (f'<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n'
             f'<title>{title}</title>\n<meta name="description" content="{html.escape(project["tagline"])}">\n'
             f'<meta name="theme-color" content="#ff7738">\n<meta name="robots" content="noindex">\n'
@@ -206,15 +276,15 @@ def crucible_page(flash, project, assets, built):
     m = one(r'<header class="site-header">.*?</header>', page, 'site header')
     page = page[:m.start()] + band + page[m.end():]
     m = one(r'(<section class="wrap section page-head">\s*<h1>)(.*?)(</h1>\s*<p class="lead">)(.*?)(</p>)', page, 'page head')
-    page = page[:m.start()] + m.group(1) + 'Update your radio' + m.group(3) + lead + m.group(5) + page[m.end():]
+    page = page[:m.start()] + m.group(1) + f'Update {name}' + m.group(3) + lead + m.group(5) + page[m.end():]
     m = one(r'<dialog id="beta-notice".*?</dialog>\s*', page, 'beta notice')
     page = page[:m.start()] + page[m.end():]
     repo, issues, upstream = (html.escape(project[k]) for k in ('repo', 'issues', 'upstream'))
     foot = ('<footer class="cx-foot">\n\t<div class="wrap">\n'
             f'\t\t<p><strong>Help:</strong> <a href="{issues}">open an issue on {html.escape(project["repo"].removeprefix("https://github.com/"))}</a>. '
-            'A problem report from this page is saved as a file: attach it to the issue. Nothing is sent anywhere by this page.</p>\n'
+            'Report a Problem saves a file. Attach the file to the issue. This page sends nothing to a server.</p>\n'
             f'\t\t<p>{name} is maintained by {html.escape(project["maintainer"])}. It is based on '
-            f'<a href="{upstream}">RadioFoundry</a> (MIT) and is not affiliated with it; please don\'t ask RadioFoundry about {name}. '
+            f'<a href="{upstream}">RadioFoundry</a> (MIT) and is not affiliated with it. Do not ask RadioFoundry about {name}. '
             f'<a href="{repo}">Source</a>.</p>\n'
             f'\t\t<p class="build-stamp">{html.escape(built)}</p>\n'
             '\t</div>\n</footer>')
@@ -337,15 +407,27 @@ def self_test():
              '<header class="site-header">nav</header><main><section class="wrap section page-head">\n<h1>Install</h1>\n'
              '<p class="lead">l</p></section><dialog id="beta-notice">b</dialog>\n<link href="../static/css/x.css?v=1">'
              '<div id="flasher"></div></main><footer class="site-footer">f</footer>'
-             '<script type="application/json" id="i18n">{"a": "Runs RadioFoundry"}</script>'
+             '<script type="application/json" id="i18n">' + json.dumps({'a': 'Runs RadioFoundry', **{k: v for k, v in
+             json.loads((ROOT / 'site' / 'i18n' / 'en.json').read_text()).items() if k in WORDS}}) + '</script>'
              '<script type="module" src="../static/js/flasher/app.js?v=1"></script></body></html>')
     proj = {'name': 'Crucible', 'tagline': 't', 'repo': 'https://github.com/o/r', 'issues': 'https://github.com/o/r/issues',
             'upstream': 'https://github.com/u/u', 'maintainer': 'M'}
     page = crucible_page(flash, proj, '1', 'v')
     assert 'data-releases="releases/index.json"' in page and 'data-reporting="off"' in page
-    assert 'Runs Crucible' in page and 'beta-notice' not in page and 'site-header' not in page
+    assert '"Your radio"' in page and '<h1>Update Crucible</h1>' in page and 'Runs Crucible' in page and 'beta-notice' not in page and 'site-header' not in page
     assert '"static/js/flasher/app.js' in page and '../' not in page and 'not affiliated' in page
     assert 'location.replace("./#terms")' in page, 'the update page asks for the terms first'
+    shared = json.loads((ROOT / 'site' / 'i18n' / 'en.json').read_text())
+    assert words(shared) is WORDS, 'every Crucible word replaces a shared key with the same placeholders'
+    for bad in ({'flash.release.go': 'x'}, {}):
+        try:
+            words({**{k: shared[k] for k in WORDS if k in shared}, **bad} if bad else {})
+        except SiteError:
+            pass
+        else:
+            raise AssertionError('a lost key or placeholder accepted')
+    for v in WORDS.values():
+        assert not re.search(r"\b(flash|bootloader|DFU|stock|codeplug|beta)\b|n't", v, re.I), v
     tpl = '<h1>{{name}}</h1><ul>\n{{radios}}\n</ul><p>{{built}}</p><a href="{{issues}}">{{repo_slug}}</a>'
     radios = [{'name': 'TYT X-2', 'maker': 'TYT', 'model': 'X-2', 'also': ['TYT X-3', 'Other Y'], 'order': 2},
               {'name': 'B Z-1', 'maker': 'B', 'model': 'Z-1', 'also': [], 'order': 1}]
