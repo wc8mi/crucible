@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { buildTleBundle, DEFAULT_SELECTED_IDS, filterFmSatellites, MAX_SELECTED_PROFILES,
+import { AMSAT_API, amsatEndpoint, buildTleBundle, DEFAULT_SELECTED_IDS, filterFmSatellites, MAX_SELECTED_PROFILES,
 	parseTleCatalog, SATELLITES } from "../static/js/satellite-tle.js";
 
 const SAMPLE = `ISS (ZARYA)\n1 25544U 98067A   26317.20662175  .00008559  00000+0  16132-3 0  9990\n2 25544  51.6325 282.6584 0007349  20.2588 339.8690 15.49346920594859\nSO-50\n1 27607U 02058C   26316.49281663  .00001582  00000+0  20311-3 0  9999\n2 27607  64.5539  30.0380 0068124 235.0518 124.4178 14.83333417286454\nAO-91\n1 43017U 17073E   26317.60524444  .00008151  00000+0  33970-3 0  9990\n2 43017  97.4443 181.7665 0144887 171.0350 189.3523 15.14807395487992\n`;
@@ -16,6 +16,20 @@ test("site satellite profiles match the firmware frequency table", async () => {
 		.map((m) => m.slice(1).map(Number));
 	assert.deepEqual(SATELLITES.map(({ id, rxHz, txHz, toneHz }) => [id, rxHz, txHz, toneHz]), firmware);
 	assert.deepEqual(DEFAULT_SELECTED_IDS, [25544, 27607, 43017]);
+});
+
+test("the AMSAT button uses the page's same-origin proxy path, or the default", async () => {
+	assert.equal(AMSAT_API, "/api/amsat-tle");
+	for (const none of [undefined, null, "", "  "]) assert.equal(amsatEndpoint(none), AMSAT_API);
+	assert.equal(amsatEndpoint("../../api/amsat-tle"), "../../api/amsat-tle");
+	assert.equal(amsatEndpoint("/crucible/api/amsat-tle"), "/crucible/api/amsat-tle");
+	for (const other of ["https://www.amsat.org/tle/daily-bulletin.txt", "//evil.example/x", "javascript:alert(1)",
+		"data:text/plain,x", "/\\evil.example/x"])
+		assert.equal(amsatEndpoint(other), AMSAT_API, other);
+	const page = await readFile(new URL("../static/js/tletool.js", import.meta.url), "utf8");
+	assert.match(page, /amsatEndpoint\(document\.getElementById\("satellite-tle"\)\?\.dataset\.amsatApi\)/);
+	assert.match(page, /fetch\(amsatApi, /);
+	assert.doesNotMatch(page, /fetch\("/, "every fetch goes through the endpoint");
 });
 
 test("only known FM satellites are included in the selectable catalog", () => {
