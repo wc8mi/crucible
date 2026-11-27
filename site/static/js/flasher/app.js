@@ -914,6 +914,8 @@ function render() {
 	const view = (missing && (() => kitView(missing))) || own || (step === "restore" && bundleBackend(S.bundle)?.views.restore) || (S.radio && backend().views[step])
 		|| { update: updateView, radio: radioView, build: buildView, bundle: bundleView, symptom: symptomView, recover: recoverView, restart: restartView }[step];
 	if (!missing && transferStep()) host.append(h("p", { class: "notice bad" }, h("strong", {}, t("flash.stay_on_page"))));
+	// a card step's own caution, above its view: what the shared step does not say for this radio
+	if (cardStep(step)?.notice) host.append(notice(cardStep(step).notice, "warn"));
 	host.append(view());
 	host.append(h("div", { class: "nav-bar" },
 		h("div", { class: "nav-back" },

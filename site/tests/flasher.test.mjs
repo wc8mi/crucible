@@ -1105,3 +1105,13 @@ test("a release page installs from its releases", () => {
 	assert.doesNotMatch(view, /requestBuild|api\(/);
 	assert.match(src, /const releaseTask = \(\) => \(\/\(\?:\^#\|&\)install\(\?:&\|\$\)\/\.test\(location\.hash\) \? "install" : "update"\);/);
 });
+
+// A card step may carry its own caution (data/install-card.json, a step's "notice"): drawn in the open step above the
+// step's view, so a radio's build choice can carry its warning on the shared release list
+test("a card step's notice shows above its view", () => {
+	const src = readFileSync(new URL("../static/js/flasher/app.js", import.meta.url), "utf8");
+	const body = src.slice(src.indexOf("function render() {"), src.indexOf("\n}\n", src.indexOf("function render() {")));
+	const shown = body.indexOf('if (cardStep(step)?.notice) host.append(notice(cardStep(step).notice, "warn"));');
+	assert.ok(shown > 0, "the step's notice is drawn as a caution");
+	assert.ok(shown < body.indexOf("host.append(view());"), "above the step's view");
+});
