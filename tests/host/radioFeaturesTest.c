@@ -2437,6 +2437,40 @@ static bool far_call(radio_dual_ref_t far)
 	return ok;
 }
 
+// Dual watch is always carrier: with Scan resume Time and a short hold, a long call on one channel keeps the watch
+// there (it doesn't move on after the hold), started after the choice as at a restart
+static void test_dual_resume_time(void)
+{
+	start();
+	add(8, "Far", 445900000, RADIO_MODE_FM);
+	memset(&zone2, 0, sizeof(zone2));
+	strcpy(zone2.name, "Far zone");
+	zone2.count = 1;
+	zone2.channels[0] = 8;
+	nzones = 2;
+	const radio_dual_ref_t home = { false, 0, 0 }, far = { false, 1, 0 };
+	scan_resume_set = SCAN_RESUME_TIME;
+	scan_hold_set = 3;
+	settings(set_scan_resume_hold);
+	dual(home, far, 0);
+	CHECK(sm.scan.kind == SCAN_DUAL && sm.scan.cfg.resume == SCAN_RESUME_CARRIER &&
+	      sm.scan.cfg.delay_ms == RADIO_DUAL_DELAY_MS);
+	signal_on(0, 146520000, 30, no_tone);
+	CHECK(wait_on(home, 500));
+	for (int i = 0; i < 40 && sm.view.scan_phase != SCAN_PH_HOLD; i++) {
+		run(25);
+	}
+	CHECK(on_ref(home) && sm.view.scan_phase == SCAN_PH_HOLD);
+	bool left = false;
+	for (int i = 0; i < 180; i++) {	// 4.5 s of the call, past the 3 s hold
+		run(25);
+		left |= !on_ref(home);
+	}
+	CHECK(!left && on_ref(home) && sm.view.scan_phase == SCAN_PH_HOLD && sm.view.scan == SCAN_DUAL);
+	hw.sig[0].hz = 0;
+	dual_stop();
+}
+
 static void test_dual_wait(void)
 {
 	start();
@@ -5078,6 +5112,7 @@ int main(void)
 #if CONFIG_DUAL_WATCH
 	test_standalone_vfo_swap();
 	test_dual_wait();
+	test_dual_resume_time();
 	test_dual_requests();
 	test_dual_rx2();
 #endif

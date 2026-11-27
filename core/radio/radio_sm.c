@@ -5100,10 +5100,10 @@ static void scan_config(const radio_sm_t *sm, uint8_t kind, scan_cfg_t *cfg)
 	cfg->delay_ms = sm->set.scan_delay_ms;
 	cfg->resume = sm->set.scan_resume;
 	cfg->priority = sm->set.scan_priority;
-	if (kind == SCAN_DUAL && cfg->resume == SCAN_RESUME_STOP) {
-		cfg->resume = SCAN_RESUME_CARRIER;	// a signal holds dual watch; it doesn't end it
-	}
 	if (kind == SCAN_DUAL) {
+		// A signal holds dual watch for as long as it lasts: it neither ends the watch (stop) nor leaves a call
+		// after the hold (time). It waits its own delay after the signal
+		cfg->resume = SCAN_RESUME_CARRIER;
 		cfg->delay_ms = sm->set.dual_delay_ms;
 	}
 }
@@ -8243,8 +8243,8 @@ static void use_settings(radio_sm_t *sm, const radio_settings_t *s, uint32_t now
 	apply_tot(sm);
 #if CONFIG_SCAN
 	if (scan_on(&sm->scan) && sm->scan.kind != SCAN_DUAL) {
-		// A scan running now takes the new delay, hold and resume mode (dual watch has its own delay and never
-		// stops on a signal). A change to stop applies from the next signal the scan stops on
+		// A scan running now takes the new delay, hold and resume mode (dual watch is always carrier with its own
+		// delay: scan_config). A change to stop applies from the next signal the scan stops on
 		sm->scan.cfg.delay_ms = sm->set.scan_delay_ms;
 		sm->scan.cfg.hold_ms = (uint16_t)(sm->set.scan_hold_s * 1000u);
 		sm->scan.cfg.resume = sm->set.scan_resume;

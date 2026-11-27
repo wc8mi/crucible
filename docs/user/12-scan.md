@@ -37,7 +37,7 @@ If dual watch is running, starting a scan stops it. The radio stays on the selec
   | Scan resume | The scan moves on |
   |---|---|
   | Carrier (default) | Scan delay after the signal ends. It stays as long as the signal lasts |
-  | Time | After **Scan hold** (3 to 30 s, default 5 s) on the signal, even if it goes on; sooner if the signal ends (after Scan delay) |
+  | Time | After **Scan hold** (3 to 30 s, default 5 s) of continuous signal, even if it goes on (the count restarts with each over), or Scan delay after the signal ends |
   | Stop | Never: the scan ends on the first signal and the radio stays on that channel. Scan delay isn't used |
 
   A change takes effect at once, in a scan already running too. Dual watch always waits for the signal to end.
