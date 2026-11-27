@@ -28,10 +28,14 @@ export const MAX_SELECTED_PROFILES = 10;
 // own in data-amsat-api; only a same-origin path is taken, so a page cannot point the button at another site.
 export const AMSAT_API = "/api/amsat-tle";
 
-export function amsatEndpoint(value) {
-	const path = typeof value === "string" ? value.trim() : "";
-	if (!path || /^[a-z][a-z0-9+.-]*:/i.test(path) || path.startsWith("//") || path.includes("\\")) return AMSAT_API;
-	return path;
+export function amsatEndpoint(value, base = globalThis.location?.href) {
+	if (typeof value !== "string" || !value.trim() || !base) return AMSAT_API;
+	try {
+		// the browser's own parse, so a tab, newline or backslash cannot turn the path into another host
+		return new URL(value, base).origin === new URL(base).origin ? value.trim() : AMSAT_API;
+	} catch {
+		return AMSAT_API;
+	}
 }
 
 export function filterFmSatellites(records) {

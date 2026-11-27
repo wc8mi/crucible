@@ -20,16 +20,20 @@ test("site satellite profiles match the firmware frequency table", async () => {
 
 test("the AMSAT button uses the page's same-origin proxy path, or the default", async () => {
 	assert.equal(AMSAT_API, "/api/amsat-tle");
-	for (const none of [undefined, null, "", "  "]) assert.equal(amsatEndpoint(none), AMSAT_API);
-	assert.equal(amsatEndpoint("../../api/amsat-tle"), "../../api/amsat-tle");
-	assert.equal(amsatEndpoint("/crucible/api/amsat-tle"), "/crucible/api/amsat-tle");
+	const page = "https://tinker.example/crucible/tools/satellite/index.html";
+	for (const none of [undefined, null, "", "  "]) assert.equal(amsatEndpoint(none, page), AMSAT_API);
+	assert.equal(amsatEndpoint("../../api/amsat-tle", page), "../../api/amsat-tle");
+	assert.equal(amsatEndpoint("/crucible/api/amsat-tle", page), "/crucible/api/amsat-tle");
+	assert.equal(amsatEndpoint("https://tinker.example/crucible/api/amsat-tle", page), "https://tinker.example/crucible/api/amsat-tle");
 	for (const other of ["https://www.amsat.org/tle/daily-bulletin.txt", "//evil.example/x", "javascript:alert(1)",
-		"data:text/plain,x", "/\\evil.example/x"])
-		assert.equal(amsatEndpoint(other), AMSAT_API, other);
-	const page = await readFile(new URL("../static/js/tletool.js", import.meta.url), "utf8");
-	assert.match(page, /amsatEndpoint\(document\.getElementById\("satellite-tle"\)\?\.dataset\.amsatApi\)/);
-	assert.match(page, /fetch\(amsatApi, /);
-	assert.doesNotMatch(page, /fetch\("/, "every fetch goes through the endpoint");
+		"data:text/plain,x", "/\\evil.example/x", "/\t/evil.example/x", "/\n/evil.example/x", "\\\\evil.example/x",
+		"http://tinker.example/crucible/api/amsat-tle", "https://tinker.example:8443/x"])
+		assert.equal(amsatEndpoint(other, page), AMSAT_API, JSON.stringify(other));
+	assert.equal(amsatEndpoint("../../api/amsat-tle", undefined), AMSAT_API, "no page to compare with: the default");
+	const tool = await readFile(new URL("../static/js/tletool.js", import.meta.url), "utf8");
+	assert.match(tool, /amsatEndpoint\(document\.getElementById\("satellite-tle"\)\?\.dataset\.amsatApi\)/);
+	assert.match(tool, /fetch\(amsatApi, /);
+	assert.doesNotMatch(tool, /fetch\("/, "every fetch goes through the endpoint");
 });
 
 test("only known FM satellites are included in the selectable catalog", () => {
