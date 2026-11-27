@@ -3,10 +3,10 @@
 ---
 date: 2026-11-27
 seq: 1
-title: A fifth radio and the NXDN radio default
+title: The {{boards/db25d}} and the NXDN radio default
 release: crucible-4e24a5e1-8a658d0d-261127-2
 ---
-- **A fifth radio:** the Radioddity mobile radio in the radio list on this page. It runs RadioFoundry's image with
+- **A fifth radio:** the {{boards/db25d}}. It runs RadioFoundry's image with
   Crucible's features on. Crucible's own features (Digital AGC, the NXDN radio default) have not run on it yet. Only
   radios of the 909E.DBB batch are tested.
 - **NXDN radio default.** Settings > Talk & listen > NXDN sets Rate, RX RAN, TX RAN and Talkgroup for the VFO and for

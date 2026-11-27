@@ -6,7 +6,8 @@ title: Digital AGC and a YSF receive fix
 release: crucible-3ebdbe50-62445a3e-261127-1
 ---
 - **Digital AGC.** Two new switches in Settings > Talk & listen: Digital AGC RX and Digital AGC TX. Both start On and
-  use each radio's own default levels. Off, the per-mode rows apply (DMR, P25, NXDN and YSF). Your earlier DMR and
+  use each radio's own default levels, on the {{boards/mduv380}}, the {{boards/dm1701}}, the {{boards/dm32}} and the
+  {{boards/md9600}}. Off, the per-mode rows apply (DMR, P25, NXDN and YSF). Your earlier DMR and
   YSF values are kept as the manual values.
 - **YSF receive fix.** After loud audio the CTCSS filter could ring, and the radio lost sync until you changed
   channel. It no longer does.
