@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 David Behnke
 """NXDN conventional on the radio (docs/spec/nxdn.md 6).
 
 test_nxdn_mode_switch: the channel on view becomes NXDN by a temporary mode change (the debug link's mode request,
@@ -7,6 +8,13 @@ debuglink.md 3.8 op 31); the nxdn view section must show the engine running (`nx
 Undoing the change brings the channel's own mode back with the engine stopped. Nothing is sent.
 
 test_nxdn_settings: the NXDN settings (op 43, RAM only) round trip through the nxdn view and are put back.
+
+test_nxdn_default_view: the stored NXDN radio default (docs/crucible/adr/004-nxdn-radio-default.md, `nxdn.default.*`)
+is in range: 4800 or 9600 bit/s, both RANs 0..63, the talkgroup 1..65519 or 65535 (all).
+
+test_nxdn_default_rate_tile: on the channel in NXDN for now, quick tile 8 flips the stored rate and the settings' with
+it (`nxdn.default.rate`, `nxdn.rate`), and a second press flips both back. Stores a setting twice; nothing is sent.
+Skipped on a stored NXDN channel (it keeps its own rate) and where the other rate has no fit.
 
 test_nxdn_stored_channel (opt-in: --allow-codeplug-write; nothing is sent): the channel on view is made a stored NXDN
 channel over CPS (nxdn-codeplug.md 2): its record the safe stand-in (DMR, receive only, no contact, its own unit ID
@@ -175,6 +183,52 @@ def test_nxdn_settings(radio):
         radio.link.nxdn_settings(**old)
     radio.wait_for(lambda x: x.get("nxdn.rx_gid") == str(old["rx_gid"]), 2.0, sections=("nxdn",),
                    what="settings put back")
+
+
+# --- The NXDN radio default (docs/crucible/adr/004-nxdn-radio-default.md) ---
+
+def default_view(radio):
+    v = nxdn_view(radio)
+    if "nxdn.default.rate" not in v:
+        skip("not_built", "firmware without the NXDN radio default (nxdn.default.*)")
+    return v
+
+
+@pytest.mark.feature("nxdn_default")
+def test_nxdn_default_view(radio):
+    v = default_view(radio)
+    assert v["nxdn.default.rate"] in ("4800", "9600"), v["nxdn.default.rate"]
+    assert 0 <= int(v["nxdn.default.rx_ran"]) <= 63 and 0 <= int(v["nxdn.default.tx_ran"]) <= 63, v
+    tg = int(v["nxdn.default.tg"])
+    assert 1 <= tg <= 65519 or tg == 65535, tg
+
+
+@pytest.mark.feature("nxdn_default")
+def test_nxdn_default_rate_tile(radio):
+    v = default_view(radio)
+    snap = radio.snapshot()
+    mode0 = radio.core().get("mode")
+    if mode0 == "nxdn":
+        skip("state", "the channel is NXDN already (a stored NXDN channel keeps its own rate)")
+    rate0 = v["nxdn.default.rate"]
+    other = "9600" if rate0 == "4800" else "4800"
+    if (as_int(v.get("nxdn.fit" + other)) or 0) & 0x3 == 0:
+        skip("no_hw", f"the radio's air interface carries no NXDN at {other} bit/s")
+    try:
+        radio.link.dmr_fields(mode="nxdn")
+        v = radio.wait_for(lambda x: x.get("mode") == "nxdn", 3.0, sections=("core",), what="the channel in NXDN")
+        for want in (other, rate0):
+            radio.go_home()
+            radio.press("quick")
+            radio.press("8")
+            radio.wait_for(lambda x: x.get("nxdn.default.rate") == want and x.get("nxdn.rate") == want, 3.0,
+                           sections=("nxdn",), what=f"the radio default at {want} bit/s")
+    finally:
+        radio.go_home()
+        if snap["vfo"] == "1":
+            radio.link.dmr_fields(mode=mode0)
+        radio.restore(snap)
+    assert radio.view(["nxdn"]).get("nxdn.default.rate") == rate0, "the stored rate not put back"
 
 
 # --- A stored NXDN channel (nxdn-codeplug.md, channel-modes.md 2) ---

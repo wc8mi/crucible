@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The radio features for the debug link (docs/spec/debuglink.md 3.7, 3.8): the "features" view section (scan, FM
 // extras, battery, beeps, settings) and the RADIO operations that drive them (scan, beep, tone burst, one setting,
 // roaming)
@@ -488,7 +489,8 @@ uint8_t debuglink_radio_feature_op(uint8_t op, const uint8_t *a, uint16_t len)
 #endif
 	}
 	case DL_OP_NXDN: {
-		// The NXDN settings (radio_nxdn_settings_t, RAM only; docs/spec/debuglink.md 3.8): u8 flags (bit 0: 9600
+		// The NXDN settings (radio_nxdn_settings_t, RAM only: a restart seeds them again from the stored radio
+		// default, nxdn.default.*; docs/spec/debuglink.md 3.8): u8 flags (bit 0: 9600
 		// bit/s, else 4800; bit 1: PTT calls a unit; bit 2: emergency), u8 rx_ran (0 any), u8 tx_ran, u16 rx_gid (0: the
 		// RAN squelch), u16 unit_id (1..65519), u16 tx_dst, little-endian. The engine takes them when not transmitting;
 		// a new rate starts it over
