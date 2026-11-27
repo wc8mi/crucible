@@ -1172,6 +1172,11 @@ The `audio` view includes `agc.built`. When built, `agc.<mode>.enabled`, `.input
 Modes 0, 1 and 2 are DMR, P25 and NXDN. Input/output are whole dBFS before user volume; gain is whole dB.
 A reading with `valid=0` is not current speech. These diagnostics do not start audio or transmit.
 
+Digital AGC (Crucible, [ADR 003](../crucible/adr/003-digital-agc.md)): `agc.rx_auto` and `agc.tx_auto` are the two
+switches (1 = On, the radio's defaults). `agc.<mode>.choice` is the RX AGC choice in force per mode (0 = Off; mode 3 is
+YSF). `voice.tx_target_p25` is P25's transmit leveling target, an RMS (0 = manual gain). The `dmr` view's TX audio keys
+add `voice.tx_target_nxdn`, and `voice.tx_profile` can read `nxdn`.
+
 ## 7. Over the air
 
 `CONFIG_DEBUGLINK_DMRIP` (off by default, never in a release; [build-config.md](../build-config.md)) carries debug link

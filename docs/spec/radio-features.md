@@ -341,7 +341,10 @@ hardware page records its measurement. The AMBE path combines this offset and an
 requested multiplier (`ambeVoiceSetMicGainQ8`); neither is applied as a separate PCM scaling stage. The codec's
 existing internal AGC options remain unchanged. A codec with internal AGC uses the middle manual step, while the
 fixed board calibration still applies. The TX level settings below add an optional software RMS target in its
-place. The shared AMBE microphone path also serves NXDN.
+place. The shared AMBE microphone path also serves NXDN, with its own profile (`AMBE_TX_NXDN`) and target. Which
+target each profile gets comes from Digital AGC (`core/radio/digital_agc.h`): with the switch On, the board's
+`tx_level_default_db` (0 = -30 dBFS) for DMR, NXDN and YSF and -20 dBFS for P25; Off, each mode's TX level row. Receive
+works the same way with `rx_agc_default_db` ([Crucible ADR 003](../crucible/adr/003-digital-agc.md)).
 
 `CONFIG_TX_MIC_LIMITER` defaults to DMR and protects the digital microphone PCM before AMBE or P25 encoding.
 One shared block controller (`core/dsp/tx_level.h`) applies the requested manual software gain once, with a
