@@ -110,7 +110,6 @@
 #define RADIO_RX2_REFRESH_MS	2000
 #define RADIO_RX2_TUNE_MS	1500
 #define RADIO_RX2_RETRY_MS	10000
-#define RADIO_SCAN_HOLD_S	5
 
 // Battery monitor: one reading a second, none while transmitting and for a while after (the load sags the voltage)
 #define RADIO_BATT_PERIOD_MS	1000

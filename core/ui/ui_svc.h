@@ -542,6 +542,9 @@ typedef enum {
 	// Scan: the wait after a signal ends before the scan moves on, ms (Settings > Talk & listen, CONFIG_SCAN;
 	// radio_settings_t.scan_delay_ms, 0 to RADIO_SCAN_DELAY_MAX_MS). Appended like the ones above
 	UI_SET_SCAN_DELAY_MS,
+	// Scan: the resume mode (scan_resume_t: 0 time, 1 carrier, 2 stop) and time mode's hold, s (0 to
+	// RADIO_SCAN_HOLD_MAX_S); radio_settings_t.scan_resume and scan_hold_s, CONFIG_SCAN. Appended like the ones above
+	UI_SET_SCAN_RESUME, UI_SET_SCAN_HOLD_S,
 	UI_SET_COUNT
 } ui_setting_t;
 

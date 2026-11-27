@@ -3995,6 +3995,21 @@ msgid "Channel"
 msgstr "信道"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_VALUE_SCAN_RESUME_CARRIER"
+msgid "Carrier"
+msgstr "载波"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_VALUE_SCAN_RESUME_TIME"
+msgid "Time"
+msgstr "定时"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_VALUE_SCAN_RESUME_STOP"
+msgid "Stop"
+msgstr "停止"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_VALUE_MSGFMT_AUTOMATIC"
 msgid "Automatic"
 msgstr "自动"
@@ -4250,9 +4265,19 @@ msgid "Show talker alias"
 msgstr "显示主叫别名"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_SCAN_RESUME"
+msgid "Scan resume"
+msgstr "扫描恢复"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_SCAN_DELAY"
 msgid "Scan delay"
 msgstr "扫描延时"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_SCAN_HOLD"
+msgid "Scan hold"
+msgstr "扫描驻留"
 
 #: core/ui/ui_menus.c
 msgctxt "SET_LABEL_DUAL_TALK_BACK"
@@ -4783,6 +4808,16 @@ msgstr "本机无 GPS"
 msgctxt "WHY_DMR_POSITION_NOT_IN_BUILD"
 msgid "DMR position: not in this build"
 msgstr "DMR 定位：本版本无"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_WHY_SCAN_HOLD_TIME_ONLY"
+msgid "Only with Scan resume Time"
+msgstr "仅在扫描恢复为定时时可用"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_WHY_SCAN_DELAY_NOT_STOP"
+msgid "Not used with Scan resume Stop"
+msgstr "扫描恢复为停止时不用"
 
 #: core/ui/ui_menus.c
 msgctxt "WHY_DIAGNOSTICS_NOT_IN_BUILD"

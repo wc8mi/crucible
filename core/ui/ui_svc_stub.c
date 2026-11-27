@@ -11,6 +11,7 @@
 #include "audio/rx_agc.h"
 #include "settings/settings.h"
 #include "radio/digital_agc.h"
+#include "radio/scan.h"
 #include "board.h"
 
 #define WEAK __attribute__((weak))
@@ -262,6 +263,7 @@ static uint8_t agc_manual, agc_tx_p25, agc_tx_nxdn;
 static int32_t nxdn_default[UI_SET_NXDN_TG - UI_SET_NXDN_RATE + 1] = { 0, 0, 1, 1 };
 // The scan's wait after a signal, past the table too: the radio core's default
 static int32_t scan_delay_ms = RADIO_SCAN_DELAY_MS;
+static int32_t scan_resume = SCAN_RESUME_CARRIER, scan_hold_s = RADIO_SCAN_HOLD_S;	// and its resume mode and hold
 #if CONFIG_RX_AGC
 // The RX choice in force for every mode, after a row or the switch changed
 static void agc_rx_configure(void)
@@ -285,6 +287,10 @@ int32_t ui_svc_ram_get(uint8_t id)
 		return nxdn_default[id - UI_SET_NXDN_RATE];
 	if (id == UI_SET_SCAN_DELAY_MS)
 		return scan_delay_ms;
+	if (id == UI_SET_SCAN_RESUME)
+		return scan_resume;
+	if (id == UI_SET_SCAN_HOLD_S)
+		return scan_hold_s;
 #if CONFIG_RX_AGC
 	if (id >= UI_SET_RX_AGC_DMR && id <= UI_SET_RX_AUDIO_LEVELS)
 		return rx_audio_preferences[id - UI_SET_RX_AGC_DMR];
@@ -329,6 +335,18 @@ bool ui_svc_ram_set(uint8_t id, int32_t value)
 		if (value < 0 || value > (int32_t)RADIO_SCAN_DELAY_MAX_MS)
 			return false;
 		scan_delay_ms = value;
+		return true;
+	}
+	if (id == UI_SET_SCAN_RESUME) {
+		if (value < SCAN_RESUME_TIME || value > SCAN_RESUME_STOP)
+			return false;
+		scan_resume = value;
+		return true;
+	}
+	if (id == UI_SET_SCAN_HOLD_S) {
+		if (value < 0 || value > (int32_t)RADIO_SCAN_HOLD_MAX_S)
+			return false;
+		scan_hold_s = value;
 		return true;
 	}
 	if (id >= UI_SET_RAM_COUNT)
