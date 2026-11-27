@@ -152,6 +152,12 @@ The result is `build/crucible-site/`. Copy it to `/crucible/` on the tinker host
 - sets `data-reporting="off"`: the page sends nothing to RadioFoundry's services, and a problem report is saved as a
   file for a wc8mi/crucible issue
 - says Crucible wherever the flasher's English says RadioFoundry, and credits RadioFoundry in the footer
+- builds the shared Satellite TLE page at `tools/satellite/index.html` in the same shell. The front page links it, and
+  the flasher offers it after an update, so a radio with the satellite feature gets new satellite data without new
+  firmware. Its AMSAT button reads the daily bulletin from `../../api/amsat-tle` (`data-amsat-api`), which is
+  `/crucible/api/amsat-tle` on the tinker host: a GET-only proxy in Caddy that sends no visitor headers. The page
+  allows requests to this site only. The satellite frequencies are the page's own table, not a download
+- fails the build if a page links to a local file that is not there
 
 The look lives in `site/crucible/` (`crucible.css`, the self-hosted Barlow Condensed heading face, OFL-1.1). It loads
 after the shared stylesheets and changes no markup, so upstream's flasher keeps merging. The design record is

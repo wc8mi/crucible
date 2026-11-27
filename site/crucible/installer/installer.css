@@ -100,7 +100,7 @@ p { margin: .6rem 0 0; text-wrap: pretty; }
 .accept { display: flex; gap: .8rem; align-items: center; margin-top: 1.4rem; font-weight: 600; cursor: pointer; }
 .accept input { flex: none; width: 1.35rem; height: 1.35rem; margin: 0; }
 
-/* Home: the Update door beside the first-install steps, then the policy */
+/* Home: the Update door beside the first-install steps, the Satellites door, then the policy */
 .doors { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 2.2rem; }
 .door { display: flex; flex-direction: column; min-height: 17rem; padding: 1.5rem; background: var(--plate);
 	border: 1px solid var(--line); border-radius: 4px; color: var(--text); text-decoration: none; }
@@ -112,6 +112,11 @@ p { margin: .6rem 0 0; text-wrap: pretty; }
 .door h2 { margin-top: auto; padding-top: 1.2rem; font-size: 2rem; line-height: 1.05; }
 .door p { color: var(--muted); }
 .door .btn { align-self: flex-start; margin-top: 1.2rem; }
+/* Satellites: a lesser door across both columns, the same plate with a quiet button */
+.door.wide { grid-column: 1 / -1; min-height: 0; flex-direction: row; align-items: center; gap: 1.5rem; }
+.door.wide .text { flex: 1; max-width: 62ch; }
+.door.wide h2 { margin: 0; padding: 0; font-size: 1.6rem; }
+.door.wide .btn { flex: none; margin: 0; align-self: center; }
 .first { padding: 1.5rem; border: 1px solid var(--line); border-radius: 4px; }
 .first h2 { font-size: 1.6rem; line-height: 1.05; }
 .first > p { color: var(--muted); }
@@ -158,4 +163,6 @@ p { margin: .6rem 0 0; text-wrap: pretty; }
 	.doors, .browsers { grid-template-columns: 1fr; }
 	.door { min-height: 0; }
 	.door .art { height: 4.25rem; }
+	.door.wide { flex-direction: column; align-items: stretch; gap: 1.2rem; }
+	.door.wide .btn { align-self: flex-start; }
 }

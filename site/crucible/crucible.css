@@ -192,3 +192,5 @@ h3 { font-weight: 650; }
 .cx-foot .build-stamp { justify-self: start; text-align: left; margin: 0; color: var(--faint); font-family: var(--font-mono); font-size: var(--text-xs); }
 /* The update page's note under the lead: a first install is RadioFoundry's (tools/crucible_site.py) */
 .page-head .cx-first { max-width: 62ch; margin: var(--space-4) 0 0; }
+/* The satellite page (tools/crucible_site.py satellite_page): a readable lead */
+.page-tools .page-head .lead { max-width: 36rem; }

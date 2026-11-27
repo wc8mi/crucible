@@ -290,63 +290,119 @@ def words(catalog):
     return WORDS
 
 
-def crucible_page(flash, project, assets, built):
-    """The shared flasher page with Crucible's head, shell, words and switches."""
-    page = flash
+def catalog_words(page, project, extra=None):
+    """The page's string catalog with Crucible's name, plus extra (each key checked against the catalog)."""
     i18n = one(r'(<script type="application/json" id="i18n">)(.*?)(</script>)', page, 'string catalog')
     strings = json.loads(i18n.group(2))
     strings = {k: v.replace('RadioFoundry', project['name']) for k, v in strings.items()}
-    strings.update(words(strings))
+    if extra is not None:
+        strings.update(extra(strings))
     catalog = json.dumps(strings, ensure_ascii=False).replace('</', '<\\/')
-    page = page[:i18n.start(2)] + catalog + page[i18n.end(2):]
+    return page[:i18n.start(2)] + catalog + page[i18n.end(2):]
 
+
+def shell(page, project, assets, built, root, title, body, help_more=''):
+    """A shared site page in Crucible's head, band and foot. root leads from the page to the site root ('' or
+    '../../'); body is the new body tag; help_more follows the help line in the foot."""
     name = html.escape(project['name'])
-    title = f'{name} · Update'
-    lead = 'Your voice codec, channels and settings stay on the radio.'
     head = (f'<head>\n<meta charset="utf-8">\n{CSP}\n<meta name="viewport" content="width=device-width, initial-scale=1">\n'
             f'<title>{title}</title>\n<meta name="description" content="{html.escape(project["tagline"])}">\n'
             f'<meta name="theme-color" content="#ff7738">\n<meta name="robots" content="noindex">\n'
-            f'<link rel="icon" href="crucible/icon-32.png?v={assets}" type="image/png" sizes="32x32">\n'
-            f'<link rel="apple-touch-icon" href="crucible/icon-180.png?v={assets}">\n'
-            f'<link rel="preload" href="crucible/fonts/barlow-condensed-700-latin.woff2" as="font" type="font/woff2" crossorigin>\n'
-            f'<link rel="stylesheet" href="static/css/tokens.css?v={assets}">\n'
-            f'<link rel="stylesheet" href="static/css/site.css?v={assets}">\n'
-            f'<link rel="stylesheet" href="crucible/crucible.css?v={assets}">\n'
+            f'<link rel="icon" href="{root}crucible/icon-32.png?v={assets}" type="image/png" sizes="32x32">\n'
+            f'<link rel="apple-touch-icon" href="{root}crucible/icon-180.png?v={assets}">\n'
+            f'<link rel="preload" href="{root}crucible/fonts/barlow-condensed-700-latin.woff2" as="font" type="font/woff2" crossorigin>\n'
+            f'<link rel="stylesheet" href="{root}static/css/tokens.css?v={assets}">\n'
+            f'<link rel="stylesheet" href="{root}static/css/site.css?v={assets}">\n'
+            f'<link rel="stylesheet" href="{root}crucible/crucible.css?v={assets}">\n'
             '<script>try{var t=localStorage.getItem("rfoundry-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>\n'
-            f'{TERMS_FIRST}\n'
+            f'{TERMS_FIRST.replace("./#terms", (root or "./") + "#terms")}\n'
             '</head>')
     m = one(r'<head>.*?</head>', page, 'head')
     page = page[:m.start()] + head + page[m.end():]
     m = one(r'<body [^>]*>', page, 'body tag')
-    page = page[:m.start()] + ('<body class="page-flash" data-root="" data-home="" data-gl-more="More" '
-                               'data-releases="releases/index.json" data-reporting="off">') + page[m.end():]
+    page = page[:m.start()] + body + page[m.end():]
     band = ('<header class="cx-band">\n\t<div class="wrap">\n'
-            f'\t\t<a class="cx-brand" href="./">{MARK}<span class="cx-word">{name}</span></a>\n'
+            f'\t\t<a class="cx-brand" href="{root or "./"}">{MARK}<span class="cx-word">{name}</span></a>\n'
             f'\t\t<button class="theme-toggle" type="button" aria-label="Switch light and dark" title="Switch light and dark">{THEME_ICON}</button>\n'
             '\t</div>\n</header>')
     m = one(r'<header class="site-header">.*?</header>', page, 'site header')
     page = page[:m.start()] + band + page[m.end():]
-    m = one(r'(<section class="wrap section page-head">\s*<h1>)(.*?)(</h1>\s*<p class="lead">)(.*?)(</p>)', page, 'page head')
-    first = (f'\n<p class="notice info cx-first">{name} updates only a radio with RadioFoundry or {name}. For a radio with the '
-             f'manufacturer\'s firmware, <a href="{RF_FLASH}">install RadioFoundry</a> first.</p>')
-    page = page[:m.start()] + m.group(1) + f'Update {name}' + m.group(3) + lead + m.group(5) + first + page[m.end():]
-    m = one(r'<dialog id="beta-notice".*?</dialog>\s*', page, 'beta notice')
-    page = page[:m.start()] + page[m.end():]
     repo, issues, upstream, community = (html.escape(project[k]) for k in ('repo', 'issues', 'upstream', 'community'))
     foot = ('<footer class="cx-foot">\n\t<div class="wrap">\n'
             f'\t\t<p><strong>Help:</strong> ask in the <a href="{community}">Crucible Community on Discord</a>, or <a href="{issues}">open an issue on {html.escape(project["repo"].removeprefix("https://github.com/"))}</a>. '
-            'Report a Problem saves a file. Attach the file to the issue. This page sends nothing to a server.</p>\n'
+            f'{help_more}This page sends nothing to a server.</p>\n'
             f'\t\t<p>{name} is maintained by {html.escape(project["maintainer"])}. It is based on '
             f'<a href="{upstream}">RadioFoundry</a> (MIT) and is not affiliated with it. Do not ask RadioFoundry about {name}. '
             f'<a href="{repo}">Source</a>.</p>\n'
             f'\t\t<p class="build-stamp">{html.escape(built)}</p>\n'
             '\t</div>\n</footer>')
     m = one(r'<footer class="site-footer">.*?</footer>', page, 'site footer')
-    page = page[:m.start()] + foot + page[m.end():]
+    return page[:m.start()] + foot + page[m.end():]
+
+
+def crucible_page(flash, project, assets, built):
+    """The shared flasher page with Crucible's head, shell, words and switches."""
+    page = catalog_words(flash, project, words)
+    name = html.escape(project['name'])
+    page = shell(page, project, assets, built, '', f'{name} · Update',
+                 '<body class="page-flash" data-root="" data-home="" data-gl-more="More" '
+                 'data-releases="releases/index.json" data-reporting="off">',
+                 'Report a Problem saves a file. Attach the file to the issue. ')
+    lead = 'Your voice codec, channels and settings stay on the radio.'
+    m = one(r'(<section class="wrap section page-head">\s*<h1>)(.*?)(</h1>\s*<p class="lead">)(.*?)(</p>)', page, 'page head')
+    first = (f'\n<p class="notice info cx-first">{name} updates only a radio with RadioFoundry or {name}. For a radio with the '
+             f'manufacturer\'s firmware, <a href="{RF_FLASH}">install RadioFoundry</a> first.</p>')
+    page = page[:m.start()] + m.group(1) + f'Update {name}' + m.group(3) + lead + m.group(5) + first + page[m.end():]
+    m = one(r'<dialog id="beta-notice".*?</dialog>\s*', page, 'beta notice')
+    page = page[:m.start()] + page[m.end():]
     page = page.replace('"../static/', '"static/')
     if '../' in re.sub(r'<script type="application/json" id="i18n">.*?</script>', '', page, flags=re.S):
         raise SiteError('flash page: a ../ link is left')
     return page
+
+
+# The satellite page: the AMSAT bulletin comes through this site's proxy (/crucible/api/amsat-tle on the tinker host),
+# named relative to the page so the folder can move; the frequencies are the page's own table (satellite-tle.js)
+SAT_PAGE = 'tools/satellite/index.html'
+SAT_API = '../../api/amsat-tle'
+SAT_LEAD = ('Load new satellite data on a radio with RadioFoundry or {name}. A firmware update is not necessary. '
+            'The radio must have the satellite feature. Select up to 10 FM satellites. Send them to the radio over USB, '
+            'or save a bundle file.')
+
+
+def satellite_page(tle, project, assets, built):
+    """The shared Satellite TLE page (site/templates/satellite_tle.html) in Crucible's shell."""
+    page = catalog_words(tle, project)
+    name = html.escape(project['name'])
+    page = shell(page, project, assets, built, '../../', f'{name} · Satellites',
+                 '<body class="page-tools" data-root="../../" data-home="../../" data-gl-more="More">',
+                 "The AMSAT button gets AMSAT's daily bulletin through this site. ")
+    m = one(r'(<section class="wrap section page-head">)\s*<p class="eyebrow">.*?</p>(\s*<h1>)(.*?)(</h1>\s*<p class="lead">)(.*?)(</p>)',
+            page, 'satellite page head')
+    page = (page[:m.start()] + m.group(1) + m.group(2) + 'Satellites' + m.group(4) + SAT_LEAD.format(name=name)
+            + m.group(6) + page[m.end():])
+    m = one(r'<section class="wrap section satellite-tle" id="satellite-tle"', page, 'satellite form')
+    page = page[:m.end()] + f' data-amsat-api="{SAT_API}"' + page[m.end():]
+    return page
+
+
+def local_links(out):
+    """Every href and src in the served pages that names a local file names one that is there."""
+    bad = []
+    for f in sorted(out.rglob('*.html')):
+        if f.parent.name == 'soon':
+            continue		# crucible/soon/: the placeholder page, served on its own with its files beside it
+        text = re.sub(r'<script type="application/json" id="i18n">.*?</script>', '', f.read_text(), flags=re.S)
+        for ref in re.findall(r'(?:href|src)="([^"]*)"', text):
+            if not ref or re.match(r'^(?:[a-z][a-z0-9+.-]*:|//|#)', ref, re.I):
+                continue
+            target = (f.parent / ref.split('#')[0].split('?')[0])
+            if target.is_dir():
+                target = target / 'index.html'
+            if not target.resolve().is_relative_to(out.resolve()) or not target.exists():
+                bad.append(f'{f.relative_to(out)}: {ref}')
+    if bad:
+        raise SiteError('a page links to a missing local file: ' + ', '.join(bad))
 
 
 def no_upstream_api(out):
@@ -511,6 +567,8 @@ def build(out, packages, github, site_out=None):
         assets = re.search(r'\?v=([0-9a-f]+)', flash).group(1)
         built = f'{project["name"]} {commit} · page built {info.get("built", "")}'
         (out / 'update.html').write_text(crucible_page(flash, project, assets, built))
+        (out / SAT_PAGE).parent.mkdir(parents=True)
+        (out / SAT_PAGE).write_text(satellite_page((site / SAT_PAGE).read_text(), project, assets, built))
         no_upstream_api(out)
         template = (ROOT / 'site' / 'crucible' / 'installer' / 'page.html').read_text()
         posts = read_news(ROOT / 'site' / 'crucible' / 'news')
@@ -528,7 +586,19 @@ def build(out, packages, github, site_out=None):
     if github:
         releases += github_releases(repo_slug, ROOT / 'build' / 'crucible-releases')
     index = write_releases(releases, out, set(boards), repo_slug)
+    after_update(out)
+    local_links(out)
     return index
+
+
+def after_update(out):
+    """The flasher's offer after a satellite-capable install (`${HOME}tools/satellite/index.html`, from update.html
+    with data-home="") lands on the page this build made."""
+    for js in ('app.js', 'c7000ui.js'):
+        if '`${HOME}' + SAT_PAGE + '`' not in (out / 'static' / 'js' / 'flasher' / js).read_text():
+            raise SiteError(f'{js}: the satellite offer changed (the shared page changed?)')
+    if 'data-home=""' not in (out / 'update.html').read_text() or not (out / SAT_PAGE).is_file():
+        raise SiteError(f'update.html: the satellite offer does not reach {SAT_PAGE}')
 
 
 def self_test():
@@ -606,6 +676,54 @@ def self_test():
         else:
             raise AssertionError('a RadioFoundry service left in the output')
     assert 'location.replace("./#terms")' in page, 'the update page asks for the terms first'
+    # the satellite page: the shared template in Crucible's shell; the AMSAT button uses this site's proxy only
+    tle = ('<html><head><title>x</title></head><body class="page-tools" data-root="../../" data-home="../../">'
+           '<header class="site-header">nav</header><main><section class="wrap section page-head">\n'
+           '<p class="eyebrow"><a href="../../tools/index.html">Tools</a></p>\n<h1>Satellite TLE Update</h1>\n<p class="lead">l</p>'
+           '</section><section class="wrap section satellite-tle" id="satellite-tle"><button id="tle-amsat">a</button></section>'
+           '</main><footer class="site-footer">f</footer><script type="application/json" id="i18n">{"b": "RadioFoundry"}</script>'
+           '<script type="module" src="../../static/js/tletool.js?v=1"></script></body></html>')
+    sat = satellite_page(tle, proj, '1', 'v')
+    assert '<h1>Satellites</h1>' in sat and 'eyebrow' not in sat and 'tools/index.html' not in sat and 'site-header' not in sat
+    assert f'id="satellite-tle" data-amsat-api="{SAT_API}"' in sat and not SAT_API.startswith(('/', 'http'))
+    assert CSP in sat and 'amsat.org' not in CSP and 'location.replace("../../#terms")' in sat and '"Crucible"' in sat
+    assert 'href="../../crucible/crucible.css?v=1"' in sat and 'class="cx-brand" href="../../"' in sat
+    assert all(len(x.split()) <= 25 for x in re.split(r'(?<=\.) ', SAT_LEAD))
+    with tempfile.TemporaryDirectory() as d:
+        out = Path(d)
+        (out / 'a').mkdir()
+        (out / 'a' / 'x.css').write_text('')
+        (out / 'index.html').write_text('<a href="a/x.css?v=1">x</a><a href="#n">n</a><a href="https://e/">e</a><a href="a/">d</a>'
+                                        '<script type="application/json" id="i18n">{"k": "<a href=\\"gone.html\\">"}</script>')
+        try:
+            local_links(out)
+        except SiteError as e:
+            assert 'a/' in str(e) and 'x.css' not in str(e) and 'gone' not in str(e)
+        else:
+            raise AssertionError('a link to a folder without index.html passed')
+        (out / 'a' / 'index.html').write_text('<a href="../index.html">up</a>')
+        local_links(out)
+        js = out / 'static' / 'js' / 'flasher'
+        js.mkdir(parents=True)
+        for f in ('app.js', 'c7000ui.js'):
+            (js / f).write_text('location.assign(`${HOME}' + SAT_PAGE + '`);')
+        (out / 'update.html').write_text('<body data-home="">')
+        try:
+            after_update(out)
+        except SiteError:
+            pass
+        else:
+            raise AssertionError('the satellite offer passed without its page')
+        (out / SAT_PAGE).parent.mkdir(parents=True)
+        (out / SAT_PAGE).write_text('')
+        after_update(out)
+        (out / 'b.html').write_text('<a href="../outside.html">o</a>')
+        try:
+            local_links(out)
+        except SiteError:
+            pass
+        else:
+            raise AssertionError('a link out of the site passed')
     shared = json.loads((ROOT / 'site' / 'i18n' / 'en.json').read_text())
     assert words(shared) is WORDS, 'every Crucible word replaces a shared key with the same placeholders'
     for bad in ({'flash.release.go': 'x'}, {}):
@@ -637,6 +755,8 @@ def self_test():
     for para in re.findall(r'<(?:p|li|h2)[^>]*>(.*?)</(?:p|li|h2)>', home, re.S):
         for x in sentences(para):
             assert not re.search(banned, x, re.I) and len(x.split()) <= 25, f'front page: {x}'
+    assert f'href="{SAT_PAGE}"' in home, 'the front page links the satellite page'
+    assert not re.search(banned, SAT_LEAD, re.I)
     for v in WORDS.values():
         assert not re.search(banned, v, re.I), v
         assert all(len(x.split()) <= 25 for x in sentences(v)), f'too long: {v}'
