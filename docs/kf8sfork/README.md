@@ -234,7 +234,7 @@ contacts, keys or personal data visible on the screen.
 
 ```text
 Radio/model and hardware revision:
-Build label (About):
+Firmware version (About, for example v0.1.0-beta.3):
 Internal microphone or speaker mic:
 Mode, channel/VFO, single/dual display:
 Feature and exact menu setting:
