@@ -680,7 +680,7 @@ RFOUNDRY_HOT_CODE static int32_t dcs_sample(air_softmodem_adapt_t *a, int32_t x)
 // NOTCH_STATE_MAX, 19 times what the filter reaches, only guards the state
 #define NOTCH_STATE_MAX	(1 << 20)
 // (c y) >> 20 exactly (nested floors), for 0 <= c < 2^20 and |y| <= 2^20, no product past 2^30
-static inline int32_t notch_q20(int32_t c, int32_t y)
+FXP_INLINE int32_t notch_q20(int32_t c, int32_t y)
 {
 	return ((c >> 10) * y + (((c & 1023) * y) >> 10)) >> 10;
 }
