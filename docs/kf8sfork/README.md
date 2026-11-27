@@ -107,6 +107,9 @@ Test DMR separately; it does not use the P25 PCM target. Software cannot repair 
 | YSF TX level | the same | The same for YSF |
 | Mic input | -7 to +8 | The microphone's analog level into digital audio. Lower it if your audio sounds distorted at every TX level |
 
+Mic input is dimmed ("Not on this radio") on a radio without an analog microphone step: the DM-32UV and the
+DB25-D PRO. On the DB25-D PRO, Crucible's Digital AGC and NXDN radio default have not been tested yet.
+
 Set them with two radios. No diagnostic screen is involved:
 
 1. On radio B, turn on **Settings > Display > RX audio levels** and that mode's **RX AGC**.

@@ -19,6 +19,7 @@ body:
         # generated: tools/boards.py docs radios; edit boards/*/board.toml
         - Baofeng DM-32UV
         - Baofeng DM-1701 / Retevis RT84
+        - Radioddity DB25-D PRO / Kydera CDR-300UV
         - TYT MD-UV380 / MD-UV390 / Retevis RT3S / MD-UV390 Plus 10 W
         - TYT MD-9600 / Retevis RT90
         # end generated

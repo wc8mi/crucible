@@ -4,7 +4,7 @@
 
 # Crucible maintainer notes
 
-Crucible is a downstream build of [RadioFoundry](https://github.com/radiofoundry/radiofoundry) for four radios.
+Crucible is a downstream build of [RadioFoundry](https://github.com/radiofoundry/radiofoundry) for five radios.
 [README.md](README.md) is the public face; this page is for whoever builds, releases and merges it, people and coding
 agents alike. Everything in [AGENTS.md](AGENTS.md) still applies. This page adds what is different downstream.
 
@@ -19,7 +19,7 @@ agents alike. Everything in [AGENTS.md](AGENTS.md) still applies. This page adds
    `CONFIG_*` switches, `RFOUNDRY_*` macros, the debug link and host link protocols, USB vendor and product ids), so
    upstream changes keep applying. Identity comes from [crucible.toml](crucible.toml) and a few build settings, not
    from edits scattered through shared code.
-4. **Four radios.** `crucible.toml [radios]` lists them. Releases, CI, the generated docs and the flasher read that
+4. **Five radios.** `crucible.toml [radios]` lists them. Releases, CI, the generated docs and the flasher read that
    list. Other boards' files stay untouched: deleting them would turn every upstream change to them into a conflict.
    This list is the one exception to AGENTS.md's "no list of radios" rule.
 5. **Keep the notices.** `LICENSE`, `AUTHORS`, `CONTRIBUTORS` and every SPDX and copyright line stay. A file we change
@@ -82,7 +82,7 @@ RadioFoundry's workflows are deleted here: their nightly and hardware jobs need 
 | Host tests | All of them, including the audio tests (RX AGC, mic gain, beeps, the synthesized voice set) |
 | Checks | Python, docs, translations, licenses, the web flasher tests, the generated mark (`tools/crucible_mark.py --check`) |
 
-Locally, `JOBS=8 tools/ci.sh` runs the same with Crucible's boards. Listening tests on the four radios go in the
+Locally, `JOBS=8 tools/ci.sh` runs the same with Crucible's boards. Listening tests on the five radios go in the
 bring-up records (`tools/bringup.py`); recordings are never committed.
 
 ## Build and package
@@ -143,7 +143,7 @@ The result is `build/crucible-site/`. Copy it to `/crucible/` on the tinker host
 
 - builds the shared site and keeps only the flash page and the files it loads
 - downloads each `crucible-*.zip` release (with `gh`, so a private repository works), checks it against its `.zip.sha256`
-  and `SHA256SUMS`, and writes the images for the four radios with `releases/index.json` (`--package ZIP` adds a local
+  and `SHA256SUMS`, and writes the images for the five radios with `releases/index.json` (`--package ZIP` adds a local
   one, `--no-github` skips the download)
 - sets `data-reporting="off"`: the page sends nothing to RadioFoundry's services, and a problem report is saved as a
   file for a wc8mi/crucible issue
