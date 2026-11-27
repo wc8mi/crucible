@@ -81,6 +81,7 @@ Some settings are on the menu before the feature behind them exists, or don't ap
 | NXDN TX level | Off, -30 to -12 dBFS | the DMR TX level's | The same for NXDN. Only in builds with NXDN | Host tested; on-air checks pending |
 | YSF TX level | Off, -30 to -12 dBFS | Off | The same for YSF. Only in builds with YSF | Host tested; on-air checks pending |
 | Mic input | -7 to +8 | 0 | The microphone's analog level into the radio's digital audio, before any of the above. Lower it if your voice sounds harsh or distorted at every TX level: a TX level can't repair a clipped input. Applies at once. Dimmed on radios without it ([which radios](../feature-matrix.md)) | Host tested; on-air checks pending |
+| NXDN | | | Opens the [NXDN radio default](#nxdn-radio-default). On radios with NXDN | Host tested |
 | Mic noise reduction | On, Off | On | Reduces steady background noise (fans, engines, wind) in what you send on DMR, also between words. Turn it off if a steady sound you want heard is cut. Dimmed on radios whose voice codec can't do it | Needs an on-air check (DMR) |
 | Monitor by default | On, Off | Off | Digital monitor (DMR: every talkgroup, promiscuous; Tier III: every talkgroup's call on the system) goes on each time you select a DMR channel, and a scan started from it keeps it on at every channel. **Back** on Home turns it off until the next channel | Works |
 | Show talker alias | On, Off | On | Show received talker aliases (names) under the caller's ID | Works |
@@ -210,6 +211,20 @@ When the keys lock by themselves and what still works while they are locked ([Ke
 <img src="../ux/screens/160x120i5/about.png" width="200" alt="Settings > Advanced > About">
 
 <img src="../ux/screens/160x120i5/settings_advanced.png" width="200" alt="Settings, Advanced">
+
+#### NXDN radio default
+
+**Settings > Talk & listen > NXDN.** What the VFO and a channel in NXDN for now use. A saved NXDN channel keeps its
+own. The radio keeps these when switched off; a change applies at once.
+
+| Setting | Values | Default | What it does |
+|---|---|---|---|
+| Rate | 4800 bit/s, 9600 bit/s | 4800 bit/s | Also quick settings tile 8 in NXDN |
+| RX RAN | Any, 1 to 63 | Any | The radio access number heard. Any receives every RAN |
+| TX RAN | 0 to 63 | 1 | The RAN sent |
+| Talkgroup | 1 to 65519, All | 1 | The group **PTT** calls. **Up** past 65519 is All. Talk to a group (hold **OK**) sets it too |
+
+A new NXDN channel made on the radio starts with this rate and these RANs.
 
 #### Setting a TX level
 

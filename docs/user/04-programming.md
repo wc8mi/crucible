@@ -150,7 +150,7 @@ channel.
 
 | Field | Meaning |
 |---|---|
-| Rate | 9600 bit/s (12.5 kHz) or 4800 bit/s (6.25 kHz) |
+| Rate | 4800 bit/s (6.25 kHz, the default for a new channel) or 9600 bit/s (12.5 kHz) |
 | Squelch | RAN: every call on the RAN. Selective: the group and calls to this radio |
 | RX RAN | Radio access number heard, 0-63. 0 receives every RAN |
 | TX RAN | RAN sent. Blank: the RX RAN (1 when the RX RAN is 0) |

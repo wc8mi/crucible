@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The radio's own settings, kept across power cycles (docs/spec/settings-store.md): where the radio was (zone,
 // channel, VFO), the VFO's settings and the user's preferences. Stored as versioned records appended to a ring of
 // flash sectors (board.flash->map settings area): a record is valid only once its commit word is programmed, so a
@@ -278,10 +279,28 @@ typedef struct {
 	uint8_t agc_manual;
 	uint8_t tx_level_p25;
 	uint8_t tx_level_nxdn;
+	// NXDN radio default (Crucible, docs/crucible/adr/004-nxdn-radio-default.md): what the VFO and a channel in NXDN
+	// for now run on (radio_nxdn_init seeds the radio core with it at start-up). A second block of Crucible's own,
+	// after the Digital AGC one: nxdn_marker is SETTINGS_NXDN_MARKER when this firmware wrote the eight bytes. A
+	// record without it (shorter, or another firmware's field here) reads the defaults at load: 4800 bit/s, RX any
+	// RAN, TX RAN 1, group 1. A RAN past 63 or a group out of range reads its default
+	uint8_t nxdn_marker;
+	uint8_t nxdn_flags;		// SETTINGS_NXDN_9600
+	uint8_t nxdn_rx_ran;		// 0 (every RAN) to 63
+	uint8_t nxdn_tx_ran;		// 0 to 63
+	uint16_t nxdn_tg;		// the group PTT calls: 1 to 65519, or SETTINGS_NXDN_TG_ALL
+	uint8_t nxdn_reserved[2];	// 0; later Crucible NXDN fields
 } settings_t;
 #define SETTINGS_AGC_MARKER	0xA6u
 #define SETTINGS_AGC_RX_MANUAL	0x01u	// Digital AGC RX is Off: each mode's RX AGC row is in force
 #define SETTINGS_AGC_TX_MANUAL	0x02u	// Digital AGC TX is Off: each mode's TX level row is in force
+#define SETTINGS_NXDN_MARKER	0xA7u
+#define SETTINGS_NXDN_9600	0x01u	// nxdn_flags: 9600 bit/s, else 4800
+#define SETTINGS_NXDN_RAN_MAX	63u
+#define SETTINGS_NXDN_TX_RAN	1u	// the defaults: TX RAN 1, group 1 (RX RAN 0, 4800 bit/s)
+#define SETTINGS_NXDN_TG	1u
+#define SETTINGS_NXDN_TG_MAX	65519u	// a group ID; the IDs above are special (NXDN TS 1-B) ...
+#define SETTINGS_NXDN_TG_ALL	0xFFFFu	// ... but all groups (NXDN_ID_ALL)
 
 // Pages: settings_t is stored as records of SETTINGS_PAGE_BYTES each (settings-store.md 2.1). Only the pages its size
 // needs are written, each with its own length, so settings_t grows by appending fields; the record's page field

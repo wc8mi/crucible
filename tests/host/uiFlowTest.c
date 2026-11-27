@@ -240,13 +240,29 @@ static const flow_t flows[] = {
 	{ "P25 channel shows its mode", "dlmode:p25", "", "mode=p25 screen=home shows=P25 hides=No_tone hides=12.5k hides=25k hides=SQ5", 0, false },
 #if CONFIG_NXDN
 	// NXDN the same way: the power, the RAN sent and the rate in the chips, the group PTT calls on the talk line
-	{ "NXDN channel shows its mode", "dlmode:nxdn", "", "mode=nxdn screen=home shows=NXDN shows=RAN_1_9600 shows=TG_1 hides=No_tone hides=SQ5", 0, false },
+	{ "NXDN channel shows its mode", "dlmode:nxdn", "", "mode=nxdn screen=home shows=NXDN shows=RAN_1_4800 shows=TG_1 hides=No_tone hides=SQ5", 0, false },
 	{ "NXDN home: scrambled call on a stored channel",
 	  "chkind:3,nxdn,COUNTY_NXDN dlpos:3 dlmode:nxdn", "nxdnrx:1234,7,p",
 	  "screen=home shows=COUNTY_NXDN shows=ENC shows=ID_1234 shows=TG_7 hides=Encrypted:_not_played", 0, false },
 	{ "NXDN home: scrambled call without a matching key", "dlmode:nxdn", "nxdnrx:1234,7,e",
 	  "screen=home shows=Encrypted:_not_played hides=ID_1234", 0, false },
-	{ "NXDN channel: bandwidth is FM only", "dlmode:nxdn", "quick 8", "mode=nxdn toast=FM_only:_this_is_NXDN", 2, false },
+	// Tile 8 is the radio default's rate (docs/crucible/adr/004-nxdn-radio-default.md); a stored NXDN channel has its
+	// own, set in the channel
+	{ "NXDN quick: rate to 9600", "dlmode:nxdn", "quick 8", "mode=nxdn toast=NXDN_9600_bit/s", 2, false },
+	{ "NXDN quick: rate back to 4800", "dlmode:nxdn quick 8", "8", "toast=NXDN_4800_bit/s", 1, false },
+	{ "NXDN quick: a stored channel's rate", "chkind:3,nxdn dlpos:3 dlmode:nxdn", "quick 8",
+	  "toast=NXDN:_set_in_the_channel", 2, false },
+	// Talk to on the radio default: for now (Back undoes it); not past 65519; a stored channel keeps its record's
+	{ "NXDN channel: talk to a typed TG", "dlmode:nxdn", "3 1 0 0 ok",
+	  "screen=home shows=TG_3100 toast=Talking_to", 5, false },
+	{ "NXDN channel: an ID past 65519 refused", "dlmode:nxdn", "9 9 9 1 2 3 4 ok",
+	  "toast=NXDN_IDs_go_up_to_65519", 8, false },
+	{ "NXDN VFO: talk to a contact", "dlvfo:438800000 dlmode:nxdn", "ok 1 9 6 7 5 3 ok",
+	  "screen=home shows=TG_91 toast=Talking_to", 8, false },
+	{ "NXDN VFO: Back undoes the talk target", "dlvfo:438800000 dlmode:nxdn ok 1 9 6 7 5 3 ok", "back",
+	  "screen=home shows=TG_1 hides=TG_91 toast=Changes_undone", 1, false },
+	{ "NXDN stored channel: talk to refused", "chkind:3,nxdn dlpos:3 dlmode:nxdn", "3 1 0 0 ok",
+	  "toast=NXDN:_set_in_the_channel", 5, false },
 #endif
 	{ "P25 channel: bandwidth is FM only", "dlmode:p25", "quick 8", "mode=p25 toast=FM_only:_this_is_a_P25_channel",
 	  2, false },
@@ -460,7 +476,7 @@ static const flow_t flows[] = {
 	{ "NXDN new from current: RAN", "dlmode:nxdn", "ok 5 up up up ok down down down",
 	  "screen=channel shows=NXDN focus=RAN hides=Color_code hides=Timeslot", 9, false },
 	{ "NXDN RAN: typed", "dlmode:nxdn ok 5 up up up ok down down down", "ok 1 7 ok", "focus=RAN shows=17", 4, false },
-	{ "NXDN rate: 4800", "dlmode:nxdn ok 5 up up up ok down down down down", "ok", "focus=Rate shows=4800_bit/s", 1,
+	{ "NXDN rate: 9600", "dlmode:nxdn ok 5 up up up ok down down down down", "ok", "focus=Rate shows=9600_bit/s", 1,
 	  false },
 	{ "NXDN ID: past 65519 refused", "dlmode:nxdn ok 5 up up up ok down down down down down down down down down down",
 	  "ok 7 0 0 0 0 ok", "toast=NXDN_IDs_go_up_to_65519", 7, false },
@@ -470,11 +486,11 @@ static const flow_t flows[] = {
 	  "focus=Mode shows=NXDN shows=RAN", 3, false },
 	{ "stored NXDN channel as FM: Save asks", "chkind:3,nxdn ok 5 ok down down ok", "long:ok",
 	  "screen=discard shows=Save_as_FM? shows=NXDN_settings_will_be shows=removed writes=0", 1, false },
-	// Where the radio runs P25 and NXDN, Mode steps through every mode: DMR, P25 with the default NAC, NXDN with
-	// RAN 1 at 9600, FM, and DMR again with nothing to save
+	// Where the radio runs P25 and NXDN, Mode steps through every mode: DMR, P25 with the default NAC, NXDN with the
+	// radio default's rate and RANs (4800, any RAN in, RAN 1 out), FM, and DMR again with nothing to save
 	{ "E Mode: DMR to P25", "p25 nxdn ok 5 ok down down", "ok", "focus=Mode shows=P25 shows=NAC shows=293", 1,
 	  false },
-	{ "E Mode: P25 to NXDN", "p25 nxdn ok 5 ok down down", "ok ok", "focus=Mode shows=NXDN shows=RAN shows=9600",
+	{ "E Mode: P25 to NXDN", "p25 nxdn ok 5 ok down down", "ok ok", "focus=Mode shows=NXDN shows=RAN shows=4800",
 	  2, false },
 	{ "E Mode: NXDN to FM", "p25 nxdn ok 5 ok down down", "ok ok ok", "focus=Mode shows=FM hides=RAN hides=NAC", 3,
 	  false },
@@ -1135,6 +1151,19 @@ static const flow_t flows[] = {
 	  "screen=group focus=DMR_RX_AGC shows=-30_dBFS toast=Digital_AGC_sets", 22, false },
 	{ "S Digital AGC RX off: DMR RX AGC editable", TL_AGC_RX " ok", "down",
 	  "screen=group focus=DMR_RX_AGC shows=Off", 1, false },
+#if CONFIG_NXDN
+	// The NXDN radio default, a page under the row above Digital AGC RX: 4800, any RAN in, RAN 1 out, group 1
+	{ "S NXDN radio default page", "nxdn " TL_AGC_RX " up", "ok",
+	  "screen=group focus=Rate shows=For_the_VFO", 1, false },
+	{ "S NXDN default rate: 9600, the quick tile's", "nxdn dlmode:nxdn " TL_AGC_RX " up ok ok long:back",
+	  "quick 8", "toast=NXDN_4800_bit/s", 2, false },
+	{ "S NXDN default talkgroup: All past the top", "nxdn dlmode:nxdn " TL_AGC_RX " up ok up ok 6 5 5 1 9",
+	  "up ok long:back", "screen=home shows=All hides=TG_65519", 3, false },
+	{ "S NXDN default talkgroup: past 65519 refused", "nxdn " TL_AGC_RX " up ok up ok", "6 5 5 2 0 ok",
+	  "toast=Not_changed:_1_to_65519", 6, false },
+	{ "S NXDN default without NXDN on the radio", TL_AGC_RX " up", "ok", "screen=group toast=Not_on_this_radio", 1,
+	  false },
+#endif
 #endif
 	// Mic AGC on: Mic gain (the row above) shows "AGC", is dimmed and says why
 	{ "S mic AGC on", "", "ok 7 3 down down down down down ok", "set71=1 shows=AGC", 9, false },

@@ -10119,10 +10119,117 @@ static void test_nxdn_system(void)
 }
 #endif
 
+// The NXDN radio default (docs/crucible/adr/004-nxdn-radio-default.md): stored, the settings at start-up; Settings and
+// Talk to change them; a stored NXDN channel keeps its own record's
+static void test_nxdn_radio_default(void)
+{
+	radio_nxdn_settings_t s;
+	const radio_nxdn_view_t *v = &sm.view.nxdn;
+
+	setup_codeplug_nxdn();
+	start();
+	// A new radio: 4800 bit/s, any RAN in, RAN 1 out, group 1
+	radio_nxdn_settings(&s);
+	CHECK(!s.rate9600 && s.rx_ran == 0 && s.tx_ran == 1 && s.tx_dst == 1 && !s.unit_call);
+	aud.feed = true;
+	req(RREQ_ZONE_POS, 2);	// the channel in NXDN (no NXDN record): on the settings
+	CHECK(sm.view.ch.mode == RADIO_MODE_NXDN && radio_nxdn_running());
+	CHECK(!(v->flags & RADIO_NXDN_9600) && v->rx_ran == 0 && v->tx_ran == 1 && v->talk == 1);
+	CHECK(ui_svc_setting_get(UI_SET_NXDN_RATE) == 0 && ui_svc_setting_get(UI_SET_NXDN_RX_RAN) == 0 &&
+	      ui_svc_setting_get(UI_SET_NXDN_TX_RAN) == 1 && ui_svc_setting_get(UI_SET_NXDN_TG) == 1);
+
+	// Set from Settings: stored, and in force at once (the rate restarts the engine)
+	CHECK(ui_svc_setting_set(UI_SET_NXDN_RATE, 1));
+	CHECK(ui_svc_setting_set(UI_SET_NXDN_RX_RAN, 5));
+	CHECK(ui_svc_setting_set(UI_SET_NXDN_TX_RAN, 6));
+	CHECK(ui_svc_setting_set(UI_SET_NXDN_TG, 300));
+	run(100);
+	CHECK(radio_nxdn_running() && (v->flags & RADIO_NXDN_9600) && v->rx_ran == 5 && v->tx_ran == 6 && v->talk == 300);
+	CHECK(ui_svc_setting_get(UI_SET_NXDN_RATE) == 1 && ui_svc_setting_get(UI_SET_NXDN_RX_RAN) == 5 &&
+	      ui_svc_setting_get(UI_SET_NXDN_TX_RAN) == 6 && ui_svc_setting_get(UI_SET_NXDN_TG) == 300);
+	// Out of range: refused, nothing changed
+	CHECK(!ui_svc_setting_set(UI_SET_NXDN_RATE, 2));
+	CHECK(!ui_svc_setting_set(UI_SET_NXDN_RX_RAN, 64));
+	CHECK(!ui_svc_setting_set(UI_SET_NXDN_TX_RAN, -1));
+	CHECK(!ui_svc_setting_set(UI_SET_NXDN_TG, 0));
+	CHECK(!ui_svc_setting_set(UI_SET_NXDN_TG, 65520));
+	CHECK(ui_svc_setting_get(UI_SET_NXDN_TG) == 300 && ui_svc_setting_get(UI_SET_NXDN_RX_RAN) == 5);
+	static char buf[4096];
+	nxdn_view_text(buf, sizeof buf);
+	CHECK(strstr(buf, "nxdn.default.rate=9600\nnxdn.default.rx_ran=5\nnxdn.default.tx_ran=6\nnxdn.default.tg=300\n") !=
+	      NULL);
+	// All groups is a talkgroup too
+	CHECK(ui_svc_setting_set(UI_SET_NXDN_TG, 0xFFFF) && v->talk == 0xFFFF);
+	CHECK(ui_svc_setting_set(UI_SET_NXDN_TG, 300));
+
+	// PTT calls the stored group at the stored TX RAN and rate
+	nfar_begin(true, 1, 2001, false, 1);
+	run(100);
+	req(RREQ_PTT, 1);
+	run(400);
+	CHECK(nfar_heard.starts == 1 && nfar_heard.call.ran == 6 && nfar_heard.call.vcall.dst == 300 &&
+	      nfar_heard.call.vcall.call_type == NXDN_CALL_GROUP);
+	req(RREQ_PTT, 0);
+	run(500);
+	CHECK(sm.view.state == RS_IDLE);
+
+	// Talk to: for now, not stored; Back (DEFAULT) goes back to the stored group
+	CHECK(ui_svc_talk_to(500, false, UI_TALK_TEMPORARY));
+	run(10);
+	CHECK(v->talk == 500 && !(v->flags & RADIO_NXDN_TALK_UNIT) && ui_svc_setting_get(UI_SET_NXDN_TG) == 300);
+	req(RREQ_RELOAD, 0);	// a reload doesn't seed the settings again: the target for now stays
+	CHECK(v->talk == 500);
+	CHECK(ui_svc_talk_to(1234, true, UI_TALK_TEMPORARY));
+	run(10);
+	CHECK(v->talk == 1234 && (v->flags & RADIO_NXDN_TALK_UNIT));
+	CHECK(ui_svc_talk_to(0xFFFFFF, false, UI_TALK_TEMPORARY));	// DMR's all call: all groups
+	run(10);
+	CHECK(v->talk == 0xFFFF);
+	// No NXDN call to 0 or past 65519: refused, the target unchanged
+	CHECK(!ui_svc_talk_to(0, false, UI_TALK_TEMPORARY));
+	CHECK(!ui_svc_talk_to(65520, false, UI_TALK_TEMPORARY));
+	CHECK(!ui_svc_talk_to(9991234, true, UI_TALK_PERMANENT));
+	run(10);
+	CHECK(v->talk == 0xFFFF);
+	CHECK(ui_svc_talk_to(0, false, UI_TALK_DEFAULT));
+	run(10);
+	CHECK(v->talk == 300 && !(v->flags & RADIO_NXDN_TALK_UNIT));
+	// Kept for good: the stored talkgroup
+	CHECK(ui_svc_talk_to(77, false, UI_TALK_PERMANENT));
+	run(10);
+	CHECK(v->talk == 77 && ui_svc_setting_get(UI_SET_NXDN_TG) == 77);
+
+	// A restart seeds the settings from the stored default
+	radio_nxdn_set_settings(&nxdn_default_set);
+	boot();
+	radio_nxdn_settings(&s);
+	CHECK(s.rate9600 && s.rx_ran == 5 && s.tx_ran == 6 && s.tx_dst == 77 && !s.unit_call);
+
+	// A stored NXDN channel runs on its record: Talk to is refused, the settings untouched
+	setup_codeplug_nxdn();
+	add(3, "NXDN rptr", 446100000, RADIO_MODE_DMR, false, 2);
+	chans[3].kind = CODEPLUG_KIND_NXDN;
+	chans[3].system = 0xFF;
+	stored_nxdn[3] = (nxdn_conv_cfg_t){ .conv = { .rate9600 = false, .rx_ran = 7, .tx_ran = 8,
+						      .squelch = NXDN_SQUELCH_RAN },
+					    .unit_id = 4321, .target = 20, .target_unit = false };
+	start();
+	req(RREQ_ZONE_POS, 2);
+	CHECK(sm.view.ch.kind == CODEPLUG_KIND_NXDN && v->talk == 20);
+	CHECK(!ui_svc_talk_to(500, false, UI_TALK_TEMPORARY));
+	CHECK(!ui_svc_talk_to(500, false, UI_TALK_PERMANENT));
+	run(10);
+	CHECK(v->talk == 20);
+	radio_nxdn_settings(&s);
+	CHECK(s.tx_dst == 1);
+	setup_codeplug();
+}
+
 static void test_nxdn(void)
 {
 	test_nxdn_rx();
 	test_nxdn_tx();
+	test_nxdn_radio_default();
 #if CONFIG_NXDN_SCRAMBLER
 	test_nxdn_system();
 #endif
@@ -12687,6 +12794,8 @@ static void test_detour(void)
 	radio_p25_settings(&p25_home);
 	radio_nxdn_settings_t nx_home, nx;
 	radio_nxdn_settings(&nx_home);
+	nx_home.tx_dst = 500;			// an NXDN talk target for now at home (ADR 004): back with the rest
+	radio_req_nxdn_settings(&nx_home);
 	uint32_t vfo_home = sm.vfo_ch.rx_hz;
 	uint8_t sq_home = sm.view.squelch;
 	uint8_t *area = &sim_flash_data[reset_map.settings_addr];
@@ -12713,6 +12822,7 @@ static void test_detour(void)
 	nx = nx_home;
 	nx.rx_ran = 9;
 	nx.tx_ran = 9;
+	nx.tx_dst = 900;
 	radio_req_nxdn_settings(&nx);
 	req(RREQ_ZONE, 1);			// another zone and channel
 	run(50);
@@ -12750,7 +12860,8 @@ static void test_detour(void)
 	radio_p25_settings(&p25);
 	CHECK(p25.rx_nac == p25_home.rx_nac && p25.tx_dst == p25_home.tx_dst);
 	radio_nxdn_settings(&nx);
-	CHECK(nx.rx_ran == nx_home.rx_ran && nx.tx_ran == nx_home.tx_ran);
+	CHECK(nx.rx_ran == nx_home.rx_ran && nx.tx_ran == nx_home.tx_ran && nx.tx_dst == 500);
+	CHECK(SETTINGS_FIELD(nxdn_tg) == SETTINGS_NXDN_TG);	// nothing stored: the target stays for now
 	CHECK(sim.started && sim.cc_filter == 2);	// the DMR receiver runs on the home channel again
 	// Nothing to save afterwards either, and a power cycle finds home
 	settings_stats_t ss;

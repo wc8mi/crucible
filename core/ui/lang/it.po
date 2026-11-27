@@ -123,6 +123,16 @@ msgid "All call"
 msgstr "Chiamata a tutti"
 
 #: core/ui/ui_app.c
+msgctxt "TALK_TOAST_NXDN_SET_IN_CHANNEL"
+msgid "NXDN: set in the channel"
+msgstr "NXDN: si imposta nel canale"
+
+#: core/ui/ui_app.c core/ui/ui_menus.c
+msgctxt "CHAN_TOAST_NXDN_ID_MAX"
+msgid "NXDN IDs go up to 65519"
+msgstr "Gli ID NXDN arrivano a 65519"
+
+#: core/ui/ui_app.c
 msgctxt "TALK_TOAST_FOR_NOW_ONLY"
 msgid "For now only: save it in qdmr"
 msgstr "Per ora: salvalo in qdmr"
@@ -518,6 +528,11 @@ msgid "VOX: not on this radio yet"
 msgstr "VOX: non ancora su questa radio"
 
 #: core/ui/ui_app.c
+msgctxt "QUICK_WHY_NXDN_RATE_NOT_ON_RADIO"
+msgid "This rate: not on this radio"
+msgstr "Velocità: non su questa radio"
+
+#: core/ui/ui_app.c
 msgctxt "QUICK_TOAST_BANDWIDTH_25_KHZ"
 msgid "Bandwidth 25 kHz"
 msgstr "Banda 25 kHz"
@@ -571,6 +586,16 @@ msgstr "Timeslot 1 per ora"
 msgctxt "QUICK_TOAST_TIMESLOT_2_FOR_NOW"
 msgid "Timeslot 2 for now"
 msgstr "Timeslot 2 per ora"
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_NXDN_9600"
+msgid "NXDN 9600 bit/s"
+msgstr "NXDN 9600 bit/s"
+
+#: core/ui/ui_app.c
+msgctxt "QUICK_TOAST_NXDN_4800"
+msgid "NXDN 4800 bit/s"
+msgstr "NXDN 4800 bit/s"
 
 #: core/ui/ui_app.c
 msgctxt "QUICK_TOAST_PRIVACY_ON_FOR_NOW"
@@ -2257,7 +2282,7 @@ msgctxt "LABEL_MODE"
 msgid "Mode"
 msgstr "Modo"
 
-#: core/ui/ui_menus.c
+#: core/ui/ui_menus.c core/ui/ui_screens.c
 msgctxt "CHAN_LABEL_RATE"
 msgid "Rate"
 msgstr "Velocità"
@@ -2416,11 +2441,6 @@ msgstr "Banda solo RX: metti FM"
 msgctxt "CHAN_WHY_PICK_TX_CONTACT"
 msgid "Pick a TX contact first"
 msgstr "Scegli prima un contatto TX"
-
-#: core/ui/ui_menus.c
-msgctxt "CHAN_TOAST_NXDN_ID_MAX"
-msgid "NXDN IDs go up to 65519"
-msgstr "Gli ID NXDN arrivano a 65519"
 
 #: core/ui/ui_menus.c
 msgctxt "CHAN_TOAST_NO_CHANGES"
@@ -4453,6 +4473,21 @@ msgid "DMR ID and name"
 msgstr "ID DMR e nome"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_NXDN_RX_RAN"
+msgid "RX RAN"
+msgstr "RAN RX"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_NXDN_TX_RAN"
+msgid "TX RAN"
+msgstr "RAN TX"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_NXDN_TALKGROUP"
+msgid "Talkgroup"
+msgstr "Gruppo"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_ROW_RSSI_VHF"
 msgid "VHF correction"
 msgstr "Correzione VHF"
@@ -4638,6 +4673,21 @@ msgid " steps"
 msgstr " passi"
 
 #: core/ui/ui_menus.c
+msgctxt "NXDN_VALUE_ANY_RAN"
+msgid "Any"
+msgstr "Qualsiasi"
+
+#: core/ui/ui_menus.c core/ui/ui_screens.c
+msgctxt "QUICK_VALUE_ALL"
+msgid "All"
+msgstr "Tutti"
+
+#: core/ui/ui_menus.c
+msgctxt "WHY_NOT_ON_THIS_RADIO"
+msgid "Not on this radio"
+msgstr "Non su questa radio"
+
+#: core/ui/ui_menus.c
 msgctxt "WHY_PERMIT_TONE_NOT_IN_BUILD"
 msgid "Talk permit tone: not in this build"
 msgstr "Tono via libera: non in questa build"
@@ -4681,11 +4731,6 @@ msgstr "L'AGC mic imposta il livello"
 msgctxt "WHY_NOISE_REDUCTION_NOT_IN_BUILD"
 msgid "Noise reduction: not in this build"
 msgstr "Riduz. rumore: non in questa build"
-
-#: core/ui/ui_menus.c
-msgctxt "WHY_NOT_ON_THIS_RADIO"
-msgid "Not on this radio"
-msgstr "Non su questa radio"
 
 #: core/ui/ui_menus.c
 msgctxt "SET_WHY_DIGITAL_AGC_ON"
@@ -4746,6 +4791,11 @@ msgstr "Nessun fix GPS attuale"
 msgctxt "SET_TOAST_SAVED_AS_YOU_CHANGE"
 msgid "Settings are saved as you change them"
 msgstr "Le impostazioni si salvano al cambio"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_BODY_NXDN_DEFAULT"
+msgid "For the VFO and channels in NXDN for now. Stored NXDN channels keep their own."
+msgstr "Per il VFO e i canali in NXDN per ora. I canali NXDN salvati usano i propri."
 
 #: core/ui/ui_menus.c core/ui/ui_position.c
 msgctxt "HINT_OK_CHANGE_BACK"
@@ -6111,11 +6161,6 @@ msgstr "Copia"
 msgctxt "QUICK_VALUE_OPEN"
 msgid "Open"
 msgstr "Apri"
-
-#: core/ui/ui_screens.c
-msgctxt "QUICK_VALUE_ALL"
-msgid "All"
-msgstr "Tutti"
 
 #: core/ui/ui_screens.c
 msgctxt "QUICK_HINT_SPLIT"

@@ -76,7 +76,7 @@ so with two pages a sector is erased once every 64 saves.
 ### 2.1 Pages
 
 `settings_t` is longer than one slot's payload, so it is stored as pages: page k holds bytes `236 * k` on.
-`SETTINGS_PAGES` is the number its size needs (2 now, 428 bytes); the page field allows 16 (3776 bytes). Each page is
+`SETTINGS_PAGES` is the number its size needs (2 now, 436 bytes); the page field allows 16 (3776 bytes). Each page is
 a record with its own length, so `settings_t` grows by appending fields, and a short page fills the fields it has.
 
 | Rule | Why |
@@ -181,6 +181,7 @@ callsign. The own DMR ID is always the codeplug's.
 | DMR AES MI reservation | Page 1, offsets 408-411. `aes_mi_res` is the end of the MI positions reserved for AES voice transmissions. Zero means no position yet. The first AES channel with a key seeds one. The radio writes a reservation before first use after power-up and renews it as the reservation runs low. Factory reset preserves it. See [Receive audio preferences](#receive-audio-preferences) and [DMR voice](dmr-voice.md) 5.1.1. |
 | Receive audio preferences | Page 1, offsets 412-414 hold `rx_agc[3]` in DMR, P25, NXDN order. Offset 415 holds `rx_audio_levels`. Offset 422 holds `rx_agc_ysf`, the YSF target. All five default to 0; an older record reads offset 422 as 0, Off. |
 | Digital AGC (Crucible) | Page 1, offsets 424-427: `agc_marker` (`SETTINGS_AGC_MARKER`, 0xA6), `agc_manual` (bit 0 RX, bit 1 TX: set = the switch is Off), `tx_level_p25` and `tx_level_nxdn` (a TX level choice + 1; 0 = unset: P25 reads -20 dBFS, NXDN reads `tx_level_dmr`). A record shorter than 428 bytes, or with another byte at 424, loads these four as the defaults (both switches On); no save is forced. See [ADR 003](../crucible/adr/003-digital-agc.md) |
+| NXDN radio default (Crucible) | Page 1, offsets 428-435: `nxdn_marker` (`SETTINGS_NXDN_MARKER`, 0xA7), `nxdn_flags` (bit 0 `SETTINGS_NXDN_9600`: 9600 bit/s, else 4800), `nxdn_rx_ran` (0 any), `nxdn_tx_ran`, `nxdn_tg` (u16 at 432: 1..65519, or 0xFFFF all) and two reserved bytes. The radio core seeds the NXDN settings from them at start-up ([nxdn.md](nxdn.md) 6.2). A record shorter than 436 bytes, or with another byte at 428, loads the defaults (4800 bit/s, RX any, TX RAN 1, group 1); a RAN above 63 or a group of 0 or above 65519 (not 0xFFFF) reads as its default; no save is forced. See [ADR 004](../crucible/adr/004-nxdn-radio-default.md) |
 | DMR AES recovery state | Page 1, offsets 416-419 hold `aes_migration`, a u32 marker. Factory reset preserves it. See [Receive audio preferences](#receive-audio-preferences). |
 | crash report | packed into spare bits, so an older record reads as off with no target: the mode (0 off, 1 ask, 2 send at once) in `accent` bits 4-5; the target's codeplug contact number (0 none, else 1..1024, 11 bits) bits 0-5 in `theme` bits 2-7 and bits 6-10 in `updown_home` bits 2-6. `theme` and `updown_home` keep their value in bits 0-1; read and write them through `settings_theme` / `settings_updown_home` and `settings_crash_*` (`settings.h`). Firmware from before reads a `theme` or `updown_home` with these bits as out of range: the dark theme and Up/Down = channel ([crash-log.md](crash-log.md) 5.2) |
 
@@ -363,8 +364,8 @@ send it:
 
 The private firmware keeps `aes_mi_res` at offsets 408-411 and stores the DMR, P25 and NXDN
 [receive AGC targets](rx-agc.md) at offsets 412-414. Each target defaults to Off. Offset 415 is
-`rx_audio_levels`, with 0 hidden and 1 shown. The layout stays at 1. Current saves write 428 payload bytes across
-two pages of 236 and 192 bytes. Offsets 420 and 421 hold signed VHF/UHF display RSSI corrections in dB;
+`rx_audio_levels`, with 0 hidden and 1 shown. The layout stays at 1. Current saves write 436 payload bytes across
+two pages of 236 and 200 bytes. Offsets 420 and 421 hold signed VHF/UHF display RSSI corrections in dB;
 422 holds `rx_agc_ysf`, the YSF receive AGC target (it was a reserved zero byte, so an older record reads Off), and
 423 holds `tx_level_ysf`, the YSF TX level choice (it was a reserved zero byte, so an older record reads Off). `settings_rx_agc` and `settings_rx_agc_offset` map an `rx_agc_mode_t` to its
 byte. Older records read zero corrections. Values outside −20 to +20

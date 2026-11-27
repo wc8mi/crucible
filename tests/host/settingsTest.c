@@ -997,8 +997,14 @@ static void test_settings_layout(void)
 		{ offsetof(settings_t, agc_manual), 425 },
 		{ offsetof(settings_t, tx_level_p25), 426 },
 		{ offsetof(settings_t, tx_level_nxdn), 427 },
+		{ offsetof(settings_t, nxdn_marker), 428 },
+		{ offsetof(settings_t, nxdn_flags), 429 },
+		{ offsetof(settings_t, nxdn_rx_ran), 430 },
+		{ offsetof(settings_t, nxdn_tx_ran), 431 },
+		{ offsetof(settings_t, nxdn_tg), 432 },
+		{ offsetof(settings_t, nxdn_reserved), 434 },
 	};
-	CHECK(sizeof(settings_t) == 428);
+	CHECK(sizeof(settings_t) == 436);
 	for (unsigned i = 0; i < sizeof(offs) / sizeof(offs[0]); i++) {
 		if (offs[i].got != offs[i].want) {
 			printf("FAIL settings_t field %u at %zu, layout 1 has it at %zu\n", i, offs[i].got, offs[i].want);
@@ -1323,7 +1329,8 @@ enum {
 	UNMARKED_SETTINGS_BYTES = 416,
 	PRE_RSSI_SETTINGS_BYTES = 420,
 	PRE_DAGC_SETTINGS_BYTES = 424,
-	CURRENT_SETTINGS_BYTES = 428,
+	PRE_NXDN_SETTINGS_BYTES = 428,
+	CURRENT_SETTINGS_BYTES = 436,
 };
 
 static void boot_audio_record(const settings_t *settings, uint16_t bytes)
@@ -1439,6 +1446,77 @@ static void test_settings_digital_agc(void)
 	boot_audio_record(&foreign, CURRENT_SETTINGS_BYTES);
 	settings_read(&s);
 	CHECK(s.agc_marker == SETTINGS_AGC_MARKER && s.agc_manual == 0 && s.tx_level_p25 == 0 && s.tx_level_nxdn == 0);
+	CHECK(sim_flash_violations() == 0);
+}
+
+// The NXDN radio default (Crucible): kept across a save; a record without the block (shorter, or another firmware's
+// byte at 428) reads the defaults; a value out of range reads its default, All (0xFFFF) is kept
+static void nxdn_block_is_default(const settings_t *s)
+{
+	CHECK(s->nxdn_marker == SETTINGS_NXDN_MARKER && s->nxdn_flags == 0 && s->nxdn_rx_ran == 0 &&
+	      s->nxdn_tx_ran == SETTINGS_NXDN_TX_RAN && s->nxdn_tg == SETTINGS_NXDN_TG);
+}
+
+static void test_settings_nxdn_default(void)
+{
+	settings_t d;
+	settings_defaults(&d);
+	nxdn_block_is_default(&d);
+	CHECK(d.nxdn_reserved[0] == 0 && d.nxdn_reserved[1] == 0);
+
+	settings_t set = d;
+	set.squelch = 3;
+	set.nxdn_flags = SETTINGS_NXDN_9600;
+	set.nxdn_rx_ran = 12;
+	set.nxdn_tx_ran = 13;
+	set.nxdn_tg = 4000;
+	boot_audio_record(&set, CURRENT_SETTINGS_BYTES);
+	settings_t s;
+	settings_read(&s);
+	CHECK(s.nxdn_flags == SETTINGS_NXDN_9600 && s.nxdn_rx_ran == 12 && s.nxdn_tx_ran == 13 && s.nxdn_tg == 4000);
+	settings_begin()->squelch = 6;	// saved again: the block goes with it
+	settings_end(1);
+	CHECK(settings_flush());
+	boot();
+	settings_read(&s);
+	CHECK(s.squelch == 6 && s.nxdn_flags == SETTINGS_NXDN_9600 && s.nxdn_rx_ran == 12 && s.nxdn_tx_ran == 13 &&
+	      s.nxdn_tg == 4000);
+
+	// A record from before the block (the Digital AGC block its end): the defaults, the AGC block kept
+	settings_t agc = set;
+	agc.agc_manual = SETTINGS_AGC_RX_MANUAL;
+	boot_audio_record(&agc, PRE_NXDN_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.squelch == 3 && s.agc_manual == SETTINGS_AGC_RX_MANUAL);
+	nxdn_block_is_default(&s);
+
+	// A full-length record whose byte 428 is not the marker (a later upstream field): the defaults
+	settings_t foreign = set;
+	foreign.nxdn_marker = 0x11;
+	boot_audio_record(&foreign, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	nxdn_block_is_default(&s);
+
+	// Marked, out of range: each value its default
+	settings_t wild = set;
+	wild.nxdn_flags = 0xFE;		// no 9600 bit, the rest unknown
+	wild.nxdn_rx_ran = 64;
+	wild.nxdn_tx_ran = 200;
+	wild.nxdn_tg = 65520;
+	boot_audio_record(&wild, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	nxdn_block_is_default(&s);
+	wild.nxdn_tg = 0;
+	boot_audio_record(&wild, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.nxdn_tg == SETTINGS_NXDN_TG);
+
+	// All groups is a talk group the block holds
+	settings_t all = set;
+	all.nxdn_tg = SETTINGS_NXDN_TG_ALL;
+	boot_audio_record(&all, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.nxdn_tg == SETTINGS_NXDN_TG_ALL && s.nxdn_tx_ran == 13);
 	CHECK(sim_flash_violations() == 0);
 }
 
@@ -1591,6 +1669,7 @@ int main(void)
 	test_settings_basic();
 	test_settings_receive_agc();
 	test_settings_digital_agc();
+	test_settings_nxdn_default();
 	test_settings_legacy_audio_tail();
 	test_settings_incomplete_aes_tail();
 	test_settings_aes_rekey_only();

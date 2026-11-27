@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The settings store (settings.h, docs/spec/settings-store.md 2). The settings area is a ring of sectors, each split
 // into SLOT_SIZE slots:
 //   0   u32 magic "OSET"     4  u32 sequence number     8  u16 layout     10  u16 payload length n
@@ -32,7 +33,9 @@ _Static_assert(offsetof(settings_t, ref_trim_ppb) % 2 == 0, "ref_trim_ppb is ali
 _Static_assert(offsetof(settings_t, aes_mi_res) == 408, "legacy AES reservation offset");
 _Static_assert(offsetof(settings_t, aes_migration) == 416, "AES migration marker offset");
 _Static_assert(offsetof(settings_t, agc_marker) == 424, "Digital AGC block offset (Crucible)");
-_Static_assert(sizeof(settings_t) == 428, "settings_t changed size: update docs/spec/settings-store.md 3 and this");
+_Static_assert(offsetof(settings_t, nxdn_marker) == 428, "NXDN radio default block offset (Crucible)");
+_Static_assert(offsetof(settings_t, nxdn_tg) == 432, "NXDN talk group offset (Crucible)");
+_Static_assert(sizeof(settings_t) == 436, "settings_t changed size: update docs/spec/settings-store.md 3 and this");
 
 static settings_t live;			// under the quick lock
 static settings_t saved;		// what the newest record holds (or the defaults)
@@ -76,6 +79,9 @@ void settings_defaults(settings_t *s)
 	s->power_levels = board.power_count;
 	s->aes_migration = SETTINGS_AES_READY;
 	s->agc_marker = SETTINGS_AGC_MARKER;	// both switches On; marked, so a manual value saved later is kept
+	s->nxdn_marker = SETTINGS_NXDN_MARKER;	// 4800 bit/s, RX any RAN, TX RAN 1, group 1
+	s->nxdn_tx_ran = SETTINGS_NXDN_TX_RAN;
+	s->nxdn_tg = SETTINGS_NXDN_TG;
 }
 
 // Power levels stored against another level count (an older record, or a board whose levels changed) may name a
@@ -160,6 +166,29 @@ static void agc_block_check(settings_t *s, size_t bytes)
 	s->agc_manual = 0;
 	s->tx_level_p25 = 0;
 	s->tx_level_nxdn = 0;
+}
+
+// The NXDN radio default block (settings.h): a record without this firmware's marker reads the defaults, marked in
+// RAM like the Digital AGC block; a marked one has each value out of range read as its default
+static void nxdn_block_check(settings_t *s, size_t bytes)
+{
+	if (bytes < offsetof(settings_t, nxdn_reserved) + sizeof s->nxdn_reserved ||
+	    s->nxdn_marker != SETTINGS_NXDN_MARKER) {
+		s->nxdn_marker = SETTINGS_NXDN_MARKER;
+		s->nxdn_flags = 0;
+		s->nxdn_rx_ran = 0;
+		s->nxdn_tx_ran = SETTINGS_NXDN_TX_RAN;
+		s->nxdn_tg = SETTINGS_NXDN_TG;
+		memset(s->nxdn_reserved, 0, sizeof s->nxdn_reserved);
+		return;
+	}
+	s->nxdn_flags &= SETTINGS_NXDN_9600;
+	if (s->nxdn_rx_ran > SETTINGS_NXDN_RAN_MAX)
+		s->nxdn_rx_ran = 0;
+	if (s->nxdn_tx_ran > SETTINGS_NXDN_RAN_MAX)
+		s->nxdn_tx_ran = SETTINGS_NXDN_TX_RAN;
+	if (s->nxdn_tg == 0 || (s->nxdn_tg > SETTINGS_NXDN_TG_MAX && s->nxdn_tg != SETTINGS_NXDN_TG_ALL))
+		s->nxdn_tg = SETTINGS_NXDN_TG;
 }
 
 static void aes_migration_check(settings_t *s, size_t bytes)
@@ -281,6 +310,7 @@ settings_load_t settings_init(void)
 		power_levels_check(&live);
 		aes_migration_check(&live, SETTINGS_PAGE_BYTES + page1_bytes);
 		agc_block_check(&live, SETTINGS_PAGE_BYTES + page1_bytes);
+		nxdn_block_check(&live, SETTINGS_PAGE_BYTES + page1_bytes);
 	}
 	storage_unlock();
 	saved = live;

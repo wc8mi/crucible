@@ -8731,7 +8731,9 @@ void radio_sm_init(radio_sm_t *sm, uint32_t now_ms)
 #endif
 #endif
 #if CONFIG_NXDN
-	radio_nxdn_init();
+	// The stored NXDN radio default, here only: a settings reload or a detour's end keeps the RAM settings (a
+	// temporary talk target, the debug link's)
+	radio_nxdn_init((st.nxdn_flags & SETTINGS_NXDN_9600) != 0, st.nxdn_rx_ran, st.nxdn_tx_ran, st.nxdn_tg);
 #endif
 #if CONFIG_YSF
 	radio_ysf_init();

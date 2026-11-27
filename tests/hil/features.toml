@@ -129,6 +129,13 @@ spec = "docs/spec/nxdn.md"
 source = ["core/nxdn", "core/air", "core/fec", "core/radio/radio_nxdn.c", "core/radio/radio_nxdn.h",
           "core/radio/radio_air.h", "core/debuglink/debuglink_view_nxdn.c"]
 
+[feature.nxdn_default]
+requires = "NXDN"
+spec = "docs/crucible/adr/004-nxdn-radio-default.md"
+source = ["core/settings/settings.c", "core/radio/radio_nxdn.c", "core/ui/ui_svc_storage.c", "core/ui/ui_svc_radio.c",
+          "core/ui/ui_menus.c", "core/debuglink/debuglink_view_nxdn.c"]
+manual = "Set the NXDN radio default in Settings, restart the radio and check the VFO starts on it; Talk to in the NXDN VFO and Back."
+
 [feature.nxdn_scrambler]
 switch = "NXDN_SCRAMBLER"
 spec = "docs/spec/nxdn.md"
