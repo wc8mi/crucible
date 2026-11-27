@@ -156,6 +156,8 @@ const API = "https://api.radiofoundry.org/v1/";
 // build service; with data-reporting="off" it sends nothing to the project's services either (a fork's own page): no
 // flash log, no problem report or stock file upload (the report dialog saves a file instead), no build lookup
 const RELEASES = document.body.dataset.releases || "";
+// A page of prebuilt releases updates by default; #install starts a first install from the same releases
+const releaseTask = () => (/(?:^#|&)install(?:&|$)/.test(location.hash) ? "install" : "update");
 const NO_REPORTING = document.body.dataset.reporting === "off";
 const FLASH_LOG = !NO_REPORTING && new URLSearchParams(location.search).get("reporting") !== "0";
 
@@ -883,7 +885,7 @@ async function reset() {
 	// exactly a fresh load: fields set along the way (buildOptions, keyFromRadio, ...) go, the rest start over
 	for (const k of Object.keys(S)) delete S[k];
 	Object.assign(S, initialState(), keep);
-	if (RELEASES) S.task = "update";	// a page of prebuilt releases has no start view
+	if (RELEASES) S.task = releaseTask();	// a page of prebuilt releases has no start view
 	setAdapter(null);	// the next connect names its own
 	render();
 }
@@ -1129,7 +1131,7 @@ function updateView() {
 // the one it runs marked. The picked one is installed as it is; one older than what the radio runs needs the user's
 // word, since newer firmware may have changed what it keeps in settings
 function releasePick(out, status, draw) {
-	const p = S.now.probe, ix = S.data.index, opts = S.buildOptions || {};
+	const p = S.task === "install" ? null : S.now?.probe, ix = S.data.index, opts = S.buildOptions || {};
 	const withTests = rel.showTests(ix, S.board.id, opts, !!S.showTests);
 	const list = rel.forRadio(ix, S.board.id, opts, { tests: withTests });
 	const hidden = withTests ? 0 : rel.hiddenTests(ix, S.board.id, opts);
@@ -1165,7 +1167,7 @@ function releasePick(out, status, draw) {
 		h("p", {}, h("b", {}, t("flash.release.older_title")), " ", t("flash.release.older_text")),
 		h("label", { class: "toggle" }, h("input", { type: "checkbox", checked: !!S.downOk, onchange: (ev) => { S.downOk = ev.target.checked; draw(); } }),
 			h("span", {}, t("flash.release.older_ok")), h("span")))
-		: dir === "unknown" ? notice(t("flash.release.unknown_age"), "info") : null;
+		: dir === "unknown" && p ? notice(t("flash.release.unknown_age"), "info") : null;
 	const optionText = Object.entries(opts).map(([k, v]) => {
 		const o = buildOptions().find((x) => x.name === k);
 		return o?.values.find((x) => x.id === v)?.title || `${k}=${v}`;
@@ -1177,7 +1179,7 @@ function releasePick(out, status, draw) {
 	out.replaceChildren(panel(t("flash.release.title"),
 		h("dl", { class: "kv-list" },
 			h("dt", {}, t("flash.update.radio")), h("dd", {}, S.radio.name + (optionText ? ` (${optionText})` : "")),
-			h("dt", {}, t("flash.release.running")), h("dd", {}, firmwareName(p.version))),
+			p ? [h("dt", {}, t("flash.release.running")), h("dd", {}, firmwareName(p.version))] : null),
 		h("h3", {}, t("flash.release.choose")),
 		none, list.length ? h("div", { class: "release-list", role: "radiogroup" }, rows) : null, tests, notesBox, down,
 		S.releaseError ? notice(S.releaseError, "bad") : null,
@@ -1186,9 +1188,33 @@ function releasePick(out, status, draw) {
 		if (!S.firmware) await loadRelease(S.pick, draw);
 		if (S.firmware) next();
 	};
-	const blocked = !S.pick || S.releaseLoading || (dir === "older" && !S.downOk);
-	S.forward(button(S.releaseLoading ? [spinner(), t("flash.release.loading")] : t(dir === "same" ? "flash.release.reinstall" : "flash.release.go", { name: S.pick?.release.name || "" }),
+	const blocked = !S.pick || S.releaseLoading || (dir === "older" && !S.downOk) || !optionsChosen();
+	// a first install picks the release and goes on to the radio; an update writes it next
+	const label = !p && S.task === "install" ? t("flash.nav.to_now") : t(dir === "same" ? "flash.release.reinstall" : "flash.release.go", { name: S.pick?.release.name || "" });
+	S.forward(button(S.releaseLoading ? [spinner(), t("flash.release.loading")] : label,
 		go, { primary: true, disabled: blocked }), dir === "older" && !S.downOk ? t("flash.release.older_first") : null);
+}
+
+// A first install from a page of prebuilt releases: the build step picks a release instead of asking the build service,
+// after the radio's build options (the MD-380's band) are chosen; the image then waits for the codec and write steps
+function releaseBuildView() {
+	const out = h("div", { class: "flasher" }), status = h("div");
+	const draw = () => {
+		const options = buildOptions().map((o) => h("div", {},
+			h("h3", {}, o.title), o.help ? h("p", { class: "small muted" }, o.help) : null,
+			h("div", { class: "choice-grid", role: "radiogroup" }, o.values.map((v) =>
+				h("button", { class: "choice", type: "button", role: "radio", "aria-checked": String(S.buildOptions?.[o.name] === v.id),
+					onclick: () => { S.buildOptions = { ...S.buildOptions, [o.name]: v.id }; S.pick = null; S.firmware = null; draw(); } },
+				h("strong", {}, v.title), v.text ? h("span", { class: "small muted" }, v.text) : null)))));
+		if (!optionsChosen()) {
+			out.replaceChildren(panel(t("flash.release.title"), ...options));
+			return S.forward(button(t("flash.nav.to_now"), () => {}, { primary: true, disabled: true }));
+		}
+		releasePick(out, status, draw);
+		if (options.length) out.querySelector("h2")?.after(...options);
+	};
+	draw();
+	return out;
 }
 
 // The picked release's image and manifest, from this site, checked against the index, the board and the radio's options
@@ -1206,7 +1232,7 @@ async function loadRelease(entry, redraw) {
 		const wrong = rel.optionMismatches(m, S.buildOptions);
 		if (wrong.length) throw new Error(t("flash.build.wrong_options", { name: wrong[0][0], value: wrong[0][1] ?? wrong[0][2] }));
 		S.firmware = { manifest: m, image: img, source: entry.release.name, origin: "release", variant: m.variant || "custom", tag: entry.release.tag };
-		diag.note("update: release", { tag: entry.release.tag, git: m.git, direction: rel.direction(S.now.probe, entry.image) });
+		diag.note("update: release", { tag: entry.release.tag, git: m.git, direction: rel.direction(S.now?.probe, entry.image) });
 	} catch (e) {
 		S.releaseError = errorText(e);
 	}
@@ -1282,6 +1308,7 @@ function selectRadio(r) {
 // install: the build (variant, a la carte)
 
 function buildView() {
+	if (RELEASES) return releaseBuildView();
 	const sel = S.selection;
 	const wrap = h("div", { class: "flasher" });
 	const vtitle = (v) => (t(`variant.${v.id}.title`) !== `variant.${v.id}.title` ? t(`variant.${v.id}.title`) : v.title);
@@ -2392,7 +2419,7 @@ function bootloaderPanel(title, makePlanFn, onDone, what, { inline = false } = {
 			}
 		}, { primary: true });
 		const winHelp = onWindows() ? h("div", {}, windowsDriverHelp()) : null;
-		const write = button(t("flash.write.go"), async () => {
+		const write = button(t(S.task === "update" ? "flash.update.go" : "flash.write.go"), async () => {
 			// an install that keeps a codec known to be missing: asked once more (not again on a retry), with the way back
 			// to the codec step. Only a forced Keep gets here, so going back drops it: a stock file picked there is used
 			if (what?.task === "install" && S.decision?.expectCodec === false && !noCodecOk) {
@@ -2450,7 +2477,7 @@ function writeView() {
 	const fw = S.firmware;
 	const what = { task: "install", source: fw.origin || "", radio: S.board.id, firmware: String(fw.manifest.version || ""),
 		variant: fw.variant || fw.manifest.variant || (fw.manifest.dev_build ? "dev" : ""), features: fw.manifest.features || "", build: fw.build || null };
-	const dfu = (opts) => bootloaderPanel(t("flash.write.title"), async () => {
+	const dfu = (opts) => bootloaderPanel(t(S.task === "update" ? "flash.task.update" : "flash.write.title"), async () => {
 		// from the cable route the codec step was skipped: decide now, from what the radio reported. A decision made here
 		// is made again after another stock file is picked; one from the codec step is the user's and stays
 		if (!S.decision || (S.decision.inline && S.decision.stock !== S.stock))
@@ -2467,7 +2494,8 @@ function writeView() {
 	}, next, what, opts);
 	if (!stubRoute()) {
 		// a page of prebuilt releases promises an update over the cable: say why this one takes the bootloader instead
-		if (RELEASES && !shortRegister()) return h("div", { class: "flasher" }, notice(t("flash.release.bootloader"), "action"), dfu());
+		// an update from a page of releases that can't go over the cable says why it needs update mode; a first install expects it
+		if (RELEASES && S.task === "update" && !shortRegister()) return h("div", { class: "flasher" }, notice(t("flash.release.bootloader"), "action"), dfu());
 		if (!shortRegister()) return dfu();
 		diag.note("flash size register reads short: update mode", { flashKb: S.now.flashKb });
 		return h("div", { class: "flasher" }, notice(t("flash.f4.register_short", { kb: S.now.flashKb }), "action"), dfu());
@@ -3434,7 +3462,11 @@ async function main() {
 	const m = location.hash.match(/radio=(\w+)/);
 	const r = m && S.data.radios.find((x) => x.id === m[1]);
 	// #update: the Update task (the Codeplug Editor's Update Firmware button); a page of prebuilt releases has no other
-	if (RELEASES || /(?:^#|&)update(?:&|$)/.test(location.hash)) {
+	if (RELEASES && releaseTask() === "install") {
+		S.task = "install";
+		S.step = 0;
+		if (r && available(r, "install")) { selectRadio(r); S.step = 1; }
+	} else if (RELEASES || /(?:^#|&)update(?:&|$)/.test(location.hash)) {
 		S.task = "update";
 		S.step = 0;
 	} else if (r && available(r, "install")) {

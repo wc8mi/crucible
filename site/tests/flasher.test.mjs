@@ -387,7 +387,7 @@ test("the update mode picture comes from the radio's data", () => {
 // install keeps a codec known to be missing, before anything is disabled or written (c7000ui and iapui tests: the others)
 test("the bootloader route's Install asks before an install without a codec", () => {
 	const src = readFileSync(new URL("../static/js/flasher/app.js", import.meta.url), "utf8");
-	const body = src.slice(src.indexOf('const write = button(t("flash.write.go")'));
+	const body = src.slice(src.indexOf('const write = button(t(S.task === "update" ? "flash.update.go" : "flash.write.go")'));
 	const ask = body.indexOf("confirmNoCodec(");
 	assert.ok(ask > 0, "confirmNoCodec called from the write button");
 	assert.ok(ask < body.indexOf("write.disabled = true") && ask < body.indexOf("flashStarted("), "asked before the write starts");
@@ -1092,4 +1092,16 @@ test("a release page never calls the build service", () => {
 		const line = src.slice(src.lastIndexOf("\n", m.index), m.index);
 		assert.ok(/RELEASES/.test(line), `requestBuild guarded: ${line.trim()}`);
 	}
+});
+
+// A first install on a page of prebuilt releases (#install) picks its image from the releases: the build step is the
+// release list, never the build service
+test("a release page installs from its releases", () => {
+	const src = readFileSync(new URL("../static/js/flasher/app.js", import.meta.url), "utf8");
+	const fn = (name) => { const at = src.indexOf(`function ${name}(`); return src.slice(at, src.indexOf("\n}\n", at)); };
+	assert.match(fn("buildView"), /^function buildView\(\) \{\n\tif \(RELEASES\) return releaseBuildView\(\);/);
+	const view = fn("releaseBuildView");
+	assert.match(view, /releasePick\(out, status, draw\)/);
+	assert.doesNotMatch(view, /requestBuild|api\(/);
+	assert.match(src, /const releaseTask = \(\) => \(\/\(\?:\^#\|&\)install\(\?:&\|\$\)\/\.test\(location\.hash\) \? "install" : "update"\);/);
 });
