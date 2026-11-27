@@ -180,6 +180,13 @@ check. One code path installs and updates, so a fix in one serves both.
 
 The DM-1701 steps are now: Radio, Version, Things you need, Save your channels, Firmware file, Install, Check.
 
+Phase 3 adds cards on the same engine. A card step can carry its own caution (`notice`), shown above the step.
+
+| Radio | Card steps | Notes |
+|---|---|---|
+| MD-UV380 family (MD-UV380, MD-UV390, RT3S, MD-UV390 Plus 10 W) | As the DM-1701 | Version shows a caution: choose 10 W by the label; the installer cannot find a wrong choice |
+| DB25-D PRO | Radio, Version, Things you need, Save your channels, Update mode, Backup, Install, Check | The HR_C7000 install steps. Update mode starts through the manufacturer's firmware with no keys; the P1 keys are the way in when that fails. Version shows a caution: tested only on 909E.DBB |
+
 Not changed: the gate, the terms, the doors, decision 5's checkbox and no-CPS path, the words, the look.
 
 ## Review log

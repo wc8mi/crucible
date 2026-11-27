@@ -23,10 +23,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
+import boards  # noqa: E402
 import crucible  # noqa: E402
 
 FORMAT = 'release-index/1'
@@ -206,6 +208,54 @@ CARD = {
                         'note': 'Step 4 uses the CPS to save your channels. Most CPS programs operate only on Windows.'}]},
             SAVE_CPS,
             {'id': 'codec', 'title': 'Firmware file'},
+            {'id': 'write', 'title': 'Install', 'result': 'Installed'},
+            {'id': 'done', 'title': 'Check'}]},
+        # The DM-1701's steps on the same engine. Its two images differ by the power class, which the radio cannot
+        # check (board.toml flash.notice): the Version step says so. SK1's place as board.toml words it (issue #203)
+        'mduv380': {'now': 'stock',
+                    'mode': ['Turn the volume knob to OFF.', 'Connect the cable to the radio and to the computer.',
+                             'Push and hold PTT and SK1. SK1 is the side key just above PTT.', 'Turn the volume knob to ON.',
+                             'Release the keys. The screen stays dark. This is correct.'],
+                    'steps': [
+            {'id': 'radio', 'title': 'Radio'},
+            {'id': 'build', 'title': 'Version',
+             'notice': 'CAUTION: Select 10 W only if the label on the radio or its box shows 10 W. '
+                       'The installer cannot find an incorrect selection.'},
+            {'id': 'need', 'title': 'Things you need', 'kind': 'checklist', 'result': 'Ready',
+             'lead': 'Get these items before you start.',
+             'items': [{'text': 'The programming cable of the radio', 'note': 'A charging cable cannot send data.'},
+                       {'text': 'A charged battery', 'note': 'Charge the battery to more than half.'},
+                       {'text': 'The TYT or Retevis firmware file',
+                        'note': 'Version 18.03 to 219.74. Files for 5 W and 10 W radios both operate. Step 5 shows each accepted version.'},
+                       {'text': "The manufacturer's programming software (CPS)",
+                        'note': 'Step 4 uses the CPS to save your channels. Most CPS programs operate only on Windows.'}]},
+            SAVE_CPS,
+            {'id': 'codec', 'title': 'Firmware file'},
+            {'id': 'write', 'title': 'Install', 'result': 'Installed'},
+            {'id': 'done', 'title': 'Check'}]},
+        # The HR_C7000 install steps (c7000ui.js INSTALL): connect starts update mode through the manufacturer's
+        # firmware with no keys; the keys ("mode") are the factory update mode, the way in when that fails. The check
+        # step backs up the program memory and reads the voice codec from it. Tested on the DBB batch only
+        'db25d': {'now': 'stock',
+                  'mode': ['Turn the radio off.', 'Connect the cable to the radio and to the computer.', 'Push and hold P1.',
+                           'Push the power key.', 'Release P1. The red LED is on and the screen stays blank. This is correct.'],
+                  'steps': [
+            {'id': 'radio', 'title': 'Radio'},
+            {'id': 'build', 'title': 'Version',
+             'notice': 'CAUTION: Open the Version screen in the radio menu. '
+                       'Crucible is tested only on radios with a version that starts with 909E.DBB.'},
+            {'id': 'need', 'title': 'Things you need', 'kind': 'checklist', 'result': 'Ready',
+             'lead': 'Get these items before you start.',
+             'items': [{'text': 'The programming cable of the radio', 'note': 'The cable connects to the K1 jack of the radio.'},
+                       {'text': 'A 13.8 V power supply', 'note': 'The radio has no battery. The supply must stay on until the install is complete.'},
+                       {'text': 'The Radioddity firmware file',
+                        'note': 'Version 018, from 2024-05-09 or later. The installer usually reads the voice codec from the radio '
+                                'and asks for this file only if it cannot.'},
+                       {'text': "The manufacturer's programming software (CPS)",
+                        'note': 'Step 4 uses the CPS to save your channels. Most CPS programs operate only on Windows.'}]},
+            SAVE_CPS,
+            {'id': 'connect', 'title': 'Update mode', 'result': 'Ready'},
+            {'id': 'check', 'title': 'Backup', 'result': 'Saved'},
             {'id': 'write', 'title': 'Install', 'result': 'Installed'},
             {'id': 'done', 'title': 'Check'}]},
     },
@@ -601,7 +651,17 @@ def self_test():
     for key, v in card_texts():
         assert not re.search(r"\b(flash|bootloader|DFU|stock|codeplug|beta)\b|n't", v, re.I), v
         assert len(v.split()) <= (20 if key in ('do', 'mode') else 25), f'too long: {v}'
-    assert all(s['id'] != 'now' for r in CARD['radios'].values() for s in r['steps']) and CARD['radios']['dm1701']['now'] == 'stock'
+    # every card radio: its board, the firmware it expects, its update-mode words, and its family's install steps
+    # (app.js STEPS.install, c7000ui.js INSTALL) in the card, ending in the write and the check
+    backend_steps = {'anyroad-dfu': {'build', 'codec', 'write', 'done'}, 'c7000-stub': {'build', 'connect', 'check', 'write', 'done'}}
+    for rid, r in CARD['radios'].items():
+        toml = ROOT / 'boards' / rid / 'board.toml'
+        assert toml.is_file(), f'card radio {rid}: no board'
+        assert r.get('now') == 'stock' and r.get('mode'), f'card radio {rid}: now and mode'
+        ids = [s['id'] for s in r['steps']]
+        assert 'now' not in ids and ids[0] == 'radio' and ids[-2:] == ['write', 'done'], f'card radio {rid}: {ids}'
+        web = boards.FAMILIES[tomllib.loads(toml.read_text())['flash']['family']]['web']
+        assert backend_steps[web] <= set(ids), f'card radio {rid}: {web} needs {sorted(backend_steps[web] - set(ids))}'
     for v in WORDS.values():
         assert not re.search(r"\b(flash|bootloader|DFU|stock|codeplug|beta)\b|n't", v, re.I), v
     tpl = '{{csp}}<h1>{{name}}</h1><ul>\n{{radios}}\n</ul><p>{{built}}</p><a href="{{issues}}">{{repo_slug}}</a>'
