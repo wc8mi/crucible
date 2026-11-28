@@ -153,6 +153,23 @@ TESTS   += ysfTest
 ysfTest: ysfTest.c ../vectors/ysf-vw-vd1.txt $(YSF) $(CORE)/ysf/ysf_engine.c $(CORE)/air/air_voice.c $(wildcard $(CORE)/ysf/*.h) $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -DCONFIG_YSF_VW=1 -o $@ ysfTest.c $(YSF) $(CORE)/ysf/ysf_engine.c $(CORE)/air/air_voice.c $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
 
+# M17 frames and addresses (core/m17), against libm17's vectors
+M17     := $(CORE)/m17/m17_frame.c $(CORE)/m17/m17_addr.c
+TESTS   += m17Test
+m17Test: m17Test.c ../vectors/m17-frames.txt $(M17) $(wildcard $(CORE)/m17/*.h) $(FEC)
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ m17Test.c $(M17) $(FEC)
+
+# M17 voice and the Codec 2 benchmark (core/m17), on codec2-fixed-point: this tree's submodule, else
+# RFOUNDRY_THIRD_PARTY's (docs/dev/building.md "Worktrees")
+C2      := $(if $(wildcard $(ROOT)/third_party/codec2-fixed-point/src/codec2_fxp.c),$(ROOT)/third_party,$(RFOUNDRY_THIRD_PARTY))/codec2-fixed-point
+C2SRC   := $(addprefix $(C2)/src/,analysis.c codec2_fxp.c delta_lsp_cb.c fxp_analysis_tables.c fxp_fft.c \
+	fxp_fft_tables.c fxp_lpc_tables.c fxp_lpcspec.c fxp_math.c fxp_math_tables.c fxp_nlp_tables.c fxp_rdft.c interp.c \
+	lpc.c nlp.c quantise.c synthesis.c)
+M17V    := $(CORE)/m17/m17_voice.c $(CORE)/m17/m17_bench.c
+TESTS   += m17VoiceTest
+m17VoiceTest: m17VoiceTest.c ../data/voice/test_transmission.pcm $(M17V) $(wildcard $(CORE)/m17/*.h) $(C2SRC)
+	$(CC) $(CFLAGS) -O2 -I$(C2)/include -o $@ m17VoiceTest.c $(M17V) $(C2SRC) -lm
+
 # The MBE synthesis core and the full-rate voice decoder on it (core/mbe), against golden vectors
 MBE2400 := $(wildcard $(CORE)/mbe/mbe2400*.c)
 MBE     := $(filter-out $(MBE2400),$(wildcard $(CORE)/mbe/*.c))
@@ -296,6 +313,8 @@ run: $(TESTS)
 	./nxdnTest | tail -1
 	./nxdnEngineTest | tail -1
 	./ysfTest | tail -1
+	./m17Test | tail -1
+	./m17VoiceTest | tail -1
 	./p25TrunkTest
 	./p25VoiceTest
 	./p25VoiceLevelTest

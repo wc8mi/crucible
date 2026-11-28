@@ -13,6 +13,10 @@ wrote it, and this page names each project Crucible builds on or takes code from
 |---|---|---|---|
 | [RadioFoundry](https://github.com/radiofoundry/radiofoundry) | The RadioFoundry Authors ([AUTHORS](AUTHORS), [CONTRIBUTORS](CONTRIBUTORS)) | MIT ([LICENSE-MIT](LICENSE-MIT)) | The whole base: core, drivers, platforms, boards, site, tools. Merged from `upstream/main` |
 | [DM32-nxdn-p25](https://github.com/donttellmeimcute/DM32-nxdn-p25) | lyra XE1POC | GPL-3.0-or-later ([LICENSE](LICENSE)) | `core/fec/imbe88.{c,h}` (MIT, The RadioFoundry Authors: P25's voice code words moved out of `p25_unit.c`); the YSF VW voice channel interleave in `core/ysf/ysf_vw.c`, which the fork gives as the permutation of MMDVMHost (GPL-2.0-or-later) and DSD-FME (GPL-2.0-or-later) |
+| [codec2-fixed-point](https://github.com/dbehnke/codec2-fixed-point) | David Behnke, from Codec 2 and Codec2-mod (below) | LGPL-2.1-only (its `LICENSE`) | The Codec 2 3200 encoder and decoder for M17, integer only: the submodule `third_party/codec2-fixed-point` (v0.1.1), built from source into the firmware when `CONFIG_M17` is on |
+| [Codec 2](https://github.com/drowe67/codec2) | David Rowe and contributors | LGPL-2.1-only | The codec codec2-fixed-point is made from; each of its files keeps David Rowe's copyright lines |
+| [Codec2-mod](https://github.com/M17-Project/Codec2-mod) | Wojciech Kaczmarski SP5WWP and the M17 Project | LGPL-2.1-only | The 3200-only refactor of Codec 2 that codec2-fixed-point starts from |
+| [libm17](https://github.com/M17-Project/libm17) | Wojciech Kaczmarski SP5WWP and the M17 Project | GPL-2.0-or-later | No code: the M17 test vectors in `tests/vectors/m17-frames.txt` were made with its encoder (v1.4.3) on a host and are committed as data. Neither linked nor shipped |
 
 Third-party libraries and fonts (FreeRTOS, TinyUSB, the STM32 HAL and CMSIS, the fonts) keep their own licenses, in
 [LICENSES/](LICENSES/), in each submodule and in `platform/<platform>/THIRD_PARTY`.
