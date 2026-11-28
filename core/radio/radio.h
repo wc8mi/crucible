@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "codeplug/codeplug.h"
+#include "codeplug/codeplug_modes.h"
 #include "config.h"
 #if CONFIG_SATELLITE_TLE
 #include "satellite/path.h"
@@ -719,6 +720,13 @@ void radio_req_ysf_settings(const radio_ysf_settings_t *s);
 // text for SEARCH). Sent as a short transmission on a YSF channel, refused as PTT would be (view.tx_deny says why)
 void radio_req_ysf_wx(uint8_t cmd, uint32_t arg, const char *text);
 #endif
+// A channel whose monitor key toggles digital monitor (the hear all latch) on its release instead of opening the
+// squelch while held: DMR, and conventional NXDN and P25. The radio core and the UI both ask this
+static inline bool radio_dmon_mode(const channel_t *ch)
+{
+	return (CONFIG_DMR && ch->mode == RADIO_MODE_DMR) || (CONFIG_NXDN && ch->mode == RADIO_MODE_NXDN) ||
+	       (CONFIG_P25 && ch->mode == RADIO_MODE_P25 && !codeplug_kind_trunked(ch->kind));
+}
 #if CONFIG_DMR
 void radio_req_reply_cancel(void);		// BACK on Home: end the DMR reply window
 // Talk to someone else for now (until the channel changes or radio_req_dmr_target_clear): a typed ID or talkgroup,
@@ -739,7 +747,8 @@ void radio_req_dmr_color_code(uint8_t cc);	// 0..15
 // The VFO's SFR role (CONFIG_SFR, docs/spec/sfr.md 4): a as a codeplug channel's SFR byte A, role bits 0 = none; the
 // outbound color code is the VFO's own. Saved with the VFO; refused outside it, while transmitting and in hotspot mode
 void radio_req_vfo_sfr(uint8_t a);
-// Hear all latched on (every talkgroup on our slot, as while MONITOR is held) until off or the channel changes
+// Hear all latched on (every talkgroup on our slot, as while MONITOR is held) until off or the channel changes. On
+// NXDN and P25 the same latch hears every RAN or NAC and every group (digital monitor, nxdn.md 6.5, p25.md 7.5)
 void radio_req_dmr_hear_all(bool on);
 // The talk target focused in a list (the UI calls it on every focus change; id 0 = none). A PTT press while one is
 // focused transmits to it once (one-shot) and keeps it as the talk target for the reply window, then the channel's

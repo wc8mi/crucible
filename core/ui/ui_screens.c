@@ -1342,6 +1342,18 @@ static void draw_talk(const radio_view_t *v, bool label_first)
 static void draw_chips_t3(const radio_view_t *v);
 #endif
 
+#if CONFIG_DMR
+// The digital monitor chip (FM's is "Mon") at x where it fits: DMR, NXDN and P25. Measured, not counted: a translation
+// may be longer
+static int draw_dmon_chip(const font_t *f, int x, int y, bool on)
+{
+	const char *dmon = TR(HOME_CHIP_DMON, "DMon");
+	if (on && x + gfx_text_width(f, dmon) <= gfx_width())
+		x = gfx_text(f, x, y, dmon, ui_col.warn) + f->w;
+	return x;
+}
+#endif
+
 static void draw_chips(const radio_view_t *v, const ui_state_t *s)
 {
 	const ui_layout_t *L = &ui_layout;
@@ -1387,7 +1399,8 @@ static void draw_chips(const radio_view_t *v, const ui_state_t *s)
 		sb_str(&b, "NAC ");
 		sb_hex(&b, v->p25.rx_nac, 3);
 		if (x + gfx_text_width(f, buf) <= w)
-			gfx_text(f, x, y, buf, ui_col.fg);
+			x = gfx_text(f, x, y, buf, ui_col.fg) + f->w;
+		draw_dmon_chip(f, x, y, v->dmr.hear_all_latch);
 #endif
 		return;
 	}
@@ -1416,7 +1429,8 @@ static void draw_chips(const radio_view_t *v, const ui_state_t *s)
 		sb_u32(&b, v->nxdn.tx_ran, 1);
 		sb_str(&b, (v->nxdn.flags & RADIO_NXDN_9600) != 0 ? " 9600" : " 4800");
 		if (x + gfx_text_width(f, buf) <= w)
-			gfx_text(f, x, y, buf, ui_col.fg);
+			x = gfx_text(f, x, y, buf, ui_col.fg) + f->w;
+		draw_dmon_chip(f, x, y, v->dmr.hear_all_latch);
 #endif
 		return;
 	}
@@ -2020,9 +2034,8 @@ static void draw_chips_dmr(const radio_view_t *v, const ui_state_t *s)
 			x = gfx_text(f, x, L->chips_y, buf, ui_col.warn) + f->w;
 	}
 	// Measured, not counted: a translation may be longer
-	const char *dmon = TR(HOME_CHIP_DMON, "DMon"), *priv = TR(HOME_CHIP_PRIVACY, "Priv");
-	if ((v->dmr.hear_all || s->hear_all) && x + gfx_text_width(f, dmon) <= gfx_width())
-		x = gfx_text(f, x, L->chips_y, dmon, ui_col.warn) + f->w;	// digital monitor (FM's is "Mon")
+	const char *priv = TR(HOME_CHIP_PRIVACY, "Priv");
+	x = draw_dmon_chip(f, x, L->chips_y, v->dmr.hear_all || s->hear_all);
 	if ((s->privacy || v->dmr.privacy) && x + gfx_text_width(f, priv) <= gfx_width())
 		gfx_text(f, x, L->chips_y, priv, ui_col.priv);
 }
@@ -4316,6 +4329,8 @@ uint8_t ui_quick_kind(int pos, const radio_view_t *v)
 		kind = QT_DGID;		// nor a width: tile 8 is the DG-ID
 	if (CONFIG_NXDN && v->ch.mode == RADIO_MODE_NXDN && kind == QT_BANDWIDTH)
 		kind = QT_NXDN_RATE;	// NXDN's width is fixed: tile 8 is the rate
+	if (kind == QT_MONITOR && v->ch.mode != RADIO_MODE_DMR && radio_dmon_mode(&v->ch))
+		kind = QT_HEAR_ALL;	// conventional NXDN and P25: tile 5 is digital monitor, as on DMR
 	if (v->vfo && (kind == QT_MONITOR || kind == QT_PRIVACY))
 		return QT_SPLIT;	// the VFO's TX frequency; Monitor stays on its key, privacy on channels
 	return kind;

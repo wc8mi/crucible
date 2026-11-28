@@ -1514,8 +1514,9 @@ static void quick_unavailable(uint8_t kind)
 	}
 }
 
-// Quick tile 5's action, on its own so a side key set to Monitor toggle runs the very same code: FM latches the
-// squelch open (or closes it again), DMR turns digital monitor on or off. kind is QT_MONITOR or QT_HEAR_ALL
+// Quick tile 5's action, on its own so a side key set to Monitor toggle runs the very same code: FM latches
+// the squelch open (or closes it again), DMR, NXDN and P25 turn digital monitor on or off. kind is QT_MONITOR or
+// QT_HEAR_ALL
 static void quick_monitor(uint8_t kind)
 {
 #if CONFIG_DMR
@@ -1537,7 +1538,7 @@ static void quick_monitor(uint8_t kind)
 // the tile is TX freq and the monitor stays on its key)
 void ui_monitor_toggle(void)
 {
-	quick_monitor(view->ch.mode == RADIO_MODE_DMR ? QT_HEAR_ALL : QT_MONITOR);
+	quick_monitor(radio_dmon_mode(&view->ch) ? QT_HEAR_ALL : QT_MONITOR);
 }
 
 static void quick_activate(int tile)
@@ -2326,18 +2327,19 @@ void ui_app_key(const input_event_t *ev)
 	    ev->action != ACT_PTT && !is_nav(ev) && !lock_key)
 		return;
 #endif
-	// The monitor key on DMR: a short press toggles digital monitor (the radio core does it on the release; the
-	// view follows). Its hold function (value 1 on the long press) runs on DMR only: on FM holding the key is the
-	// squelch break (#19). The radio task outranks this one and gets the edge first, so the view at the release
-	// may already be toggled: the toast inverts the latch as it was at the press, when the core leaves it alone
+	// The monitor key on DMR, NXDN and P25 (radio_dmon_mode): a short press toggles digital monitor (the radio core
+	// does it on the release; the view follows). Its hold function (value 1 on the long press) runs there only: on FM
+	// holding the key is the squelch break (#19). The radio task outranks this one and gets the edge first, so the
+	// view at the release may already be toggled: the toast inverts the latch as it was at the press, when the core
+	// leaves it alone
 #if CONFIG_DMR
 	if (ev->action == ACT_MONITOR && ev->gesture == GESTURE_DOWN)
 		dmon_at_press = view->dmr.hear_all_latch;
 	if (ev->action == ACT_MONITOR && ev->gesture == GESTURE_UP && ev->value == 0 &&
-	    view->ch.mode == RADIO_MODE_DMR && !view->monitor)
+	    radio_dmon_mode(&view->ch) && !view->monitor)
 		ui_toast(dmon_text(!dmon_at_press));
 #endif
-	if (ev->gesture == GESTURE_LONG && ev->value != 0 && view->ch.mode != RADIO_MODE_DMR)
+	if (ev->gesture == GESTURE_LONG && ev->value != 0 && !radio_dmon_mode(&view->ch))
 		return;
 	if (ev->action == ACT_PTT)
 		ptt_held = ev->gesture == GESTURE_DOWN;	// PTT sends only DOWN and UP (raw edges)

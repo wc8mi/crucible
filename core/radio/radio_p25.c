@@ -189,6 +189,23 @@ static void talk_lc(p25_lc_t *lc, bool unit, uint32_t dst)
 		lc->tgid = (uint16_t)dst;
 }
 
+// Digital monitor (radio_p25_monitor): every NAC and every call heard, whatever the channel says
+static bool monitor;
+
+void radio_p25_monitor(bool on)
+{
+	monitor = on;
+}
+
+// Digital monitor on top of the parameters: the receive side only, what PTT sends stays the channel's
+static void monitored(p25_engine_cfg_t *cfg)
+{
+	if (monitor) {
+		cfg->rx_nac = P25_NAC_ANY;
+		cfg->rx_tgid = 0;
+	}
+}
+
 void radio_p25_params(const channel_t *ch, uint16_t number, uint32_t own_id, p25_engine_cfg_t *cfg)
 {
 	p25_conv_cfg_t cc;
@@ -205,6 +222,7 @@ void radio_p25_params(const channel_t *ch, uint16_t number, uint32_t own_id, p25
 		cfg->unit_id = (set.unit_id != 0 ? set.unit_id : cc.unit_id) & 0xFFFFFFu;
 		talk_lc(&cfg->tx_lc, cc.target_unit, cc.target);
 		cfg->talkaround = cc.talkaround;
+		monitored(cfg);
 		return;
 	}
 	cfg->rx_nac = set.rx_nac;
@@ -214,6 +232,7 @@ void radio_p25_params(const channel_t *ch, uint16_t number, uint32_t own_id, p25
 	talk_lc(&cfg->tx_lc, set.unit_call, set.tx_dst);
 	cfg->talkaround = set.talkaround == RADIO_P25_TA_ON ||
 			  (set.talkaround == RADIO_P25_TA_AUTO && (ch->tx_hz == ch->rx_hz || ch->tx_hz == 0));
+	monitored(cfg);
 }
 
 // The engine's configuration as settings: what the screen, the view and the debug link show
