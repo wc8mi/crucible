@@ -4,13 +4,23 @@
 #include "satellite/frequency.h"
 #include "satellite/store.h"
 
+// TX 0 is listen only: SSTV and telemetry downlinks, and satellites whose uplink the radio can't use
 static const satellite_frequency_profile_t profile_catalog[] = {
 	{ 25544u, "ISS", 437800000u, 145990000u, 670u },
 	{ 27607u, "SO-50", 436795000u, 145850000u, 670u },
+	{ 39444u, "AO-73", 145935000u, 0u, 0u },
 	{ 40908u, "LILACSAT-2", 437200000u, 144350000u, 0u },
 	{ 40931u, "IO-86", 435880000u, 145880000u, 885u },
-	{ 43017u, "AO-91", 145960000u, 435250000u, 0u },
+	{ 43017u, "AO-91", 145960000u, 435250000u, 670u },
 	{ 43678u, "PO-101", 145900000u, 437500000u, 1413u },
+	{ 43770u, "AO-95", 145920000u, 0u, 0u },
+	{ 48274u, "CSS", 436510000u, 145875000u, 0u },
+	{ 57172u, "UMKA-1", 437625000u, 0u, 0u },
+	{ 57180u, "MONITOR-3", 435290000u, 0u, 0u },
+	{ 57182u, "MONITOR-4", 436080000u, 0u, 0u },
+	{ 57189u, "VIZARD-METEO", 437825000u, 0u, 0u },
+	{ 57203u, "UTMN-2", 436125000u, 0u, 0u },
+	{ 59112u, "SONATE-2", 145880000u, 0u, 0u },
 	{ 61781u, "AO-123", 435400000u, 145850000u, 670u },
 	{ 63213u, "TEVEL2-4", 436400000u, 145970000u, 0u },
 	{ 63214u, "TEVEL2-5", 436400000u, 145970000u, 0u },
@@ -21,7 +31,10 @@ static const satellite_frequency_profile_t profile_catalog[] = {
 	{ 63237u, "TEVEL2-9", 436400000u, 145970000u, 0u },
 	{ 63238u, "TEVEL2-7", 436400000u, 145970000u, 0u },
 	{ 63239u, "TEVEL2-8", 436400000u, 145970000u, 0u },
+	{ 67287u, "LUCA-1", 437180000u, 0u, 0u },
 	{ 67291u, "RS95S", 436950000u, 145920000u, 670u },
+	{ 101101u, "SO-131", 436888000u, 145925000u, 0u },
+	{ 101102u, "SO-132", 436665000u, 0u, 0u },
 };
 
 uint8_t satellite_frequency_profile_catalog_count(void)

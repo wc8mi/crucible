@@ -1,5 +1,6 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 The RadioFoundry Authors -->
+<!-- Copyright (c) 2026 David Behnke -->
 
 # YSF in the codeplug
 
@@ -31,8 +32,22 @@ The tag ([channel-modes.md](channel-modes.md) 2): no system, flag bit 0 transmit
 |---|---|---|
 | 0 | 1 | Transmit DG-ID, 0-99. Above 99 reads as 0 |
 | 1 | 1 | Receive DG-ID, 0-99; 0 = every DG-ID. Above 99 reads as 0 |
+| 2 | 1 | Voice mode and deviation (below). Absent: DN, Wide |
 
-A zeroed block, or none, sends DG-ID 0 and hears every DG-ID; with the tag's flag bit 0 clear, receive only.
+Byte 2 ([ADR 005](../crucible/adr/005-ysf-vw-vd1.md) 6):
+
+| Bits | Meaning |
+|---|---|
+| 0-1 | Transmit data type, the FICH DT code: 2 DN (V/D mode 2), 3 VW, 0 V/D mode 1. 1 (data) reads as DN |
+| 2 | 1 Narrow (half deviation), 0 Wide (ADR 005 5) |
+| 3-7 | Reserved. The radio writes 0; the Codeplug Editor keeps what it read |
+
+A block without byte 2, or none, sends DG-ID 0 in DN Wide and hears every DG-ID; with the tag's flag bit 0 clear,
+receive only. A zeroed 3-byte block is V/D mode 1: byte 2 present and 0.
+
+Older firmware reads bytes 0-1 only. When it rewrites a channel whose name is unchanged, the tag's other bytes stay
+(`codeplug_tag.c`), byte 2 among them. A rename on older firmware writes a fresh 2-byte block, and the channel reads as
+DN Wide again.
 
 The base record carries:
 

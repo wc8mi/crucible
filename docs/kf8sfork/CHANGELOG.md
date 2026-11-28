@@ -5,15 +5,17 @@
 # KF8S Fork Changelog
 
 Changes added to `kf8sfork`, now Crucible, from its first feature commit on November 23, 2026, through
-v0.1.0-beta.1 on November 27, 2026.
+v0.1.0 on November 27, 2026.
 This lists fork-specific changes, not the features inherited from upstream RadioFoundry.
 See the [usage and testing guide](README.md) for menu paths and test instructions.
 
-## v0.1.0-beta.1, November 27, 2026
+## v0.1.0, November 27, 2026
 
-The first Crucible build with a version number. Builds are now named `v<version>-beta.<n>` until a version is
-stable, then `v<version>`. The radio shows the version on the boot screen and in About. Earlier test builds had dated
-names (`crucible-<upstream>-<commit>-<yymmdd>-<n>`); their GitHub releases are removed and their tags kept.
+The first Crucible version. Versions are plain semantic versions: a fix raises the patch (0.1.1), new features the
+minor (0.2.0). Every release is a test release (a GitHub pre-release) until a build is stable. The radio shows the
+version on the boot screen and in About. Earlier test builds had dated names
+(`crucible-<upstream>-<commit>-<yymmdd>-<n>`), and one was published as `v0.1.0-beta.1`; their GitHub releases are
+removed and their tags kept.
 
 Changes since the last dated test build (`crucible-4e24a5e1-8a658d0d-261127-2`):
 
@@ -24,9 +26,11 @@ Changes since the last dated test build (`crucible-4e24a5e1-8a658d0d-261127-2`):
   default 5 s) applies when Scan resume is Time; Scan delay is dimmed in Stop. A change applies to a running scan.
   Dual watch always waits for the signal to end.
 - **From RadioFoundry f5f086d2:** APRS keeps the radio's own frequency the first time it sees one.
+- **License.** Crucible is now GPL-3.0-or-later. RadioFoundry's files keep their MIT license (`LICENSE-MIT`), and
+  `CREDITS.md` lists every project Crucible builds on.
 - **Update site.** The [Crucible flasher](https://tinker.wc8mi.net/crucible/) now only updates radios that already run
   RadioFoundry or Crucible; install RadioFoundry first from radiofoundry.org. It has news posts and a Satellite TLE
-  page for new satellite data without new firmware.
+  page for new satellite data without new firmware, from AMSAT or PE0SAT's amateur list.
 
 Earlier Crucible test builds, November 26-27, 2026:
 
@@ -56,16 +60,16 @@ the firmware stack check identified an 8-byte margin shortfall; all four final i
 
 | Item | Value |
 |---|---|
-| Version | [`v0.1.0-beta.1`](https://github.com/wc8mi/crucible/releases/tag/v0.1.0-beta.1) (pre-release) |
-| Firmware source | `9beca430` |
-| Upstream main included | `f5f086d2` |
-| ZIP | `crucible-v0.1.0-beta.1.zip` |
-| ZIP SHA-256 | `e470a042f25496bfc11814b618fe8ddbbfaec27019c5cace48c9c6743ba5f89a` |
+| Version | [`v0.1.0`](https://github.com/wc8mi/crucible/releases/tag/v0.1.0) (pre-release) |
+| Firmware source | `e877e643` |
+| Upstream main included | `5168a55d` |
+| ZIP | `crucible-v0.1.0.zip` |
+| ZIP SHA-256 | `4bcfe7cebc2de7497a8b1b42725af822725154383d76ce18a70ace4a440c8894` |
 | Images | RT3S / MD-UV380 (5 W and 10 W), MD9600, DM1701, DM32, DB25-D PRO |
 | AMBE codec | Not included |
 
 The tag identifies the firmware source. Later documentation commits do not change that firmware.
-The ZIP and checksum are on the [GitHub release](https://github.com/wc8mi/crucible/releases/tag/v0.1.0-beta.1).
+The ZIP and checksum are on the [GitHub release](https://github.com/wc8mi/crucible/releases/tag/v0.1.0).
 Update a radio with the [Crucible flasher](https://tinker.wc8mi.net/crucible/).
 
 ## November 24, 2026

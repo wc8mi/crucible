@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
 # Copyright (c) 2026 David Behnke
-"""Build and package a release: Crucible's radios from main, named by semantic version (v0.1.0-beta.N, or v0.1.0 with
---final; crucible.toml [release]), or every board from the old kf8sfork and kf8sforkysf branches with a private label.
+"""Build and package a release: Crucible's radios from main, named by semantic version (v0.1.0: crucible.toml
+[release] version), or every board from the old kf8sfork and kf8sforkysf branches with a private label.
 Other branches refuse this wrapper."""
 import argparse
 from datetime import datetime
@@ -74,19 +74,17 @@ def require_branch(branch):
     return BRANCH_PREFIX[branch]
 
 
-def next_sequence(path, day, floor=0, field='day'):
-    """Reserve once per complete build attempt, shared across worktrees and protected against concurrent builders.
-    The count starts again at 1 when the key (field: the day, or a Crucible version) changes, and is always above
-    floor (the highest number a tag already uses)."""
+def next_sequence(path, day):
+    """Reserve once per complete build attempt, shared across worktrees and protected against concurrent builders."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.with_suffix('.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         saved = json.loads(path.read_text()) if path.exists() else {}
-        sequence = max(saved.get('sequence', 0) + 1 if saved.get(field) == day else 1, floor + 1)
+        sequence = saved.get('sequence', 0) + 1 if saved.get('day') == day else 1
         descriptor, temporary = tempfile.mkstemp(prefix=path.name, dir=path.parent)
         try:
             with os.fdopen(descriptor, 'w') as stream:
-                json.dump({field: day, 'sequence': sequence}, stream)
+                json.dump({'day': day, 'sequence': sequence}, stream)
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(temporary, path)
@@ -106,15 +104,13 @@ def release_tags(remote):
     return names
 
 
-def crucible_label(version, tags, final, counter):
-    """The tag a Crucible build gets: v<version> with final, else the next v<version>-beta.N. Refuses a version that is
-    already released: crucible.toml [release] version must be raised first."""
+def crucible_label(version, tags):
+    """The tag a Crucible build gets: v<version>. Refuses a version already tagged, here or on origin: crucible.toml
+    [release] version must be raised first."""
     release = f'v{version}'
     if release in tags:
-        raise ValueError(f'{release} is already released: raise crucible.toml [release] version (CRUCIBLE.md "Versions")')
-    if final:
-        return release
-    return f'{release}-beta.{counter(crucible.last_beta(version, tags))}'
+        raise ValueError(f'{release} is already tagged: raise crucible.toml [release] version (CRUCIBLE.md "Versions")')
+    return release
 
 
 # The C-SKY compiler runs under amd64 emulation on an Arm host, where cc1 now and then dies of a segfault on a file that
@@ -418,21 +414,14 @@ def self_test():
             pass
         else:
             raise AssertionError('an empty counter must fail closed')
-        path = Path(directory) / 'release.json'
-        assert next_sequence(path, '0.1.0', floor=4, field='version') == 5
-        assert next_sequence(path, '0.1.0', field='version') == 6
-        assert next_sequence(path, '0.1.0', floor=9, field='version') == 10
-        assert next_sequence(path, '0.1.1', field='version') == 1
-    assert crucible_label('0.1.0', set(), False, lambda last: last + 1) == 'v0.1.0-beta.1'
-    assert crucible_label('0.1.0', {'v0.1.0-beta.3', 'v26.11'}, False, lambda last: last + 1) == 'v0.1.0-beta.4'
-    assert crucible_label('0.1.0', {'v0.1.0-beta.3'}, True, None) == 'v0.1.0'
-    for final in (False, True):
-        try:
-            crucible_label('0.1.0', {'v0.1.0'}, final, lambda last: last + 1)
-        except ValueError:
-            pass
-        else:
-            raise AssertionError('a released version must be raised before the next build')
+    assert crucible_label('0.1.0', set()) == 'v0.1.0'
+    assert crucible_label('0.1.1', {'v0.1.0', 'v0.1.0-beta.1', 'v26.11'}) == 'v0.1.1'
+    try:
+        crucible_label('0.1.0', {'v0.1.0'})
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('a released version must be raised before the next build')
     standard = {'DMR', 'DMR_AES', 'DMR_IP_GATEWAY', 'P25', 'P25_TX_AGC', 'RX_AGC'}
     diagnostic = (standard - {'DMR_IP_GATEWAY'}) | {'P25_PARROT'}
     without_aes = diagnostic - {'DMR_AES'}
@@ -518,16 +507,12 @@ def main():
                         help='build the temporary P25 calibration profile with RAM-heavy optional services disabled')
     parser.add_argument('--board', action='append', choices=sorted(boards.BOARDS),
                         help='build only this registry board (repeat for multiple boards)')
-    parser.add_argument('--final', action='store_true',
-                        help='Crucible: build the release v<version> (crucible.toml [release]) instead of the next beta')
     args = parser.parse_args()
     if args.self_test:
         self_test()
         return
     branch = git('branch', '--show-current')
     prefix = require_branch(branch)
-    if args.final and prefix != 'crucible':
-        raise ValueError('--final is for Crucible releases from main')
     if git('status', '--porcelain', '--untracked-files=normal'):
         raise ValueError('commit or preserve pending changes before building')
     # Start from board defaults. Docker receives explicit make arguments and release.py needs the same overrides.
@@ -559,15 +544,14 @@ def main():
     if not common.is_absolute():
         common = ROOT / common
     if product:
-        # semantic versions: the counter is per version, above any beta already tagged here or on origin
-        release = crucible.release_version(ROOT)
-        version = crucible_label(release, release_tags('origin'), args.final, lambda last: next_sequence(
-            common / 'crucible-release-sequence.json', release, floor=last, field='version'))
+        # semantic versions: one build name per version, never one already tagged here or on origin
+        version = crucible_label(crucible.release_version(ROOT), release_tags('origin'))
+        prerelease = crucible.release_prerelease(ROOT)
     else:
         sequence = next_sequence(common / 'kf8s-build-sequence.json', day)
         version = f'{prefix}-{upstream}-{commit}-{day}-{sequence}'
     out = ROOT / 'build' / 'kf8s' / version
-    if out.exists():	# only a --final build reuses its name: after a failed attempt
+    if out.exists():	# a Crucible version reuses its name after a failed attempt
         raise ValueError(f'{out} exists from an earlier attempt: look at it, then remove it to build {version} again')
     package = out / 'package'
     package.mkdir(parents=True)
@@ -623,17 +607,17 @@ def main():
         profile += '-test-no-aes'
     metadata = {'version': version, 'upstream': upstream_full,
                 'commit': commit_full, 'profile': profile,
-                **({'prerelease': crucible.is_prerelease(version)} if product else {}),
+                **({'prerelease': prerelease} if product else {}),
                 'build_overrides': profile_flags, 'images': images}
     (package / 'build.json').write_text(json.dumps(metadata, indent=2) + '\n')
     (package / 'README.txt').write_text(package_readme(version, args.parrot, args.without_aes,
                                                        ysf=prefix in ('kf8sysf', 'crucible'), product=product,
-                                                       prerelease=not product or crucible.is_prerelease(version)))
+                                                       prerelease=not product or prerelease))
     for name in ('LICENSE', 'LICENSE-MIT', 'CREDITS.md', 'AUTHORS', 'CONTRIBUTORS'):
         shutil.copy2(ROOT / name, package / name)
     shutil.copytree(ROOT / 'LICENSES', package / 'LICENSES')
     copy_firmware_notices(package, images, build_env)
-    # crucible-v0.1.0-beta.1.zip (the flasher site takes crucible-*.zip); the older labels get radiofoundry- in front
+    # crucible-v0.1.0.zip (the flasher site takes crucible-*.zip); the older labels get radiofoundry- in front
     archive = out / (f'crucible-{version}.zip' if product else f'radiofoundry-{version}.zip')
     digest = write_archive(package, archive, images)
     print(f'ZIP: {archive}\nSHA256: {digest}')

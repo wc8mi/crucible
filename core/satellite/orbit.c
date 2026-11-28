@@ -50,6 +50,24 @@ static uint32_t number(const char *p, size_t n)
 	return value;
 }
 
+// Columns 3-7 of both lines: five digits, or Alpha-5 for catalog numbers past 99999 (a letter for the leading two
+// digits, A = 10 to Z = 33, skipping I and O, then four digits)
+bool satellite_tle_catalog_id(const char *field, uint32_t *catalog_id)
+{
+	if (field == NULL || catalog_id == NULL || !digits(field + 1, 4u))
+		return false;
+	char lead = field[0];
+	uint32_t high;
+	if (lead >= '0' && lead <= '9')
+		high = (uint32_t)(lead - '0');
+	else if (lead >= 'A' && lead <= 'Z' && lead != 'I' && lead != 'O')
+		high = 10u + (uint32_t)(lead - 'A') - (lead > 'I' ? 1u : 0u) - (lead > 'O' ? 1u : 0u);
+	else
+		return false;
+	*catalog_id = high * 10000u + number(field + 1, 4u);
+	return true;
+}
+
 static bool checksum(const char *line)
 {
 	if (line[68] < '0' || line[68] > '9')
@@ -405,10 +423,12 @@ static bool parse_elements(satellite_orbit_t *orbit, const satellite_record_t *r
 {
 	const char *line1 = record->line1;
 	const char *line2 = record->line2;
+	uint32_t line1_id, line2_id;
 	if (line1[SATELLITE_TLE_LINE_LENGTH] != 0 || line2[SATELLITE_TLE_LINE_LENGTH] != 0 ||
 	    line1[0] != '1' || line1[1] != ' ' ||
-	    line2[0] != '2' || line2[1] != ' ' || !digits(line1 + 2, 5u) || !digits(line2 + 2, 5u) ||
-	    number(line1 + 2, 5u) != record->catalog_id || number(line2 + 2, 5u) != record->catalog_id ||
+	    line2[0] != '2' || line2[1] != ' ' ||
+	    !satellite_tle_catalog_id(line1 + 2, &line1_id) || !satellite_tle_catalog_id(line2 + 2, &line2_id) ||
+	    line1_id != record->catalog_id || line2_id != record->catalog_id ||
 	    !checksum(line1) || !checksum(line2) || !digits(line1 + 18, 5u) || line1[23] != '.' ||
 	    !digits(line1 + 24, 8u) || line1[32] != ' ' || line1[43] != ' ' || line1[52] != ' ' ||
 	    line1[61] != ' ' || line1[63] != ' ' || line2[7] != ' ' || line2[16] != ' ' ||
@@ -481,7 +501,7 @@ static bool parse_elements(satellite_orbit_t *orbit, const satellite_record_t *r
 
 bool satellite_orbit_init(satellite_orbit_t *orbit, const satellite_record_t *record)
 {
-	if (orbit == NULL || record == NULL || record->catalog_id == 0u || record->catalog_id > 99999u)
+	if (orbit == NULL || record == NULL || record->catalog_id == 0u || record->catalog_id > SATELLITE_CATALOG_ID_MAX)
 		return false;
 	memset(orbit, 0, sizeof(*orbit));
 	if (!parse_elements(orbit, record))
