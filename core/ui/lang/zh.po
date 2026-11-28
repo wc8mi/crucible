@@ -1549,7 +1549,7 @@ msgctxt "GPS_TITLE_SIGNAL"
 msgid "Signal"
 msgstr "信号"
 
-#: core/ui/ui_gps.c core/ui/ui_menus.c
+#: core/ui/ui_gps.c core/ui/ui_menus.c core/ui/ui_position.c
 msgctxt "WORD_GRID"
 msgid "Grid"
 msgstr "网格"
@@ -5088,6 +5088,16 @@ msgstr "纬度"
 msgctxt "POS_LABEL_LONGITUDE"
 msgid "Longitude"
 msgstr "经度"
+
+#: core/ui/ui_position.c
+msgctxt "POS_TOAST_GRID"
+msgid "Grid: 4, 6 or 8 characters"
+msgstr "网格：4、6 或 8 位"
+
+#: core/ui/ui_position.c
+msgctxt "POS_TOAST_NOT_SAVED"
+msgid "Position not saved"
+msgstr "位置未保存"
 
 #: core/ui/ui_position.c
 msgctxt "POS_TOAST_RANGE"

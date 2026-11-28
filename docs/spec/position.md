@@ -141,6 +141,19 @@ with a toast, Up / Down or the knob switch N / S or E / W, BACK takes the last d
 the editor unchanged), OK saves with the places not typed as zeros. The editor starts with the stored value shown;
 the first digit starts over.
 
+A third row, Grid, is built with the keypad text editor (`UI_GRID_ENTRY`: `CONFIG_POSITION` and any of the switches
+that build the editor). It shows the fixed position's 6-character Maidenhead square, and OK opens the editor
+(`grid-text`) empty. A kept locator of 4, 6 or 8 characters, in either case, sets latitude and longitude together to
+the center of its square (`ui_svc_position_set_fixed()`: one change, one save, so no report sends half of each).
+Anything else is refused with a toast and changes nothing. The locator code is `core/position/maidenhead.c`, shared
+with the GPS screen's Grid page.
+
+| Locator | Square | Farthest point from the center (at the equator) |
+|---|---|---|
+| `EN82` | 2 x 1 degree | 125 km |
+| `EN82mn` | 5 x 2.5 minutes | 5.2 km |
+| `EN82mn47` | 30 x 15 seconds | 520 m |
+
 The altitude and the ambiguity are set over the debug link.
 
 ## 7. Debug link

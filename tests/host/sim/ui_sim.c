@@ -4623,3 +4623,13 @@ void ui_svc_p25_parrot_view(p25_parrot_view_t *out)
 	}
 }
 #endif
+
+#if CONFIG_POSITION
+// The fixed position as one change (ui_svc.h): the sim keeps both halves as settings
+bool ui_svc_position_set_fixed(int32_t lat_e7, int32_t lon_e7)
+{
+	if (lat_e7 < -900000000 || lat_e7 > 900000000 || lon_e7 < -1800000000 || lon_e7 > 1800000000)
+		return false;
+	return ui_svc_setting_set(UI_SET_POS_FIXED_LAT, lat_e7) && ui_svc_setting_set(UI_SET_POS_FIXED_LON, lon_e7);
+}
+#endif

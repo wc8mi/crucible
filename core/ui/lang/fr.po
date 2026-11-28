@@ -1547,7 +1547,7 @@ msgctxt "GPS_TITLE_SIGNAL"
 msgid "Signal"
 msgstr "Signal"
 
-#: core/ui/ui_gps.c core/ui/ui_menus.c
+#: core/ui/ui_gps.c core/ui/ui_menus.c core/ui/ui_position.c
 msgctxt "WORD_GRID"
 msgid "Grid"
 msgstr "Grille"
@@ -5086,6 +5086,16 @@ msgstr "Latitude"
 msgctxt "POS_LABEL_LONGITUDE"
 msgid "Longitude"
 msgstr "Longitude"
+
+#: core/ui/ui_position.c
+msgctxt "POS_TOAST_GRID"
+msgid "Grid: 4, 6 or 8 characters"
+msgstr "Grille : 4, 6 ou 8 caractères"
+
+#: core/ui/ui_position.c
+msgctxt "POS_TOAST_NOT_SAVED"
+msgid "Position not saved"
+msgstr "Position non enregistrée"
 
 #: core/ui/ui_position.c
 msgctxt "POS_TOAST_RANGE"
