@@ -67,8 +67,9 @@ static void test_round_trip(void)
 		for (int g = 0; g < 18; g += 2)
 			for (int s = 0; s < 24; s += 5)
 				for (int e = 0; e < 10; e += 3) {
-					snprintf(in, sizeof in, "%c%c%d%d%c%c%d%d", 'A' + f, 'A' + g, e, 9 - e, 'a' + s,
-						 'a' + 23 - s, e, 9 - e);
+					// %c digits: GCC can't bound an int's width and warns of truncation for %d
+					snprintf(in, sizeof in, "%c%c%c%c%c%c%c%c", 'A' + f, 'A' + g, '0' + e, '9' - e,
+						 'a' + s, 'a' + 23 - s, '0' + e, '9' - e);
 					if (!maidenhead_parse(in, &lat, &lon)) {
 						bad++;
 						continue;
