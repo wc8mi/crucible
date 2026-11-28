@@ -128,7 +128,9 @@ Reacquiring valid inputs may resume tracking only while the same satellite and f
 Tools > Satellite first predicts passes for every locally installed TLE using one current GPS position and UTC
 snapshot. The list is ordered by AOS, shows time to AOS in hours and minutes (`H:MM`) and maximum elevation, and
 reports prediction progress. A missing position or valid UTC leaves the list unavailable instead of using stale
-inputs; a position without altitude counts as 0 m ([position.md](position.md)). Its AOS countdown updates as time passes from the scan's UTC snapshot. The pass list shows the age of the oldest
+inputs: the scan ends as `NO_POSITION` (checked first) or `NO_TIME`, and the list row says which and opens Fixed
+position or Date & time ([clock.md](clock.md#user-interface)). While in either state the list asks for a scan every
+2 s, so it fills in once the input appears; a position without altitude counts as 0 m ([position.md](position.md)). Its AOS countdown updates as time passes from the scan's UTC snapshot. The pass list shows the age of the oldest
 stored TLE when UTC is available, updates it as time passes, and warns once per inventory generation when it reaches
 14 days. TLEs fetched together can have different epochs. When prediction completes with passes, the first pass is
 focused; returning from details preserves the selected row while the results remain available. Selecting a pass persists its record,

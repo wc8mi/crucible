@@ -545,6 +545,11 @@ void radio_req_satellite_scan(bool enabled)
 	send(&req, 0);
 }
 
+// The service's status goes to the UI as it is
+_Static_assert((int)RADIO_SAT_SCAN_UNAVAILABLE == (int)SATELLITE_SERVICE_SCAN_UNAVAILABLE &&
+	       (int)RADIO_SAT_SCAN_NO_POSITION == (int)SATELLITE_SERVICE_SCAN_NO_POSITION &&
+	       (int)RADIO_SAT_SCAN_NO_TIME == (int)SATELLITE_SERVICE_SCAN_NO_TIME, "one scan status order");
+
 void radio_get_satellite_scan(uint8_t *status, uint8_t *completed, uint8_t *total, uint8_t *passes)
 {
 	if (satellite_lock == NULL) {

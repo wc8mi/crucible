@@ -1127,6 +1127,76 @@ msgctxt "HINT_OK_CHOOSE_BACK"
 msgid "OK choose  Back"
 msgstr "OK scegli  Indietro"
 
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_SRC_GPS"
+msgid "GPS"
+msgstr "GPS"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_SRC_COMPUTER"
+msgid "Computer"
+msgstr "Computer"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_SRC_TYPED"
+msgid "Typed"
+msgstr "Manuale"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_SRC_RTC"
+msgid "RTC"
+msgstr "RTC"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_LABEL_DATE"
+msgid "UTC date"
+msgstr "Data UTC"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_LABEL_TIME"
+msgid "UTC time"
+msgstr "Ora UTC"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_LABEL_SOURCE"
+msgid "Source"
+msgstr "Origine"
+
+#: core/ui/ui_clock.c core/ui/ui_menus.c core/ui/ui_position.c core/ui/ui_rooms.c
+msgctxt "VALUE_NOT_SET"
+msgid "Not set"
+msgstr "Non impostato"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_TOAST_REFUSED"
+msgid "Time not set"
+msgstr "Ora non impostata"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_TOAST_SET"
+msgid "Time set"
+msgstr "Ora impostata"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_TOAST_YEAR"
+msgid "Year 2020 to 2099"
+msgstr "Anno 2020-2099"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_TOAST_RANGE"
+msgid "Out of range"
+msgstr "Fuori intervallo"
+
+#: core/ui/ui_clock.c core/ui/ui_menus.c
+msgctxt "SET_LABEL_DATE_TIME"
+msgid "Date & time"
+msgstr "Data e ora"
+
+#: core/ui/ui_clock.c core/ui/ui_menus.c core/ui/ui_position.c
+msgctxt "HINT_OK_CHANGE_BACK"
+msgid "OK change  Back"
+msgstr "OK cambia  Indietro"
+
 #: core/ui/ui_dual.c core/ui/ui_screens.c
 msgctxt "HOME_CHIP_AIR_BAND_AM"
 msgid "Air Band AM"
@@ -3087,11 +3157,6 @@ msgctxt "MYID_LABEL_DMR_ID"
 msgid "DMR ID"
 msgstr "ID DMR"
 
-#: core/ui/ui_menus.c core/ui/ui_position.c core/ui/ui_rooms.c
-msgctxt "VALUE_NOT_SET"
-msgid "Not set"
-msgstr "Non impostato"
-
 #: core/ui/ui_menus.c
 msgctxt "MYID_LABEL_YSF_CALLSIGN"
 msgid "YSF callsign"
@@ -4842,11 +4907,6 @@ msgctxt "SET_BODY_NXDN_DEFAULT"
 msgid "For the VFO and channels in NXDN for now. Stored NXDN channels keep their own."
 msgstr "Per il VFO e i canali in NXDN per ora. I canali NXDN salvati usano i propri."
 
-#: core/ui/ui_menus.c core/ui/ui_position.c
-msgctxt "HINT_OK_CHANGE_BACK"
-msgid "OK change  Back"
-msgstr "OK cambia  Indietro"
-
 #: core/ui/ui_menus.c
 msgctxt "RESET_ROW_KEEP"
 msgid "No, keep settings"
@@ -5201,6 +5261,16 @@ msgstr "Nessun TLE: carica dal sito"
 msgctxt "SATELLITE_TLE_AGE"
 msgid "TLE age"
 msgstr "Età TLE"
+
+#: core/ui/ui_satellite.c
+msgctxt "SATELLITE_NO_POSITION"
+msgid "No position: set it"
+msgstr "Nessuna posizione: impostala"
+
+#: core/ui/ui_satellite.c
+msgctxt "SATELLITE_NO_TIME"
+msgid "No time: set it"
+msgstr "Nessuna ora: impostala"
 
 #: core/ui/ui_satellite.c
 msgctxt "GPS_TIME_UNAVAILABLE"

@@ -73,6 +73,9 @@ extern const ui_scr_def_t ui_gps_screen;	// ui_gps.c
 extern const ui_scr_def_t ui_satellite_screen;	// ui_satellite.c
 extern const ui_scr_def_t ui_satellite_passes_screen;	// ui_satellite.c
 #endif
+#if CONFIG_CLOCK
+extern const ui_scr_def_t ui_clock_screen;	// ui_clock.c
+#endif
 #if CONFIG_DUAL_WATCH
 extern const ui_scr_def_t ui_dual_screen, ui_dual_pick_screen, ui_dual_zone_screen;	// ui_dual.c
 #endif
@@ -7017,7 +7020,7 @@ bool ui_menus_home_leave(ui_scr_t scr, bool text_open)
 typedef enum { ST_TOGGLE, ST_LIST, ST_NUMBER, ST_ACTION } set_type_t;
 enum { SA_DIAG, SA_FIRMWARE, SA_CODEPLUG, SA_RESET, SA_MY_RADIO, SA_CRASH, SA_LANGUAGE, SA_HARDWARE, SA_FIXED_POS,
 	SA_SAVE_GPS_POS, SA_DATA_SERVICES, SA_BL_TEST, SA_P25_PARROT, SA_AES_RECOVERY, SA_SIG_BEGIN, SA_SIG_END,
-	SA_SIG_IDLE, SA_RSSI, SA_RSSI_RESET, SA_NXDN };	// signaling tone steps, by sig_event_t
+	SA_SIG_IDLE, SA_RSSI, SA_RSSI_RESET, SA_NXDN, SA_CLOCK };	// signaling tone steps, by sig_event_t
 
 typedef struct {
 	tr_id_t name;			// TRN; TR_NONE for a key's row (set_name)
@@ -7484,6 +7487,9 @@ static const set_item_t s_location[] = {
 		UI_SET_POS_DMR_CALLS),
 #if CONFIG_GPS && CONFIG_SATELLITE_TLE
 	ACTION(TRN(SAVE_GPS_POSITION, "Save GPS position"), "save current GPS fix as fixed fallback", SA_SAVE_GPS_POS),
+#endif
+#if CONFIG_CLOCK
+	ACTION(TRN(SET_LABEL_DATE_TIME, "Date & time"), "clock UTC time date set satellite", SA_CLOCK),
 #endif
 #endif
 };
@@ -8423,6 +8429,9 @@ static void group_select(uint16_t i, bool hold)
 #endif
 #if CONFIG_POSITION
 		case SA_FIXED_POS: ui_push(SCR_FIXED_POS, 0); break;
+#if CONFIG_CLOCK
+		case SA_CLOCK: ui_push(SCR_CLOCK, 0); break;
+#endif
 #endif
 #if CONFIG_POSITION && CONFIG_GPS && CONFIG_SATELLITE_TLE
 		case SA_SAVE_GPS_POS:
@@ -9115,6 +9124,9 @@ const ui_scr_def_t *const ui_scr[SCR_COUNT] = {
 	[SCR_SATELLITE_PASSES] = &ui_satellite_passes_screen,
 	[SCR_SATELLITE] = &ui_satellite_screen,
 	[SCR_SATELLITE_TEXT] = &satellite_text_screen,
+#if CONFIG_CLOCK
+	[SCR_CLOCK] = &ui_clock_screen,
+#endif
 #endif
 #if CONFIG_CRASH_SCREEN
 	[SCR_CRASH] = &crash_screen,

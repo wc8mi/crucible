@@ -2731,6 +2731,9 @@ __attribute__((noinline)) bool ui_app_tick(const radio_view_t *v, uint32_t now_m
 	ui_svc_satellite_poll();
 	ui_satellite_passes_tick();
 #endif
+#if CONFIG_CLOCK
+	ui_clock_tick(now_ms);
+#endif
 #if CONFIG_CRASH_SCREEN
 	ui_crash_tick(now_ms);
 #endif

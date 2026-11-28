@@ -131,6 +131,10 @@ WEAK bool ui_svc_position(ui_position_t *out) { (void)out; return false; }
 #if CONFIG_GPS && CONFIG_POSITION && CONFIG_SATELLITE_TLE
 WEAK bool ui_svc_position_save_gps(void) { return false; }
 #endif
+#if CONFIG_CLOCK
+WEAK bool ui_svc_clock_now(int64_t *utc_s, uint8_t *src, uint32_t *age_s) { (void)utc_s; (void)src; (void)age_s; return false; }
+WEAK bool ui_svc_clock_set(int64_t utc_s) { (void)utc_s; return false; }
+#endif
 #if CONFIG_SATELLITE_TLE
 WEAK uint8_t ui_svc_satellite_count(void) { return 0; }
 WEAK bool ui_svc_satellite_get(uint8_t index, satellite_record_t *record)

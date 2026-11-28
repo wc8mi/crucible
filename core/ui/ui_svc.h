@@ -296,6 +296,12 @@ bool ui_svc_position(ui_position_t *out);	// false: no GPS on this radio (or off
 #if CONFIG_GPS && CONFIG_POSITION && CONFIG_SATELLITE_TLE
 bool ui_svc_position_save_gps(void);	// save the current fresh board fix as the fixed-position fallback
 #endif
+#if CONFIG_CLOCK
+// The UTC clock (core/clock/clock.h): false while it was never set. src is clock_src_t, age_s the seconds since it was
+// last set. Setting is a time typed by hand (CLOCK_SRC_MANUAL); false: refused (before 2020)
+bool ui_svc_clock_now(int64_t *utc_s, uint8_t *src, uint32_t *age_s);
+bool ui_svc_clock_set(int64_t utc_s);
+#endif
 #if CONFIG_SATELLITE_TLE
 uint8_t ui_svc_satellite_count(void);
 bool ui_svc_satellite_get(uint8_t index, satellite_record_t *record);

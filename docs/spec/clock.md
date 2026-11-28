@@ -60,6 +60,15 @@ Whether a radio's RTC keeps time with the power off depends on a backup supply, 
 | `BKP18R` | A board's power flag, where a board needs one |
 | `BKP19R` | ROM bootloader request (`sysboot.c`, `REBOOT` mode 1) |
 
+## User interface
+
+Settings > Location > **Date & time** (`ui_clock.c`, screen `clock`) shows the UTC date, the UTC time and the source
+with its age. Each of the date and time rows edits three fields; saving one keeps the other half of the clock as it is
+now, and sets the clock as MANUAL. An unset clock starts the editor at 2026-01-01 00:00:00. Years outside 2020-2099
+are refused as typed. The user's keys are in [Settings](../user/17-settings.md#date--time).
+
+The satellite pass list opens this screen when a scan ends `NO_TIME` ([satellite.md](satellite.md)).
+
 ## Locking
 
 The clock has its own lock (`clock_set_lock`; the radio task gives the scheduler lock). The position service feeds it
