@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
 # Copyright (c) 2026 David Behnke
-"""Build and package a release with a private label: Crucible's radios from main (crucible-...), or every board from the
-old kf8sfork and kf8sforkysf branches. Other branches refuse this wrapper."""
+"""Build and package a release: Crucible's radios from main, named by semantic version (v0.1.0: crucible.toml
+[release] version), or every board from the old kf8sfork and kf8sforkysf branches with a private label.
+Other branches refuse this wrapper."""
 import argparse
 from datetime import datetime
 import fcntl
@@ -91,6 +92,25 @@ def next_sequence(path, day):
             Path(temporary).unlink(missing_ok=True)
         return sequence
 
+
+
+def release_tags(remote):
+    """Every tag name, local and on remote, so a label already pushed from another checkout is never reused."""
+    names = set(git('tag', '--list').split())
+    out = subprocess.run(['git', '-C', str(ROOT), 'ls-remote', '--tags', '--refs', remote], capture_output=True, text=True)
+    if out.returncode:
+        raise ValueError(f'cannot list the tags on {remote}: ' + out.stderr.strip())
+    names |= {line.split('refs/tags/', 1)[1] for line in out.stdout.splitlines() if 'refs/tags/' in line}
+    return names
+
+
+def crucible_label(version, tags):
+    """The tag a Crucible build gets: v<version>. Refuses a version already tagged, here or on origin: crucible.toml
+    [release] version must be raised first."""
+    release = f'v{version}'
+    if release in tags:
+        raise ValueError(f'{release} is already tagged: raise crucible.toml [release] version (CRUCIBLE.md "Versions")')
+    return release
 
 
 # The C-SKY compiler runs under amd64 emulation on an Arm host, where cc1 now and then dies of a segfault on a file that
@@ -278,7 +298,7 @@ def write_archive(package, archive, images):
     return digest
 
 
-def package_readme(version, parrot, without_aes, ysf=False, product=None):
+def package_readme(version, parrot, without_aes, ysf=False, product=None, prerelease=True):
     aes = ('DMR AES is disabled in this package. AES channels are unavailable and PTT is rejected.\n'
            if without_aes else "DMR AES follows each board's default. See the image manifest.\n")
     diagnostic = ('P25 calibration diagnostic enabled wherever P25 is built. See build.json for overrides.\n'
@@ -294,7 +314,7 @@ def package_readme(version, parrot, without_aes, ysf=False, product=None):
                   'The test does not save a new AGC setting. Raw audio is erased after the sweep or on exit; no RF is sent.\n'
                   if parrot else 'The codec diagnostic is off. The DMR IP gateway retains its board defaults.\n')
     return (
-        (f'{version}\n{product["name"]} pre-release, based on RadioFoundry (MIT) and not affiliated with it.\n'
+        (f'{version}\n{product["name"]} {"pre-release" if prerelease else "release"}, based on RadioFoundry (MIT) and not affiliated with it.\n'
          f'Help and bug reports: {product["issues"]} (not RadioFoundry).\n'
          if product else f'{version}\nPrivate KF8S test build based on RadioFoundry. Contact: dbehnke (KF8S).\n') +
         'Includes transmit and receive audio AGC, dual caller display, and optional P25 caller lookup.\n'
@@ -315,7 +335,7 @@ def package_readme(version, parrot, without_aes, ysf=False, product=None):
            if product else 'Use each image with its JSON manifest in the RadioFoundry web flasher.\n') +
         'Images contain no AMBE codec. Follow the flasher instructions to preserve or supply your codec.\n'
         'P25 remains unavailable where upstream has not implemented it. See the feature matrix.\n'
-        'Keep LICENSE, AUTHORS, CONTRIBUTORS, LICENSES/ and notices/ with redistributed downloads.\n')
+        'Keep LICENSE, LICENSE-MIT, CREDITS.md, AUTHORS, CONTRIBUTORS, LICENSES/ and notices/ with redistributed downloads.\n')
 
 
 def test_release_notices():
@@ -394,6 +414,14 @@ def self_test():
             pass
         else:
             raise AssertionError('an empty counter must fail closed')
+    assert crucible_label('0.1.0', set()) == 'v0.1.0'
+    assert crucible_label('0.1.1', {'v0.1.0', 'v0.1.0-beta.1', 'v26.11'}) == 'v0.1.1'
+    try:
+        crucible_label('0.1.0', {'v0.1.0'})
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('a released version must be raised before the next build')
     standard = {'DMR', 'DMR_AES', 'DMR_IP_GATEWAY', 'P25', 'P25_TX_AGC', 'RX_AGC'}
     diagnostic = (standard - {'DMR_IP_GATEWAY'}) | {'P25_PARROT'}
     without_aes = diagnostic - {'DMR_AES'}
@@ -461,11 +489,12 @@ def self_test():
     product = {'name': 'Crucible', 'issues': 'https://example.invalid/issues', 'flasher': 'https://example.invalid/f/'}
     crucible_readme = package_readme('test-version', False, False, ysf=True, product=product)
     assert 'Crucible pre-release' in crucible_readme and 'not RadioFoundry' in crucible_readme
+    assert 'Crucible release,' in package_readme('v0.1.0', False, False, product=product, prerelease=False)
     assert 'https://example.invalid/f/' in crucible_readme and 'RadioFoundry web flasher' not in crucible_readme
     assert 'Private KF8S' not in crucible_readme and 'Private KF8S' in default_readme
     assert 'Settings > Advanced > P25 calibration' in diagnostic_readme and 'Limited blocks' in diagnostic_readme
     test_release_notices()
-    print('kf8s build: branch guards, daily sequence, provenance, archive, notice and README checks passed')
+    print('kf8s build: branch guards, daily sequence, release labels, provenance, archive, notice and README checks passed')
 
 
 def main():
@@ -514,9 +543,16 @@ def main():
     common = Path(git('rev-parse', '--git-common-dir'))
     if not common.is_absolute():
         common = ROOT / common
-    sequence = next_sequence(common / 'kf8s-build-sequence.json', day)
-    version = f'{prefix}-{upstream}-{commit}-{day}-{sequence}'
+    if product:
+        # semantic versions: one build name per version, never one already tagged here or on origin
+        version = crucible_label(crucible.release_version(ROOT), release_tags('origin'))
+        prerelease = crucible.release_prerelease(ROOT)
+    else:
+        sequence = next_sequence(common / 'kf8s-build-sequence.json', day)
+        version = f'{prefix}-{upstream}-{commit}-{day}-{sequence}'
     out = ROOT / 'build' / 'kf8s' / version
+    if out.exists():	# a Crucible version reuses its name after a failed attempt
+        raise ValueError(f'{out} exists from an earlier attempt: look at it, then remove it to build {version} again')
     package = out / 'package'
     package.mkdir(parents=True)
     print(version, flush=True)
@@ -571,16 +607,18 @@ def main():
         profile += '-test-no-aes'
     metadata = {'version': version, 'upstream': upstream_full,
                 'commit': commit_full, 'profile': profile,
+                **({'prerelease': prerelease} if product else {}),
                 'build_overrides': profile_flags, 'images': images}
     (package / 'build.json').write_text(json.dumps(metadata, indent=2) + '\n')
     (package / 'README.txt').write_text(package_readme(version, args.parrot, args.without_aes,
-                                                       ysf=prefix in ('kf8sysf', 'crucible'), product=product))
-    for name in ('LICENSE', 'AUTHORS', 'CONTRIBUTORS'):
+                                                       ysf=prefix in ('kf8sysf', 'crucible'), product=product,
+                                                       prerelease=not product or prerelease))
+    for name in ('LICENSE', 'LICENSE-MIT', 'CREDITS.md', 'AUTHORS', 'CONTRIBUTORS'):
         shutil.copy2(ROOT / name, package / name)
     shutil.copytree(ROOT / 'LICENSES', package / 'LICENSES')
     copy_firmware_notices(package, images, build_env)
-    # a Crucible label already starts with crucible-; the older labels get radiofoundry- in front
-    archive = out / (f'{version}.zip' if product else f'radiofoundry-{version}.zip')
+    # crucible-v0.1.0.zip (the flasher site takes crucible-*.zip); the older labels get radiofoundry- in front
+    archive = out / (f'crucible-{version}.zip' if product else f'radiofoundry-{version}.zip')
     digest = write_archive(package, archive, images)
     print(f'ZIP: {archive}\nSHA256: {digest}')
 

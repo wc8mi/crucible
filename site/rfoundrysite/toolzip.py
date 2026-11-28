@@ -18,7 +18,7 @@ from . import repo
 
 NAME = "rfoundry-tool.zip"
 # what the launcher and the serial route import, and what tells a user what they have
-FILES = ("LICENSE", "AUTHORS", "tools/rfoundry/README.md", "tools/rfoundry/pyproject.toml", "tools/serial_loader.py",
+FILES = ("LICENSE", "LICENSE-MIT", "AUTHORS", "tools/rfoundry/README.md", "tools/rfoundry/pyproject.toml", "tools/serial_loader.py",
 	 "tools/hrc7000_codec.py", "stub/stubtool.py", "stub/f4stub.py", "stub/USER-GUIDE.md")
 PACKAGE = "tools/rfoundry/rfoundry"
 

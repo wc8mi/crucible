@@ -10,9 +10,10 @@ agents alike. Everything in [AGENTS.md](AGENTS.md) still applies. This page adds
 
 ## Rules
 
-1. **Upstream first.** A change that would help RadioFoundry goes to RadioFoundry as a pull request from a feature
-   branch, and comes back with the next merge. Crucible carries only what upstream won't take or what is ours alone:
-   the identity, the radio subset, our defaults, packaging, the flasher site. Keep that carried diff small.
+1. **Our own project, upstream's changes welcome.** Crucible is GPL-3.0-or-later and sends nothing back to
+   RadioFoundry. We still merge `upstream/main` (MIT code may go into a GPL work) and take the best of other firmware
+   under GPL-3.0-compatible licenses, with credit ([CREDITS.md](CREDITS.md), [AGENTS.md](AGENTS.md) rule 1). Keep
+   the diff in RadioFoundry's own files small, so the merges stay cheap.
 2. **Merge, never rebase.** `main` merges `upstream/main`. Shared history is what keeps those merges cheap. Never
    rewrite `main`.
 3. **Thin identity layer.** What users see says Crucible. Internal names stay RadioFoundry's (`rfoundry_*` files,
@@ -22,7 +23,8 @@ agents alike. Everything in [AGENTS.md](AGENTS.md) still applies. This page adds
 4. **Five radios.** `crucible.toml [radios]` lists them. Releases, CI, the generated docs and the flasher read that
    list. Other boards' files stay untouched: deleting them would turn every upstream change to them into a conflict.
    This list is the one exception to AGENTS.md's "no list of radios" rule.
-5. **Keep the notices.** `LICENSE`, `AUTHORS`, `CONTRIBUTORS` and every SPDX and copyright line stay. A file we change
+5. **Keep the notices, give credit.** `LICENSE` (GPL-3.0), `LICENSE-MIT` (RadioFoundry's), `AUTHORS`,
+   `CONTRIBUTORS`, [CREDITS.md](CREDITS.md) and every SPDX and copyright line stay. A file we change
    gets `Copyright (c) 2026 David Behnke` below the existing lines, never in place of them ([FORKING.md](FORKING.md)).
 6. **Not RadioFoundry.** Nothing we publish may look like it comes from, or is supported by, the RadioFoundry project.
    Support questions come to us. Crucible sends nothing to RadioFoundry's services (build API, flash log, error
@@ -68,6 +70,7 @@ Nothing is removed from the tree. A feature Crucible doesn't ship is off by defa
 | FM, DMR, P25, NXDN | On |
 | YSF | On; incomplete, so every release is a pre-release until a build is stable |
 | Trunking (DMR Tier III, P25 trunked) | Off (`config/crucible.mk`), and out of the maximal build |
+| MMDVM hotspot with split duplex, single frequency repeater, zone sharing | Off (`config/crucible.mk`), and out of the maximal build: their flash goes to YSF VW and M17 |
 | Scan delay | 5 s by default (RadioFoundry's is 2 s): the value of `RADIO_SCAN_DELAY_MS` in `core/radio/radio.h`; keep 5000u on a merge conflict |
 | IP services, satellite tracking | On, best effort: upstream maintains them; their host tests run, but a failure alone doesn't block a release |
 
@@ -101,34 +104,58 @@ crucible.toml `upstream`, else `origin`) and requires that commit to be an ances
 radio in crucible.toml `[radios]` with every band/power option (`--board` narrows that), runs each image's stack
 check, rejects build warnings, and packages codec-free images with flasher manifests and license notices.
 
-Every image, manifest and ZIP in one batch uses:
+Every image, manifest and ZIP in one batch is named by its version (see [Versions](#versions)), for example
+`v0.1.0`. The ZIP is `crucible-<version>.zip`; its README says the build
+is Crucible's and sends help to Crucible's issues. The version is the release field the radio shows (splash, About,
+the debug link's `release=`); the Git commit, build-source metadata and crash ID keep their normal meaning, and
+`build.json` records the upstream and Crucible commits. The old `kf8sfork` and `kf8sforkysf` branches still build every
+board under their dated `kf8s-` and `kf8sysf-` labels.
 
-```
-crucible-<upstream-main-short-hash>-<main-short-hash>-<yymmdd>-<sequence>
-```
-
-The ZIP is `crucible-<label>.zip`; its README says the build is Crucible's and sends help to Crucible's issues. The
-old `kf8sfork` and `kf8sforkysf` branches still build every board under the `kf8s-` and `kf8sysf-` labels.
-
-Hashes have eight characters. Dates use America/Detroit. The sequence starts at 1 each day and increments once
-per build attempt, including failed attempts, so a label is never reused. The counter is local Git metadata shared
-by worktrees. Keep it when moving the build setup. The actual Git commit, build-source metadata and crash ID keep
-their normal meaning. The full label is the release field; the old CPS Git field stays a short commit.
-
-Output is under `build/kf8s/<label>/`. The ZIP includes every image and manifest, `SHA256SUMS`, build metadata,
-`LICENSE`, `AUTHORS`, `CONTRIBUTORS` and third-party licenses. Keep those notices when sharing it, as
+Output is under `build/kf8s/<version>/`. The ZIP includes every image and manifest, `SHA256SUMS`, build metadata,
+`LICENSE`, `LICENSE-MIT`, `CREDITS.md`, `AUTHORS`, `CONTRIBUTORS` and third-party licenses. Keep those notices when sharing it, as
 [FORKING.md](FORKING.md) requires. No AMBE codec is included.
 
 Host tests and firmware checks do not replace listening tests on the radios. No build command flashes or keys a radio.
 
+## Versions
+
+Crucible's versions follow [semantic versioning](https://semver.org), starting at 0.1.0. A version is plain
+`vMAJOR.MINOR.PATCH`: no `-beta` or other suffix. crucible.toml `[release]` holds the next one; it changes only by a
+commit.
+
+| Key | What |
+|---|---|
+| `version` | The next release. `tools/kf8s_build.py` names the build `v<version>` and refuses a version already tagged here or on origin. |
+| `prerelease` | `true` marks every release a GitHub pre-release, a test release: the flasher lists it under "Show test builds", and anyway while a radio has no full release. Set it `false` once a build is stable (YSF is still incomplete). |
+
+- After each release, raise the patch in its own commit (0.1.0 to 0.1.1): the resting value assumes fixes only.
+- The pull request that merges the first new feature since the last release raises the minor in the same commit
+  (0.1.1 to 0.2.0), so `version` always matches what is queued. An upstream merge that adds features counts. 1.0.0 and
+  later majors are for changes that break settings or codeplugs; before 1.0.0 a minor may also change them, so say so
+  in the notes.
+- A failed build reuses its version: remove `build/kf8s/<version>/` and build again. Once a version is tagged it is
+  never rebuilt.
+- Tags are `v` and the version, nothing else: no build metadata (`+...`), because the radio shows the name.
+  Upstream's calendar tags (`v26.11`) never look like ours, and `tools/crucible.py tag` checks one.
+- Older names stay as tags only, so a report from one of those builds still finds its source: the dated test releases
+  (`crucible-<hash>-<hash>-<yymmdd>-<n>`) and `v0.1.0-beta.1`, rebuilt as `v0.1.0`.
+
 ## Publishing a release
 
-Finish building and verifying the package first, then publish it in
-[wc8mi/crucible releases](https://github.com/wc8mi/crucible/releases). Use the package label as the annotated Git tag,
-pointing to the exact firmware commit in `build.json`. Push the branch and tag without changing an existing release
-tag. Attach the ZIP and its `.zip.sha256` sidecar, keep all license notices, and include the radios, changes,
-validation limits and a link to the [usage guide](docs/kf8sfork/README.md). Mark every release a pre-release until a build is stable (YSF is still incomplete). The flasher lists
-pre-releases when a radio has no full release. The
+Finish building and verifying the package first, with `main` pushed. Then:
+
+```
+python3 tools/crucible_release.py notes build/kf8s/<version> > notes.md   # a draft: radios, commits, changes, limits
+python3 tools/crucible_release.py publish build/kf8s/<version> --notes notes.md --dry-run
+python3 tools/crucible_release.py publish build/kf8s/<version> --notes notes.md
+```
+
+Read and edit the draft first: the flasher shows the notes next to the version. `publish` refuses a package whose
+ZIP doesn't match its sidecar, whose commit is not on `origin/main`, or whose release already exists. It makes the
+annotated tag on the commit in `build.json`, pushes the tag, and creates the release in
+[wc8mi/crucible releases](https://github.com/wc8mi/crucible/releases) with the ZIP and its `.zip.sha256` attached: a
+pre-release while `[release] prerelease` was true for the build, else the latest release. Keep all license notices
+and the link to the [usage guide](docs/kf8sfork/README.md) in the notes. Then raise `[release] version`. The
 [Crucible flasher](https://tinker.wc8mi.net/crucible/) lists a release once its site is rebuilt.
 
 ## Flasher page
@@ -154,8 +181,11 @@ The result is `build/crucible-site/`. Copy it to `/crucible/` on the tinker host
 - says Crucible wherever the flasher's English says RadioFoundry, and credits RadioFoundry in the footer
 - builds the shared Satellite TLE page at `tools/satellite/index.html` in the same shell. The front page links it, and
   the flasher offers it after an update, so a radio with the satellite feature gets new satellite data without new
-  firmware. Its AMSAT button reads the daily bulletin from `../../api/amsat-tle` (`data-amsat-api`), which is
-  `/crucible/api/amsat-tle` on the tinker host: a GET-only proxy in Caddy that sends no visitor headers. The page
+  firmware. Its Load latest TLEs button reads the AMSAT daily bulletin from `../../api/amsat-tle` (`data-amsat-api`)
+  and PE0SAT's amateur list from `../../api/pe0sat-tle` (`data-pe0sat-api`), and keeps the newest TLE per satellite.
+  On the tinker host these are `/crucible/api/amsat-tle` and `/crucible/api/pe0sat-tle`: GET-only proxies in Caddy
+  that send no visitor headers. PE0SAT (`http://tle.pe0sat.nl/kepler/amateur.txt`) serves HTTP only; the proxy gives the
+  page HTTPS. The page
   allows requests to this site only. The satellite frequencies are the page's own table, not a download
 - builds the shared Codeplug Editor at `channels/index.html` in the same shell, titled Channels. The front page links
   it. The editor's root carries three switches: `data-targets="all"` checks each channel on every Crucible radio

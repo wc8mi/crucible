@@ -4,9 +4,46 @@
 
 # KF8S Fork Changelog
 
-Changes added to `kf8sfork` from its first feature commit on November 23, 2026, through November 24, 2026.
+Changes added to `kf8sfork`, now Crucible, from its first feature commit on November 23, 2026, through
+v0.1.0 on November 27, 2026.
 This lists fork-specific changes, not the features inherited from upstream RadioFoundry.
 See the [usage and testing guide](README.md) for menu paths and test instructions.
+
+## v0.1.0, November 27, 2026
+
+The first Crucible version. Versions are plain semantic versions: a fix raises the patch (0.1.1), new features the
+minor (0.2.0). Every release is a test release (a GitHub pre-release) until a build is stable. The radio shows the
+version on the boot screen and in About. Earlier test builds had dated names
+(`crucible-<upstream>-<commit>-<yymmdd>-<n>`), and one was published as `v0.1.0-beta.1`; their GitHub releases are
+removed and their tags kept.
+
+Changes since the last dated test build (`crucible-4e24a5e1-8a658d0d-261127-2`):
+
+- **Scan delay.** Settings > Talk & listen > Scan delay (1, 2, 3, 5, 10 or 15 s): how long the scan stays on a
+  channel after the signal ends. The default is 5 s (RadioFoundry's is 2 s). Radios that already saved settings keep
+  their stored value until changed.
+- **Scan resume and Scan hold.** Scan resume is Carrier (default), Time or Stop. Scan hold (3, 5, 10, 15 or 30 s,
+  default 5 s) applies when Scan resume is Time; Scan delay is dimmed in Stop. A change applies to a running scan.
+  Dual watch always waits for the signal to end.
+- **From RadioFoundry f5f086d2:** APRS keeps the radio's own frequency the first time it sees one.
+- **License.** Crucible is now GPL-3.0-or-later. RadioFoundry's files keep their MIT license (`LICENSE-MIT`), and
+  `CREDITS.md` lists every project Crucible builds on.
+- **Update site.** The [Crucible flasher](https://tinker.wc8mi.net/crucible/) now only updates radios that already run
+  RadioFoundry or Crucible; install RadioFoundry first from radiofoundry.org. It has news posts and a Satellite TLE
+  page for new satellite data without new firmware, from AMSAT or PE0SAT's amateur list.
+
+Earlier Crucible test builds, November 26-27, 2026:
+
+- Five radios: RT3S / MD-UV380, MD9600, DM1701, DM32 and DB25-D PRO (the DB25-D PRO from November 27; only radios
+  of the 909E.DBB batch are tested).
+- Digital AGC RX and Digital AGC TX switches in Settings > Talk & listen, on by default with each radio's levels.
+- YSF receive: the CTCSS filter no longer rings after loud audio and loses sync.
+- NXDN radio default: Rate, RX RAN, TX RAN and Talkgroup for the VFO and channels without their own NXDN settings;
+  4800 bit/s by default; Contacts > Talk to in the NXDN VFO; quick settings tile 8 switches the rate.
+- DMR and YSF transmit levels set with two radios; the Mic check screen is removed.
+- Mic input moved into Crucible's own settings block. Radios on earlier builds keep their setting.
+
+The settings record changed in these builds. If you go back to RadioFoundry, reset the settings.
 
 ## Receive display and RSSI correction
 
@@ -16,23 +53,24 @@ See the [usage and testing guide](README.md) for menu paths and test instruction
 - Selected monochrome hollow S cells, filled over cells and inactive underlines, with no S9 divider.
 - Kept caller identity, large-text layout, and tested P25/DMR audio behavior.
 
-These changes are included in the current test package below. The shared startup stack gained 64 bytes after
+These changes were in the `kf8s-5172c91a-65621980-261124-11` test package. The shared startup stack gained 64 bytes after
 the firmware stack check identified an 8-byte margin shortfall; all four final images pass.
 
 ## Current test build
 
 | Item | Value |
 |---|---|
-| Firmware source | `65621980` |
-| Upstream main included | `5172c91a` |
-| Release tag | [`kf8s-5172c91a-65621980-261124-11`](https://github.com/dbehnke/RadioFoundry/tree/kf8s-5172c91a-65621980-261124-11) |
-| ZIP | `radiofoundry-kf8s-5172c91a-65621980-261124-11.zip` |
-| Images | RT3S / MD-UV380 standard 5 W, MD9600, DM1701, DM32 |
-| Optional calibration | Off in this package |
-| DMR AES | Enabled in this package |
+| Version | [`v0.1.0`](https://github.com/wc8mi/crucible/releases/tag/v0.1.0) (pre-release) |
+| Firmware source | `e877e643` |
+| Upstream main included | `5168a55d` |
+| ZIP | `crucible-v0.1.0.zip` |
+| ZIP SHA-256 | `4bcfe7cebc2de7497a8b1b42725af822725154383d76ce18a70ace4a440c8894` |
+| Images | RT3S / MD-UV380 (5 W and 10 W), MD9600, DM1701, DM32, DB25-D PRO |
+| AMBE codec | Not included |
 
 The tag identifies the firmware source. Later documentation commits do not change that firmware.
-The ZIP and checksum are available on the [GitHub release](https://github.com/dbehnke/RadioFoundry/releases/tag/kf8s-5172c91a-65621980-261124-11).
+The ZIP and checksum are on the [GitHub release](https://github.com/wc8mi/crucible/releases/tag/v0.1.0).
+Update a radio with the [Crucible flasher](https://tinker.wc8mi.net/crucible/).
 
 ## November 24, 2026
 

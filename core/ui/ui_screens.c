@@ -2795,7 +2795,9 @@ static void draw_activity(const radio_view_t *v, const ui_state_t *s)
 	}
 }
 
-// An NXDN talk target set for now on the radio default (Back undoes it, as DMR's target_manual)
+#if CONFIG_DMR
+// An NXDN talk target set for now on the radio default (Back undoes it, as DMR's target_manual). Guarded as its one
+// caller in home_hint(), so a build without DMR has no unused function
 static bool nxdn_talk_temporary(const radio_view_t *v)
 {
 #if CONFIG_NXDN
@@ -2805,6 +2807,7 @@ static bool nxdn_talk_temporary(const radio_view_t *v)
 	return false;
 #endif
 }
+#endif
 
 static const char *home_hint(const radio_view_t *v, const ui_state_t *s)
 {

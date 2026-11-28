@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2026 David Behnke
 // One codeplug for several radios (static/js/codeplug/targets.js): the radios.json profiles become targets, a power
 // byte reads as each radio's own level, and a channel a radio can't use is a warning naming that radio.

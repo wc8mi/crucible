@@ -20,17 +20,23 @@ line, add the user's copyright below ours, never in place of it, and tell the us
 
 ## Hard rules
 
-1. **Clean room.** Never open, read, search or copy another radio firmware's source (the aftermarket firmware,
-   OpenRTX, MMDVMHost or any GPL code), vendor SDKs under restrictive licenses, or disassembly. Work from `docs/spec/`,
-   datasheets, public standards (ETSI TS 102 361-1..4, the MMDVM protocol) and permissively licensed code. The full
-   rules are in [docs/CLEANROOM.md](docs/CLEANROOM.md). If a task seems to need foreign code, stop and ask.
+1. **Licenses and credit, not clean room.** Crucible is GPL-3.0-or-later (`LICENSE`) and does not send work back to
+   RadioFoundry, so upstream's clean-room rule ([docs/CLEANROOM.md](docs/CLEANROOM.md)) does not apply. Read and
+   take the best of other firmware: RadioFoundry (MIT), GPL forks such as DM32-nxdn-p25, OpenRTX, MMDVMHost. Code
+   brought in must be GPL-3.0 compatible (MIT, BSD, Apache-2.0, LGPL, GPL-2.0-or-later, GPL-3.0); GPL-2.0-only code
+   is not. Keep every SPDX and copyright line of what you bring in, and credit its source in
+   [CREDITS.md](CREDITS.md) in the same commit. A library keeps its own license in its own directory (`third_party/`).
+   Code whose license forbids commercial use (the aftermarket firmware), vendor SDKs under restrictive licenses and
+   disassembly of stock firmware stay out. If the license of what you would copy is unclear, stop and ask.
 2. **Never commit** the AMBE codec, stock firmware images, bootloader keys, memory or flash dumps, or audio recordings.
    `codecs/` and `build/` are ignored for that reason. Don't weaken those ignore rules. The one exception is the
    synthesized test speech in `tests/data/voice`, tracked by name with `git add -f`
    ([its README](tests/data/voice/README.md)).
-3. **SPDX header on every new file**, in the style of its neighbors:
-   `// SPDX-License-Identifier: MIT` and `// Copyright (c) 2026 The RadioFoundry Authors` (`#` for scripts and
-   makefiles, `<!-- -->` for Markdown).
+3. **SPDX header on every new file**: <!-- REUSE-IgnoreStart -->`// SPDX-License-Identifier: GPL-3.0-or-later`<!-- REUSE-IgnoreEnd --> and
+   `// Copyright (c) 2026 David Behnke` (`#` for scripts and makefiles, `<!-- -->` for Markdown). A file from
+   RadioFoundry keeps its MIT header; add `// Copyright (c) 2026 David Behnke` below the existing lines. When GPL code
+   goes into such a file, its identifier becomes `MIT AND GPL-3.0-or-later` and the GPL source's copyright line is
+   added ([FORKING.md](FORKING.md)). A file taken from a GPL project keeps its header as it was.
 4. **Generic first.** `core/` never includes a board or platform header and never tests a radio define. Radio
    differences go through `board_t` and the `hal/` interfaces ([docs/dev/architecture.md](docs/dev/architecture.md)).
    Chip drivers go in `drivers/`, SoC code in `platform/`, a radio's wiring in `boards/<radio>/`. The same holds

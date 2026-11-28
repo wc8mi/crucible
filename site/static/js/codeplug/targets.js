@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2026 David Behnke
 // The radios a codeplug is made for, without one on the line. Every radio stores the same codeplug, so one file serves
 // them all; what differs is what each image can do with a channel: its power levels, the frequencies it transmits and
