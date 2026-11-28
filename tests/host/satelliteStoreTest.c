@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The debug-link satellite TLE store on simulated NOR: bounded capacity, merged commits, input validation and aborts.
 #include <stdio.h>
 #include <string.h>
@@ -29,6 +30,9 @@ void storage_quick_unlock(void) { }
 
 #define FLASH_SIZE 0x13000u
 #define TEST_RECORD_MAX (4u + 1u + 48u + 2u * 69u)
+// A profile ID list that fits one PROFILE_SET request (the protocol-v7 clients' maximum)
+#define V7_PROFILES 10u
+#define INFO_LEN 7u	// protocol v8: status, version, capacity u16, count u16, profile capacity
 static band_t test_band = { .lo_hz = 10000000u, .hi_hz = 999999999u, .tx = true };
 static const hal_flash_map_t map = {
 	.settings_addr = 0x01000u, .settings_size = 0x02000u, .journal_addr = 0x03000u,
@@ -158,7 +162,7 @@ static uint16_t make_record(uint8_t *out, uint32_t id, const char *name, const c
 static bool install_operation(const uint8_t *data, uint16_t data_len, uint16_t count, bool bad_crc, bool bad_tle,
 			     bool bad_orbit, uint8_t begin_operation)
 {
-	uint8_t transfer_data[10 * TEST_RECORD_MAX];
+	uint8_t transfer_data[SATELLITE_STORE_MAX_RECORDS * TEST_RECORD_MAX];
 	memcpy(transfer_data, data, data_len);
 	if (bad_tle) transfer_data[5u + transfer_data[4] + 68u] ^= 1u;
 	if (bad_orbit) {
@@ -317,8 +321,9 @@ static bool install_replace_profile_chunks(const uint8_t *data, uint16_t data_le
 static void test_inventory_transactions(void)
 {
 	uint8_t req[9] = { DL_SAT_OP_INFO };
-	CHECK(command(req, 1) == 6 && output[0] == DL_ST_OK && output[1] == 7 && get16(output + 2) == 10 &&
-	      get16(output + 4) == 0);
+	CHECK(command(req, 1) == INFO_LEN && output[0] == DL_ST_OK && output[1] == 8 &&
+	      get16(output + 2) == SATELLITE_STORE_MAX_RECORDS && get16(output + 4) == 0 &&
+	      output[6] == SATELLITE_PROFILE_MAX);
 	uint8_t profile_req = DL_SAT_OP_PROFILE_GET;
 	CHECK(command(&profile_req, 1u) == 14u && output[0] == DL_ST_OK && output[1] == 3u &&
 	      get32(output + 2u) == 25544u && get32(output + 6u) == 27607u && get32(output + 10u) == 43017u);
@@ -335,7 +340,7 @@ static void test_inventory_transactions(void)
 	      output[1] == SATELLITE_CHANNELS_SYNC_FAILED);
 	channel_sync_result = true;
 
-	uint8_t data[10 * TEST_RECORD_MAX];
+	uint8_t data[SATELLITE_STORE_MAX_RECORDS * TEST_RECORD_MAX];
 	uint16_t first_len = make_record(data, 25544u, "ISS", "26315.50000000");
 	CHECK(install(data, first_len, 1, false, false, false));
 	uint16_t second_len = make_record(data + first_len, 20580u, "HST", "26315.50000000");
@@ -355,11 +360,11 @@ static void test_inventory_transactions(void)
 	uint32_t selected_profiles[SATELLITE_PROFILE_MAX] = {
 		40908u, 40931u, 43678u, 61781u, 63213u, 63214u, 63215u, 67291u, 63217u, 63218u
 	};
-	CHECK(satellite_store_profiles_set(SATELLITE_PROFILE_MAX, selected_profiles));
+	CHECK(satellite_store_profiles_set(V7_PROFILES, selected_profiles));
 	uint8_t selected_count = 0u;
 	uint32_t selected_readback[SATELLITE_PROFILE_MAX] = { 0 };
 	CHECK(satellite_store_profiles_get(&selected_count, selected_readback) &&
-	      selected_count == SATELLITE_PROFILE_MAX && memcmp(selected_readback, selected_profiles, sizeof(selected_profiles)) == 0);
+	      selected_count == V7_PROFILES && memcmp(selected_readback, selected_profiles, V7_PROFILES * 4u) == 0);
 	satellite_frequency_profile_t frequency_profile;
 	CHECK(satellite_frequency_profile(40908u, &frequency_profile) && frequency_profile.rx_hz == 437200000u);
 	CHECK(!satellite_frequency_profile(25544u, &frequency_profile));
@@ -376,7 +381,7 @@ static void test_inventory_transactions(void)
 	CHECK(satellite.catalog_id == 20580u && strcmp(satellite.name, "HST") == 0 &&
 	      memcmp(satellite.line1, replacement_line1, 69u) == 0);
 	CHECK(satellite_store_profiles_get(&selected_count, selected_readback) &&
-	      selected_count == SATELLITE_PROFILE_MAX && memcmp(selected_readback, selected_profiles, sizeof(selected_profiles)) == 0);
+	      selected_count == V7_PROFILES && memcmp(selected_readback, selected_profiles, V7_PROFILES * 4u) == 0);
 	replacement_line1[68] = replacement_line1[68] == '9' ? '0' : (char)(replacement_line1[68] + 1);
 	CHECK(!satellite_store_replace(0u, replacement_line1, replacement_line2));
 	CHECK(satellite_store_get(0u, &satellite) && memcmp(satellite.line1, replacement_line1, 68u) == 0 &&
@@ -385,14 +390,14 @@ static void test_inventory_transactions(void)
 	CHECK(!satellite_store_replace(0u, replacement_line1, replacement_line2));
 
 	req[0] = DL_SAT_OP_INFO;
-	CHECK(command(req, 1) == 6 && output[0] == DL_ST_OK && get16(output + 4) == 2);
+	CHECK(command(req, 1) == INFO_LEN && output[0] == DL_ST_OK && get16(output + 4) == 2);
 	uint8_t list_req[3] = { DL_SAT_OP_LIST, 0, 0 };
 	CHECK(command(list_req, sizeof(list_req)) == 18 && output[0] == DL_ST_OK && output[1] == 2);
 	CHECK(get32(output + 2) == 20580u && get32(output + 10) == 25544u && get32(output + 6) != 0u);
 
 	uint16_t replacement_len = make_record(data, 25544u, "ISS UPDATED", "26316.50000000");
 	CHECK(!install(data, replacement_len, 1, true, false, false));
-	CHECK(command(req, 1) == 6 && output[0] == DL_ST_OK && get16(output + 4) == 2);
+	CHECK(command(req, 1) == INFO_LEN && output[0] == DL_ST_OK && get16(output + 4) == 2);
 	CHECK(command(list_req, sizeof(list_req)) == 18 && output[0] == DL_ST_OK && output[1] == 2);
 	CHECK(get32(output + 2) == 20580u && get32(output + 10) == 25544u);
 	uint32_t old_epoch = get32(output + 14);
@@ -402,7 +407,7 @@ static void test_inventory_transactions(void)
 	uint32_t committed_epoch = get32(output + 14);
 	CHECK(!install(data, replacement_len, 1, false, true, false));
 	CHECK(!install(data, replacement_len, 1, false, false, true));
-	CHECK(command(req, 1) == 6 && output[0] == DL_ST_OK && get16(output + 4) == 2);
+	CHECK(command(req, 1) == INFO_LEN && output[0] == DL_ST_OK && get16(output + 4) == 2);
 
 	uint16_t interrupted_len = make_record(data, 25544u, "ISS INTERRUPTED", "26317.50000000");
 	uint32_t interrupted_crc = storage_crc32(0, data, interrupted_len);
@@ -431,28 +436,28 @@ static void test_inventory_transactions(void)
 	transfer[0] = DL_SAT_OP_ABORT;
 	put16(transfer + 1, transaction);
 	CHECK(command(transfer, 3) == 1 && output[0] == DL_ST_OK);
-	CHECK(command(req, 1) == 6 && output[0] == DL_ST_OK && get16(output + 4) == 2);
+	CHECK(command(req, 1) == INFO_LEN && output[0] == DL_ST_OK && get16(output + 4) == 2);
 	CHECK(command(list_req, sizeof(list_req)) == 18 && output[0] == DL_ST_OK && get32(output + 14) == committed_epoch);
 	list_req[1] = 2;
 	CHECK(command(list_req, sizeof(list_req)) == 2 && output[0] == DL_ST_OK && output[1] == 0);
 	uint8_t begin[9] = { DL_SAT_OP_BEGIN };
-	put16(begin + 1, 11);
-	put16(begin + 3, 11u * 144u);
+	put16(begin + 1, SATELLITE_STORE_MAX_RECORDS + 1u);
+	put16(begin + 3, (SATELLITE_STORE_MAX_RECORDS + 1u) * 144u);
 	CHECK(command(begin, sizeof(begin)) == 1 && output[0] == DL_ST_BAD_ARG);
 	uint16_t keep_len = make_record(data, 25544u, "ISS", "26318.50000000");
 	CHECK(install_replace(data, keep_len, 1u));
-	CHECK(command(req, 1u) == 6u && output[0] == DL_ST_OK && get16(output + 4u) == 1u);
+	CHECK(command(req, 1u) == INFO_LEN && output[0] == DL_ST_OK && get16(output + 4u) == 1u);
 	list_req[1] = 0u;
 	CHECK(command(list_req, sizeof(list_req)) == 10u && output[0] == DL_ST_OK && output[1] == 1u &&
 	      get32(output + 2u) == 25544u);
 	CHECK(satellite_store_profiles_get(&selected_count, selected_readback) &&
-	      selected_count == SATELLITE_PROFILE_MAX && memcmp(selected_readback, selected_profiles, sizeof(selected_profiles)) == 0);
+	      selected_count == V7_PROFILES && memcmp(selected_readback, selected_profiles, V7_PROFILES * 4u) == 0);
 	static const uint32_t chunked_ids[SATELLITE_PROFILE_MAX] = {
 		25544u, 27607u, 40908u, 40931u, 43017u, 43678u, 61781u, 63213u, 63214u, 63215u
 	};
 	satellite_frequency_profile_t chunked_profiles[SATELLITE_PROFILE_MAX] = { 0 };
 	uint16_t chunked_len = 0u, five_record_len = 0u;
-	for (uint8_t i = 0u; i < SATELLITE_PROFILE_MAX; i++) {
+	for (uint8_t i = 0u; i < V7_PROFILES; i++) {
 		chunked_profiles[i].catalog_id = chunked_ids[i];
 		chunked_profiles[i].rx_hz = 145900000u;
 		chunked_profiles[i].tx_hz = 435100000u;
@@ -466,8 +471,8 @@ static void test_inventory_transactions(void)
 			five_record_len = chunked_len;
 	}
 	CHECK(install_replace_profile_chunks(data, five_record_len, 5u, chunked_profiles));
-	CHECK(install_replace_profile_chunks(data, chunked_len, SATELLITE_PROFILE_MAX, chunked_profiles));
-	CHECK(satellite_store_count() == SATELLITE_PROFILE_MAX);
+	CHECK(install_replace_profile_chunks(data, chunked_len, V7_PROFILES, chunked_profiles));
+	CHECK(satellite_store_count() == V7_PROFILES);
 	CHECK(satellite_frequency_profile(63215u, &frequency_profile) && frequency_profile.rx_hz == 145900000u &&
 	      frequency_profile.tx_hz == 435100000u && frequency_profile.tx_tone_tenths == 885u);
 }
@@ -479,7 +484,7 @@ static void test_corrupt_empty_area_recovers(void)
 	CHECK(storage_init());
 	for (uint8_t bank = 0u; bank < 3u; bank++)
 		sim_flash_data[map.satellite_addr + (uint32_t)bank * STORAGE_SECTOR] = 0u;
-	CHECK(command(&req, 1) == 6u && output[0] == DL_ST_OK && get16(output + 4u) == 0u);
+	CHECK(command(&req, 1) == INFO_LEN && output[0] == DL_ST_OK && get16(output + 4u) == 0u);
 	uint8_t record[TEST_RECORD_MAX];
 	uint16_t length = make_record(record, 25544u, "ISS", "26315.50000000");
 	CHECK(install(record, length, 1u, false, false, false));
@@ -488,7 +493,7 @@ static void test_corrupt_empty_area_recovers(void)
 
 static void test_commit_power_cuts(void)
 {
-	static const uint32_t cuts[] = { 1u, 100u, 170u, 174u };
+	static const uint32_t cuts[] = { 1u, 100u, 170u, 174u, 300u, 400u, 430u };
 	for (unsigned cut = 0; cut < sizeof(cuts) / sizeof(cuts[0]); cut++) {
 		sim_flash_create(FLASH_SIZE, &map);
 		CHECK(storage_init());
@@ -522,7 +527,7 @@ static void test_commit_power_cuts(void)
 		sim_flash_power_on();
 		CHECK(storage_init());
 		uint8_t info = DL_SAT_OP_INFO;
-		CHECK(command(&info, 1u) == 6u && output[0] == DL_ST_OK && get16(output + 4) == 1u);
+		CHECK(command(&info, 1u) == INFO_LEN && output[0] == DL_ST_OK && get16(output + 4) == 1u);
 		uint8_t list[3] = { DL_SAT_OP_LIST, 0, 0 };
 		CHECK(command(list, sizeof(list)) == 10u && output[0] == DL_ST_OK && output[1] == 1u);
 		CHECK(get32(output + 2) == 25544u &&
@@ -535,7 +540,7 @@ static void test_commit_power_cuts(void)
 
 static void test_replace_power_cuts(void)
 {
-	static const uint32_t cuts[] = { 1u, 100u, 170u, 174u };
+	static const uint32_t cuts[] = { 1u, 100u, 170u, 174u, 300u, 400u, 430u };
 	for (unsigned cut = 0; cut < sizeof(cuts) / sizeof(cuts[0]); cut++) {
 		sim_flash_create(FLASH_SIZE, &map);
 		CHECK(storage_init());
@@ -629,19 +634,19 @@ static void test_working_buffer_reuse(void)
 	static const uint32_t ten[SATELLITE_PROFILE_MAX] = {
 		40908u, 40931u, 43678u, 61781u, 63213u, 63214u, 63215u, 67291u, 63217u, 63218u
 	};
-	uint8_t set[2u + 4u * SATELLITE_PROFILE_MAX] = { DL_SAT_OP_PROFILE_SET };
+	uint8_t set[2u + 4u * V7_PROFILES] = { DL_SAT_OP_PROFILE_SET };
 	uint8_t get_ids = DL_SAT_OP_PROFILE_GET, get_values = DL_SAT_OP_PROFILE_VALUES_GET;
 	uint8_t list[3] = { DL_SAT_OP_LIST };
 	uint8_t record[TEST_RECORD_MAX];
 
 	CHECK(install(record, make_record(record, 25544u, "ISS", "26315.50000000"), 1, false, false, false));
 	CHECK(command(list, 3u) == 2u + 8u && output[0] == DL_ST_OK && output[1] == 1u);	// the list buffer holds a record
-	set[1] = SATELLITE_PROFILE_MAX;
-	for (uint8_t i = 0u; i < SATELLITE_PROFILE_MAX; i++)
+	set[1] = V7_PROFILES;
+	for (uint8_t i = 0u; i < V7_PROFILES; i++)
 		put32(set + 2u + 4u * i, ten[i]);
 	CHECK(command(set, sizeof(set)) == 1u && output[0] == DL_ST_OK);
-	CHECK(command(&get_values, 1u) == 2u + 14u * SATELLITE_PROFILE_MAX && output[0] == DL_ST_OK &&
-	      output[1] == SATELLITE_PROFILE_MAX && get32(output + 2u) == ten[0] &&
+	CHECK(command(&get_values, 1u) == 2u + 14u * V7_PROFILES && output[0] == DL_ST_OK &&
+	      output[1] == V7_PROFILES && get32(output + 2u) == ten[0] &&
 	      get32(output + 2u + 14u * 9u) == ten[9]);		// the buffer now holds ten profiles
 	set[1] = 2u;
 	CHECK(command(set, 2u + 4u * 2u) == 1u && output[0] == DL_ST_OK);
@@ -652,9 +657,9 @@ static void test_working_buffer_reuse(void)
 	CHECK(command(list, 3u) == 2u + 8u && output[0] == DL_ST_OK && output[1] == 1u && get32(output + 2u) == 25544u);
 	CHECK(command(&get_ids, 1u) == 2u + 4u * 2u && output[1] == 2u && get32(output + 2u) == ten[0] &&
 	      get32(output + 6u) == ten[1]);
-	set[1] = SATELLITE_PROFILE_MAX;
+	set[1] = V7_PROFILES;
 	CHECK(command(set, sizeof(set)) == 1u && output[0] == DL_ST_OK);
-	CHECK(command(&get_ids, 1u) == 2u + 4u * SATELLITE_PROFILE_MAX && output[1] == SATELLITE_PROFILE_MAX &&
+	CHECK(command(&get_ids, 1u) == 2u + 4u * V7_PROFILES && output[1] == V7_PROFILES &&
 	      get32(output + 2u + 4u * 9u) == ten[9]);
 }
 
@@ -711,12 +716,12 @@ static void test_first_install_recovery(void)
 	sim_flash_power_on();
 	CHECK(storage_init());
 	uint8_t info = DL_SAT_OP_INFO;
-	CHECK(command(&info, 1u) == 6u && output[0] == DL_ST_OK && get16(output + 4) == 0u);
+	CHECK(command(&info, 1u) == INFO_LEN && output[0] == DL_ST_OK && get16(output + 4) == 0u);
 	req[0] = DL_SAT_OP_ABORT;
 	put16(req + 1, transaction);
 	CHECK(command(req, 3u) == 1u && output[0] == DL_ST_OK);
 	CHECK(install(record, length, 1u, false, false, false));
-	CHECK(command(&info, 1u) == 6u && output[0] == DL_ST_OK && get16(output + 4) == 1u);
+	CHECK(command(&info, 1u) == INFO_LEN && output[0] == DL_ST_OK && get16(output + 4) == 1u);
 }
 
 static void test_cross_band_profiles_install(void)
@@ -743,6 +748,165 @@ static void test_cross_band_profiles_install(void)
 	test_band.hi_hz = 999999999u;
 }
 
+
+// Every catalog FM satellite (17) plus one of the user's own: the full 18 records and profiles in one 4 KiB sector,
+// at the 48-byte name limit, staged in profile chunks; a 19th is refused
+static const uint32_t all_ids[SATELLITE_STORE_MAX_RECORDS] = {
+	25544u, 27607u, 40908u, 40931u, 43017u, 43678u, 61781u, 63213u, 63214u,
+	63215u, 63217u, 63218u, 63219u, 63237u, 63238u, 63239u, 67291u, 99001u,
+};
+
+static void test_eighteen_records(void)
+{
+	static uint8_t data[SATELLITE_STORE_MAX_RECORDS * TEST_RECORD_MAX];
+	static satellite_frequency_profile_t profiles[SATELLITE_PROFILE_MAX];
+	static const char long_name[] = "A SATELLITE NAME FORTY EIGHT BYTES LONG ........";
+	sim_flash_create(FLASH_SIZE, &map);
+	CHECK(storage_init());
+	CHECK(sizeof(long_name) - 1u == 48u);
+	uint16_t len = 0u;
+	for (uint8_t i = 0u; i < SATELLITE_STORE_MAX_RECORDS; i++) {
+		len = (uint16_t)(len + make_record(data + len, all_ids[i], long_name, "26318.50000000"));
+		profiles[i].catalog_id = all_ids[i];
+		profiles[i].rx_hz = 436000000u + i * 5000u;
+		profiles[i].tx_hz = 145900000u;
+		profiles[i].tx_tone_tenths = 670u;
+	}
+	CHECK(len == SATELLITE_STORE_MAX_RECORDS * TEST_RECORD_MAX);
+	CHECK(install_replace_profile_chunks(data, len, SATELLITE_STORE_MAX_RECORDS, profiles));
+	CHECK(satellite_store_count() == SATELLITE_STORE_MAX_RECORDS);
+	uint8_t list[3] = { DL_SAT_OP_LIST, 0, 0 };
+	CHECK(command(list, 3u) == 2u + 8u * SATELLITE_STORE_MAX_RECORDS && output[1] == SATELLITE_STORE_MAX_RECORDS &&
+	      get32(output + 2u + 8u * 17u) == 99001u);
+	uint8_t values = DL_SAT_OP_PROFILE_VALUES_GET;
+	CHECK(command(&values, 1u) == 2u + 14u * SATELLITE_PROFILE_MAX && output[1] == SATELLITE_PROFILE_MAX &&
+	      get32(output + 2u + 14u * 17u) == 99001u && get32(output + 6u + 14u * 17u) == 436085000u);
+	sim_flash_power_on();
+	CHECK(storage_init());
+	satellite_record_t record;
+	satellite_frequency_profile_t readback;
+	CHECK(satellite_store_count() == SATELLITE_STORE_MAX_RECORDS && satellite_store_get(17u, &record) &&
+	      record.catalog_id == 99001u && strcmp(record.name, long_name) == 0);
+	CHECK(satellite_store_profile_get(99001u, &readback) && readback.rx_hz == 436085000u);
+	uint8_t begin[9] = { DL_SAT_OP_REPLACE_BEGIN };
+	put16(begin + 1u, SATELLITE_STORE_MAX_RECORDS + 1u);
+	put16(begin + 3u, (SATELLITE_STORE_MAX_RECORDS + 1u) * 144u);
+	CHECK(command(begin, sizeof(begin)) == 1u && output[0] == DL_ST_BAD_ARG);
+	CHECK(satellite_store_count() == SATELLITE_STORE_MAX_RECORDS);
+}
+
+// Protocol v8's PROFILE_SET_CHUNK: a catalog ID list longer than one request, in order, applied with its last chunk
+static void test_profile_set_chunk(void)
+{
+	sim_flash_create(FLASH_SIZE, &map);
+	CHECK(storage_init());
+	uint8_t record[TEST_RECORD_MAX];
+	CHECK(install(record, make_record(record, 25544u, "ISS", "26315.50000000"), 1, false, false, false));
+	const uint8_t total = SATELLITE_STORE_MAX_RECORDS - 1u;	// the 17 catalog satellites
+	uint8_t req[64] = { DL_SAT_OP_PROFILE_SET_CHUNK, total, 0u, 15u };
+	for (uint8_t i = 0u; i < 15u; i++)
+		put32(req + 4u + 4u * i, all_ids[i]);
+	CHECK(command(req, 4u + 4u * 15u) == 1u && output[0] == DL_ST_OK);
+	uint8_t get_ids = DL_SAT_OP_PROFILE_GET;
+	CHECK(command(&get_ids, 1u) == 2u + 4u * 3u && output[1] == 3u);	// not applied until the list is whole
+	req[2] = 16u;	// a gap: refused, the list dropped
+	req[3] = 1u;
+	put32(req + 4u, all_ids[16]);
+	CHECK(command(req, 8u) == 1u && output[0] == DL_ST_BAD_ARG);
+	req[2] = 15u;
+	req[3] = 2u;
+	put32(req + 4u, all_ids[15]);
+	put32(req + 8u, all_ids[16]);
+	CHECK(command(req, 12u) == 1u && output[0] == DL_ST_BAD_ARG);	// the dropped list needs its start again
+	req[2] = 0u;
+	req[3] = 15u;
+	for (uint8_t i = 0u; i < 15u; i++)
+		put32(req + 4u + 4u * i, all_ids[i]);
+	CHECK(command(req, 4u + 4u * 15u) == 1u && output[0] == DL_ST_OK);
+	req[2] = 15u;
+	req[3] = 2u;
+	put32(req + 4u, all_ids[15]);
+	put32(req + 8u, all_ids[16]);
+	CHECK(command(req, 12u) == 1u && output[0] == DL_ST_OK);
+	CHECK(command(&get_ids, 1u) == 2u + 4u * total && output[1] == total && get32(output + 2u) == all_ids[0] &&
+	      get32(output + 2u + 4u * 16u) == all_ids[16]);
+	req[3] = 16u;	// more than a request holds
+	CHECK(command(req, 4u + 4u * 16u) == 1u && output[0] == DL_ST_BAD_ARG);
+	req[1] = 2u;	// a non-catalog ID: the whole list refused, the old one kept
+	req[2] = 0u;
+	req[3] = 2u;
+	put32(req + 4u, 25544u);
+	put32(req + 8u, 99001u);
+	CHECK(command(req, 12u) == 1u && output[0] == DL_ST_REFUSED);
+	CHECK(command(&get_ids, 1u) == 2u + 4u * total && output[1] == total);
+}
+
+// A bank written by version 4 (172-byte header, 10 profile slots) still reads, records and profiles; the next commit
+// writes version 5 and keeps both
+static void test_v4_bank_reads(void)
+{
+	sim_flash_create(FLASH_SIZE, &map);
+	CHECK(storage_init());
+	uint8_t *bank = sim_flash_data + map.satellite_addr;
+	uint8_t record[TEST_RECORD_MAX];
+	uint16_t len = make_record(record, 25544u, "ISS", "26315.50000000");
+	uint8_t profiles[141] = { 2u };
+	put32(profiles + 1u, 25544u);
+	put32(profiles + 5u, 437800000u);
+	put32(profiles + 9u, 145990000u);
+	put16(profiles + 13u, 670u);
+	put32(profiles + 15u, 27607u);
+	put32(profiles + 19u, 436795000u);
+	put32(profiles + 23u, 145850000u);
+	put16(profiles + 27u, 670u);
+	put32(bank, 0x31544653u);
+	bank[4] = 4u;
+	bank[5] = 1u;
+	put16(bank + 6u, len);
+	put32(bank + 8u, 7u);
+	put32(bank + 12u, storage_crc32(0u, record, len));
+	put32(bank + 16u, 0u);
+	put32(bank + 20u, 0x54494D43u);
+	memcpy(bank + 24u, profiles, sizeof(profiles));
+	put32(bank + 165u, storage_crc32(0u, profiles, sizeof(profiles)));
+	memcpy(bank + 172u, record, len);
+	CHECK(storage_init());
+	CHECK(satellite_store_count() == 1u && satellite_store_generation() == 7u);
+	satellite_record_t satellite;
+	CHECK(satellite_store_get(0u, &satellite) && satellite.catalog_id == 25544u && strcmp(satellite.name, "ISS") == 0);
+	satellite_frequency_profile_t profile;
+	CHECK(satellite_store_profile_get(27607u, &profile) && profile.rx_hz == 436795000u);
+	uint8_t count = 0u;
+	uint32_t ids[SATELLITE_PROFILE_MAX];
+	CHECK(satellite_store_profiles_get(&count, ids) && count == 2u && ids[1] == 27607u);
+	bank[24u + 140u] ^= 1u;	// a damaged v4 profile table: the bank is not valid
+	CHECK(storage_init());
+	CHECK(satellite_store_count() == 0u);
+	bank[24u + 140u] ^= 1u;
+	CHECK(storage_init());
+	char line1[70], line2[70];
+	make_line((uint8_t *)line1, '1', 25544u, "26316.50000000");
+	make_line((uint8_t *)line2, '2', 25544u, "00000.00000000");
+	line1[69] = line2[69] = '\0';
+	CHECK(satellite_store_replace(0u, line1, line2));	// commits a version-5 bank
+	sim_flash_power_on();
+	CHECK(storage_init());
+	CHECK(satellite_store_count() == 1u && satellite_store_generation() == 8u);
+	CHECK(satellite_store_get(0u, &satellite) && memcmp(satellite.line1, line1, 69u) == 0);
+	CHECK(satellite_store_profiles_get(&count, ids) && count == 2u && ids[0] == 25544u && ids[1] == 27607u);
+	CHECK(satellite_store_profile_get(27607u, &profile) && profile.rx_hz == 436795000u);
+	bool v5 = false;
+	for (uint8_t b = 0u; b < 3u; b++) {
+		const uint8_t *h = sim_flash_data + map.satellite_addr + (uint32_t)b * STORAGE_SECTOR;
+		v5 = v5 || (get32(h) == 0x31544653u && h[4] == 5u && get32(h + 8u) == 8u);
+	}
+	CHECK(v5);
+	// An additive install merges with the records the v4 bank had
+	uint8_t second[TEST_RECORD_MAX];
+	CHECK(install(second, make_record(second, 27607u, "SO-50", "26315.50000000"), 1, false, false, false));
+	CHECK(satellite_store_count() == 2u);
+}
+
 int main(void)
 {
 	sim_flash_create(FLASH_SIZE, &map);
@@ -757,6 +921,9 @@ int main(void)
 	test_arm_capability();
 	test_first_install_recovery();
 	test_cross_band_profiles_install();
+	test_eighteen_records();
+	test_profile_set_chunk();
+	test_v4_bank_reads();
 	CHECK(sim_flash_violations() == 0);
 	sim_flash_free();
 	if (failures != 0) {

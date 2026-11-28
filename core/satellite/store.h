@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // Installed satellite TLE records, validated and committed by the dedicated flash store.
 #ifndef SATELLITE_STORE_H
 #define SATELLITE_STORE_H
@@ -10,8 +11,9 @@
 
 #define SATELLITE_NAME_MAX 48u
 #define SATELLITE_TLE_LINE_LENGTH 69u
-#define SATELLITE_STORE_MAX_RECORDS 10u
-#define SATELLITE_PROFILE_MAX 10u
+// 18 records and their profiles fill one 4 KiB erase sector at the 48-byte name limit (store.c checks it)
+#define SATELLITE_STORE_MAX_RECORDS 18u
+#define SATELLITE_PROFILE_MAX 18u
 #define SATELLITE_PROFILE_RX_MIN_HZ 10000000u
 #define SATELLITE_PROFILE_RX_MAX_HZ 1000000000u
 #define SATELLITE_PROFILE_TX_MIN_HZ 10000000u

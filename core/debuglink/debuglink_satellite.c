@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // Satellite inventory command protocol. Flash persistence lives in core/satellite/store.c.
 #include <string.h>
 #include "config.h"
@@ -11,7 +12,9 @@
 #if CONFIG_SATELLITE_TLE
 #define SAT_MAX_RECORDS SATELLITE_STORE_MAX_RECORDS
 #define SAT_PROFILE_CHUNK_MAX 4u
-#define SAT_PROTOCOL_VERSION 7u
+#define SAT_PROTOCOL_VERSION 8u
+// PROFILE_SET_CHUNK: op, total, start, count, then IDs within the 64-byte request
+#define SAT_PROFILE_SET_CHUNK_MAX ((DL_REQ_MAX - 4u) / 4u)
 
 static uint16_t get16(const uint8_t *p)
 {
@@ -26,6 +29,11 @@ static union {
 	satellite_frequency_profile_t profiles[SATELLITE_PROFILE_MAX];
 	uint32_t ids[SATELLITE_PROFILE_MAX];
 } work;
+
+// PROFILE_SET_CHUNK's IDs gathered across requests (the work union is reused by every other operation in between).
+// profile_set_next is the next expected start; 0 when no list is being gathered
+static uint32_t profile_set_ids[SATELLITE_PROFILE_MAX];
+static uint8_t profile_set_next;
 
 static uint32_t get32(const uint8_t *p)
 {
@@ -111,6 +119,29 @@ static __attribute__((noinline)) size_t satellite_profile_stage(const uint8_t *r
 		get16(req + 1u), req[3], profiles)));
 }
 
+// A profile ID list longer than one request: chunks in order from start 0, the list applied (as PROFILE_SET) with the
+// one that completes it. A chunk at start 0 begins a new list; any other gap is refused and drops the list
+static __attribute__((noinline)) size_t satellite_profile_set_chunk(const uint8_t *req, uint16_t len, uint8_t *out)
+{
+	if (len < 8u || req[1] == 0u || req[1] > SATELLITE_PROFILE_MAX || req[3] == 0u ||
+	    req[3] > SAT_PROFILE_SET_CHUNK_MAX || req[2] > req[1] || req[3] > req[1] - req[2] ||
+	    len != 4u + (uint16_t)req[3] * 4u)
+		return status(out, DL_ST_BAD_ARG);
+	if (req[2] == 0u)
+		profile_set_next = 0u;
+	if (req[2] != profile_set_next) {
+		profile_set_next = 0u;
+		return status(out, DL_ST_BAD_ARG);
+	}
+	for (uint8_t i = 0u; i < req[3]; i++)
+		profile_set_ids[req[2] + i] = get32(req + 4u + (uint16_t)i * 4u);
+	profile_set_next = (uint8_t)(req[2] + req[3]);
+	if (profile_set_next < req[1])
+		return status(out, DL_ST_OK);
+	profile_set_next = 0u;
+	return status(out, satellite_store_profiles_set(req[1], profile_set_ids) ? DL_ST_OK : DL_ST_REFUSED);
+}
+
 static __attribute__((noinline)) size_t satellite_profile_values_get(uint8_t *out, size_t cap)
 {
 	uint8_t count;
@@ -143,13 +174,14 @@ size_t debuglink_cmd_satellite(const uint8_t *req, uint16_t len, uint8_t *out, s
 		return status(out, DL_ST_UNAVAILABLE);
 	switch (req[0]) {
 	case DL_SAT_OP_INFO: {
-		if (len != 1u || cap < 6u)
+		if (len != 1u || cap < 7u)
 			return status(out, DL_ST_BAD_ARG);
 		out[0] = DL_ST_OK;
 		out[1] = SAT_PROTOCOL_VERSION;
 		put16(out + 2u, SAT_MAX_RECORDS);
 		put16(out + 4u, satellite_store_count());
-		return 6u;
+		out[6] = SATELLITE_PROFILE_MAX;	// v8: frequency profiles the radio keeps
+		return 7u;
 	}
 	case DL_SAT_OP_LIST:
 		return satellite_list(req, len, out, cap);
@@ -237,6 +269,8 @@ size_t debuglink_cmd_satellite(const uint8_t *req, uint16_t len, uint8_t *out, s
 		out[0] = DL_ST_OK;
 		out[1] = (uint8_t)satellite_channels_sync_status();
 		return 2u;
+	case DL_SAT_OP_PROFILE_SET_CHUNK:
+		return satellite_profile_set_chunk(req, len, out);
 	default:
 		return status(out, DL_ST_BAD_ARG);
 	}
