@@ -14,7 +14,7 @@ Tracking needs three independent inputs:
 | Input | Requirements |
 |---|---|
 | Orbital elements | A valid, paired two-line element set (TLE) and its epoch. Reject malformed or incomplete sets. The element epoch and current UTC determine whether the prediction is usable. |
-| Observer location | Latitude, longitude and altitude from the selected position source. A missing or stale position stops pass and Doppler updates; fixed position is usable when selected. |
+| Observer location | Latitude, longitude and altitude from the selected position source; an unknown altitude counts as 0 m. A missing or stale position stops pass and Doppler updates; fixed position is usable when selected. |
 | Current time | Valid UTC. A local monotonic tick may schedule work but is not a substitute for UTC in orbit propagation. |
 
 Satellite calculations are pure, bounded work: they take a TLE, observer state and UTC instant, then return a result.
@@ -127,8 +127,8 @@ Reacquiring valid inputs may resume tracking only while the same satellite and f
 
 Tools > Satellite first predicts passes for every locally installed TLE using one current GPS position and UTC
 snapshot. The list is ordered by AOS, shows time to AOS in hours and minutes (`H:MM`) and maximum elevation, and
-reports prediction progress. Missing position, altitude or valid UTC leaves the list unavailable instead of using stale
-inputs. Its AOS countdown updates as time passes from the scan's UTC snapshot. The pass list shows the age of the oldest
+reports prediction progress. A missing position or valid UTC leaves the list unavailable instead of using stale
+inputs; a position without altitude counts as 0 m ([position.md](position.md)). Its AOS countdown updates as time passes from the scan's UTC snapshot. The pass list shows the age of the oldest
 stored TLE when UTC is available, updates it as time passes, and warns once per inventory generation when it reaches
 14 days. TLEs fetched together can have different epochs. When prediction completes with passes, the first pass is
 focused; returning from details preserves the selected row while the results remain available. Selecting a pass persists its record,

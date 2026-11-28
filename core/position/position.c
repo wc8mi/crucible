@@ -242,6 +242,11 @@ uint8_t position_fix_for_satellite(position_fix_t *out, uint32_t now_ms)
 		fixed_position(out, now_ms);
 		src = POSITION_SRC_FIXED;
 	}
+	// An unknown altitude counts as sea level here only: a few hundred meters move a LEO pass by seconds, and a fixed
+	// position typed by hand has none (docs/spec/satellite.md). What we send (DMR, LRRP, APRS) still says "none"
+	if (src != POSITION_SRC_NONE && out->alt_m == POSITION_ALT_NONE) {
+		out->alt_m = 0;
+	}
 	UNLOCK();
 	return src;
 }
