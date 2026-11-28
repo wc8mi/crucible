@@ -2294,7 +2294,7 @@ msgctxt "CHAN_LABEL_RATE"
 msgid "Rate"
 msgstr "速率"
 
-#: core/ui/ui_menus.c core/ui/ui_screens.c
+#: core/ui/ui_menus.c core/ui/ui_satellite.c core/ui/ui_screens.c
 msgctxt "WORD_RX_ONLY"
 msgid "RX only"
 msgstr "仅接收"
@@ -5355,6 +5355,11 @@ msgid "No callsign"
 msgstr "无呼号"
 
 #: core/ui/ui_screens.c
+msgctxt "HOME_CHIP_DMON"
+msgid "DMon"
+msgstr "数听"
+
+#: core/ui/ui_screens.c
 msgctxt "HOME_CHIP_BROADCAST_FM"
 msgid "Broadcast FM"
 msgstr "调频广播"
@@ -5723,11 +5728,6 @@ msgstr "漫游？"
 msgctxt "HOME_CHIP_ROAM"
 msgid "Roam"
 msgstr "漫游"
-
-#: core/ui/ui_screens.c
-msgctxt "HOME_CHIP_DMON"
-msgid "DMon"
-msgstr "数听"
 
 #: core/ui/ui_screens.c
 msgctxt "HOME_CHIP_PRIVACY"
