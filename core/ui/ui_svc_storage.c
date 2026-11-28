@@ -297,6 +297,12 @@ static __attribute__((noinline)) int32_t setting_get_flash(uint8_t id)
 		uint8_t squelch = SETTINGS_FIELD(squelch);
 		return squelch <= 9 ? squelch : ui_svc_ram_get(id);
 	}
+#if CONFIG_SATELLITE_TLE
+	case UI_SET_SAT_SQUELCH: {
+		uint8_t squelch = SETTINGS_FIELD(sat_squelch);
+		return squelch <= SETTINGS_SAT_SQUELCH_NORMAL ? squelch : SETTINGS_SAT_SQUELCH_OPEN;
+	}
+#endif
 #if CONFIG_RX_EXT
 	case UI_SET_RX_EXT:
 		return (SETTINGS_FIELD(cp_flags) & SETTINGS_CP_RX_EXT) != 0;
@@ -771,6 +777,16 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 		settings_end(hal_millis());
 		radio_req_reload();	// the default squelch is a preference the radio core reads on reload
 		return true;
+#if CONFIG_SATELLITE_TLE
+	case UI_SET_SAT_SQUELCH:
+		if (value < 0 || value > (int32_t)SETTINGS_SAT_SQUELCH_NORMAL)
+			return false;
+		st = settings_begin();
+		st->sat_squelch = (uint8_t)value;
+		settings_end(hal_millis());
+		radio_req_satellite_squelch((uint8_t)value);	// not a reload: that would end a tracking session
+		return true;
+#endif
 #if CONFIG_RX_EXT
 	case UI_SET_RX_EXT:
 		st = settings_begin();

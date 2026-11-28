@@ -1,5 +1,6 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 The RadioFoundry Authors -->
+<!-- Copyright (c) 2026 David Behnke -->
 
 # Satellite Tracking
 
@@ -113,6 +114,16 @@ The radio retains one pass at a time: the upcoming pass becomes current at AOS, 
 pass after LOS. A missing position, valid UTC, unavailable record or stale TLE leaves the session unavailable
 and does not apply a correction. The radio restores ordinary channel frequencies when tracking stops, the channel/VFO
 context changes, scan or hotspot mode starts, or required inputs become invalid.
+
+## Pass squelch
+
+While the satellite you track is up, from AOS to LOS, the radio's FM squelch is open by default, so you hear the whole
+pass without holding Monitor. Settings > Talk & listen > **Pass squelch** chooses: **Open**, a level from 1 to 9, or
+**Normal** (the radio's own squelch). If you change the squelch during a pass, your own level applies until that
+pass ends; the next pass starts on the setting again. Below the horizon and when tracking stops, the radio's own
+squelch is back.
+
+## Stop tracking
 
 Press **OK** again while the active satellite is selected, or leave its detail screen, to stop tracking and restore
 the previous channel or VFO settings; leaving the screen shows a "Tracking stopped" notice. Opening the TLE editor or

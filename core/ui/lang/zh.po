@@ -4295,6 +4295,11 @@ msgid "Default squelch"
 msgstr "默认静噪"
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_PASS_SQUELCH"
+msgid "Pass squelch"
+msgstr "过境静噪"
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_VFO_STEP"
 msgid "VFO step"
 msgstr "VFO 步进"
@@ -4773,6 +4778,16 @@ msgstr " 步"
 msgctxt "SIG_UNIT_STEPS"
 msgid " steps"
 msgstr " 步"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_VALUE_SQUELCH_OPEN"
+msgid "Open"
+msgstr "打开"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_VALUE_SQUELCH_NORMAL"
+msgid "Normal"
+msgstr "正常"
 
 #: core/ui/ui_menus.c
 msgctxt "NXDN_VALUE_ANY_RAN"

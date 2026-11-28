@@ -820,6 +820,8 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 		return false;
 	if (id == UI_SET_SCAN_HOLD_S && (value < 0 || value > (int32_t)RADIO_SCAN_HOLD_MAX_S))
 		return false;
+	if (id == UI_SET_SAT_SQUELCH && (value < 0 || value > (int32_t)SETTINGS_SAT_SQUELCH_NORMAL))
+		return false;
 #if CONFIG_NXDN
 	if (id >= UI_SET_NXDN_RATE && id <= UI_SET_NXDN_TG)
 		return sim_nxdn_default(id, value);
@@ -2920,6 +2922,7 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	sim_late[UI_SET_SCAN_DELAY_MS - UI_SET_RAM_COUNT] = RADIO_SCAN_DELAY_MS;	// the radio core's default
 	sim_late[UI_SET_SCAN_RESUME - UI_SET_RAM_COUNT] = SCAN_RESUME_CARRIER;		// its defaults too
 	sim_late[UI_SET_SCAN_HOLD_S - UI_SET_RAM_COUNT] = RADIO_SCAN_HOLD_S;
+	sim_late[UI_SET_SAT_SQUELCH - UI_SET_RAM_COUNT] = SETTINGS_SAT_SQUELCH_OPEN;	// Pass squelch: Open
 	ui_svc_ram_set(UI_SET_AGC_RX_AUTO, 1);	// Digital AGC: both switches On, as a new radio starts
 	ui_svc_ram_set(UI_SET_AGC_TX_AUTO, 1);
 	emergency_on = false;
@@ -3301,6 +3304,7 @@ static bool check(const char *kv, char *err, size_t len)
 		snprintf(got, sizeof got, "%u", (unsigned char)value[0] == 0x81);
 	}
 	else if (strcmp(key, "masterpower") == 0) snprintf(got, sizeof got, "%d", (int)ui_svc_setting_get(UI_SET_MASTER_POWER));
+	else if (strcmp(key, "satsquelch") == 0) snprintf(got, sizeof got, "%d", (int)ui_svc_setting_get(UI_SET_SAT_SQUELCH));
 	else if (strcmp(key, "power") == 0) snprintf(got, sizeof got, "%u", view.power);
 	else if (strcmp(key, "sq") == 0) snprintf(got, sizeof got, "%u", view.squelch);
 	else if (strcmp(key, "ts") == 0) snprintf(got, sizeof got, "%u", view.dmr.ts);

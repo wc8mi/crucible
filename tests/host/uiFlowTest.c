@@ -1507,6 +1507,21 @@ static const flow_t flows[] = {
 #if CONFIG_SATELLITE_TLE
 	{ "L save GPS without a fix", "ok 7 5 down down down down", "ok", "toast=No_current_GPS_fix focus=Save_GPS_position", 1, false },
 #endif
+#if CONFIG_SATELLITE_TLE
+	// Settings > Talk & listen > Pass squelch (satellite.md, Pass squelch): just above the last row, Default TX power
+#if CONFIG_TX_POWER_MENU
+#define PASS_SQUELCH_ROW	"ok 7 3 up up"
+#define PASS_SQUELCH_KEYS	5
+#else
+#define PASS_SQUELCH_ROW	"ok 7 3 up"
+#define PASS_SQUELCH_KEYS	4
+#endif
+	{ "S pass squelch row: Open", "", PASS_SQUELCH_ROW, "screen=group focus=Pass_squelch satsquelch=0",
+	  PASS_SQUELCH_KEYS, false },
+	{ "S pass squelch: a level", PASS_SQUELCH_ROW, "ok up ok", "focus=Pass_squelch satsquelch=1", 3, false },
+	{ "S pass squelch: Normal at the top", PASS_SQUELCH_ROW, "ok 1 0 ok", "focus=Pass_squelch satsquelch=10", 4,
+	  false },
+#endif
 	{ "L fixed position page", "ok 7 5 down down", "ok", "screen=fixed-pos", 1, false },
 	{ "L no fixed position yet", "ok 7 5 down down", "ok", "shows=Not_set", 1, false },
 	{ "L fixed position found by latitude", "", "5 2 8 4 8 8 3 3", "shows=Fixed_position", 8, false },

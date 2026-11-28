@@ -7473,6 +7473,12 @@ static const set_item_t s_talk[] = {
 	TOGGLE(TRN(SET_LABEL_P25_CONTACT_LOOKUP, "P25 contact lookup"), "DMR caller callsign name database",
 		UI_SET_P25_ID_LOOKUP),
 #endif
+#if CONFIG_SATELLITE_TLE
+	// The squelch while a tracked satellite is up: Open, a level, or Normal (the radio's own); satellite.md.
+	// Near the end, so the rows above keep their places (Default TX power stays the last)
+	NUMBER(TRN(SET_LABEL_PASS_SQUELCH, "Pass squelch"), "satellite AOS LOS open monitor", UI_SET_SAT_SQUELCH, 0,
+		SETTINGS_SAT_SQUELCH_NORMAL, 1, NULL),
+#endif
 #if CONFIG_TX_POWER_MENU
 	NUMBER(TRN(SET_LABEL_DEFAULT_TX_POWER, "Default TX power"), "transmit watt level", UI_SET_MASTER_POWER, -1, 0, 1, NULL),
 #endif
@@ -8116,6 +8122,14 @@ static void set_value_text(const set_item_t *s, int32_t v, char *out, size_t len
 #if CONFIG_REF_TRIM
 		if (s->id == UI_SET_REF_TRIM) {
 			sb_ppm(&b, v);
+			break;
+		}
+#endif
+#if CONFIG_SATELLITE_TLE
+		if (s->id == UI_SET_SAT_SQUELCH &&
+		    (v == SETTINGS_SAT_SQUELCH_OPEN || v == SETTINGS_SAT_SQUELCH_NORMAL)) {
+			sb_str(&b, v == SETTINGS_SAT_SQUELCH_OPEN ? TR(SET_VALUE_SQUELCH_OPEN, "Open") :
+				   TR(SET_VALUE_SQUELCH_NORMAL, "Normal"));
 			break;
 		}
 #endif
