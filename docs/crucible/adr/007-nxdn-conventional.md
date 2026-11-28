@@ -5,7 +5,7 @@
 
 | | |
 |---|---|
-| Status | Proposed |
+| Status | Accepted |
 | Date | 2026-11-28 |
 | Decides | Which of the DM32-nxdn-p25 fork's conventional NXDN changes Crucible takes, how they fit our stack, and in what order the work lands |
 
@@ -162,5 +162,6 @@ Each step is its own pull request. Each builds clean with `CONFIG_NXDN`, `CONFIG
 
 | Round | Verdict | Changes |
 |---|---|---|
+| 3 | Accepted | The owner accepted it (2026-11-28) |
 | 2 | Owner's answers | No quick selectors; P25 digital monitor added to (2) and the dual watch note in (3); no P25 or YSF lead-in. Open questions replaced by the answers |
 | 1 | Draft | First draft from a comparison with the fork at `4ebc641` |
