@@ -186,10 +186,11 @@ function targetPicker() {
 
 // The connected radio's firmware features (its probe), which say the channel modes it runs; null without a radio
 // The features the editor offers modes and systems for: the radio on the line's, else those of any radio the codeplug is
-// made for (a channel mode one of them has), else null (no radio: everything)
+// made for (a channel mode one of them has), else null (no radio: everything). A page whose radios are the only ones
+// it serves (data-targets="all") reads none picked as any of them, so it never offers a mode none of its radios runs
 function features() {
 	if (S.conn) return S.conn.probe?.features ?? "";
-	const on = madeFor();
+	const on = madeFor().length || root.dataset.targets !== "all" ? madeFor() : S.targets;
 	return on.length && on.every((x) => x.features) ? [...new Set(on.flatMap((x) => x.features))] : null;
 }
 
