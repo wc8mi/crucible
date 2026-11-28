@@ -19,7 +19,7 @@ upstream = "https://github.com/radiofoundry/radiofoundry"
 # for new features, the major (from 1.0.0) for a change that breaks settings or codeplugs. prerelease marks every
 # release a GitHub pre-release (a test release); set it false once a build is stable.
 [release]
-version = "0.1.0"
+version = "0.1.1"
 prerelease = true
 
 # The radios Crucible builds, releases, tests and documents: board ids (boards/<id>/). The other boards stay in the tree

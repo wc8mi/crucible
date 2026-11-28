@@ -96,8 +96,9 @@ def notes(pkg, project, since, subjects):
     lines += [f'Update with the Crucible flasher (radios that run RadioFoundry or Crucible): {project["flasher"]}',
               f'Usage and testing guide: {project["repo"]}/blob/main/{USAGE_GUIDE}',
               f'Help and bug reports: {project["issues"]} (not RadioFoundry).', '',
-              'Crucible is based on RadioFoundry (MIT) and is not affiliated with it. The ZIP keeps every license notice;',
-              'keep them when sharing it. No AMBE codec is included.']
+              'Crucible is GPL-3.0-or-later and builds on RadioFoundry (MIT; see LICENSE-MIT and CREDITS.md).',
+              'Crucible is not affiliated with RadioFoundry. The ZIP keeps every license notice; keep them when sharing it.',
+              'No AMBE codec is included.']
     return '\n'.join(lines) + '\n'
 
 
@@ -159,6 +160,7 @@ def self_test():
     assert text.startswith('Crucible v0.1.1: a test release.')
     assert '- Merge pull request #1 from o/x' in text and 'Changes since v0.1.0:' in text
     assert 'RadioFoundry fedcba98' in text and 'test release:' in text and 'not affiliated' in text
+    assert 'GPL-3.0-or-later' in text and 'LICENSE-MIT' in text
     Fake.tag, Fake.prerelease = 'v0.1.0', False
     text = notes(Fake(), project, None, [])
     assert text.startswith('Crucible v0.1.0.\n') and 'Changes since' not in text and 'test release' not in text
