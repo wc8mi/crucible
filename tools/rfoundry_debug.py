@@ -246,6 +246,7 @@ OP_NXDN = 43
 OP_YSF = 44
 P25_TALKAROUND = {"auto": 0, "on": 1, "off": 2}
 CHANNEL_MODES = {"fm": 0, "dmr": 1, "p25": 2, "nxdn": 3, "ysf": 4}
+YSF_VOICES = {"dn": 0, "vw": 1, "vd1": 2}  # ysf_cp_voice_t, RADIO op 44
 # The VFO's SFR role names (sfrRole_t, docs/spec/sfr.md 4): off, user, user of an ERDM repeater, repeater, ERDM style
 SFR_ROLES = {"off": 0, "user": 1, "user-erdm": 2, "rpt": 3, "rpt-erdm": 4}
 OP_PA_SWEEP = 39
@@ -1485,21 +1486,36 @@ class DebugLink:
         cur.update(kw)
         self.nxdn_settings(**cur)
 
-    def ysf_settings(self, tx_dgid=0, rx_dgid=0, bench=None):
+    def ysf_settings(self, tx_dgid=0, rx_dgid=0, bench=None, voice=None, narrow=None):
         """The YSF DG-IDs (RADIO op 44; debuglink.md 3.8; RAM only, the ysf view section shows them): sent and heard,
         0..99 each, rx_dgid 0 hears every DG-ID. bench: the soft modem's options off for an A/B (bit 0 equalizer,
-        bit 1 tone notch, bit 2 DCS remover), None to leave it. The callsign and the radio ID can't be set here (ysf.md 6)."""
-        if not (0 <= tx_dgid <= 99 and 0 <= rx_dgid <= 99) or (bench is not None and not 0 <= bench <= 7):
-            raise ValueError("ysf_settings: DG-IDs 0..99, bench 0..7")
+        bit 1 tone notch, bit 2 DCS remover), None to leave it. voice: the VFO's voice mode (0 DN, 1 VW, 2 V/D mode 1),
+        narrow: its deviation (False Wide, True Narrow), each None to leave it (RAM only; Settings stores them). The op
+        carries its fields in order, so a later one given sends the earlier ones: bench 0 (all on), and the voice mode
+        from the view. The callsign and the radio ID can't be set here (ysf.md 6)."""
+        if not (0 <= tx_dgid <= 99 and 0 <= rx_dgid <= 99) or (bench is not None and not 0 <= bench <= 7) or \
+                (voice is not None and voice not in (0, 1, 2)):
+            raise ValueError("ysf_settings: DG-IDs 0..99, bench 0..7, voice 0..2")
+        if narrow is not None and voice is None:
+            voice = int(self.view(["ysf"]).get("ysf.voice_mode", 0))
+        if voice is not None and bench is None:
+            bench = 0
         args = struct.pack("<BB", tx_dgid, rx_dgid) + (b"" if bench is None else struct.pack("<B", bench))
+        if voice is not None:
+            args += struct.pack("<B", voice) + (b"" if narrow is None else struct.pack("<B", 1 if narrow else 0))
         self.radio(OP_YSF, args)
 
     def ysf_settings_update(self, **kw):
-        """ysf_settings with the DG-IDs in force (the ysf view section) changed only where kw says."""
+        """ysf_settings with the DG-IDs in force (the ysf view section) changed only where kw says; a voice mode or
+        deviation given keeps the soft modem's options as they are."""
         v = self.view(["ysf"])
         if v.get("ysf.built") != "1":
             raise DebugLinkError("unavailable")
         cur = {"tx_dgid": int(v["ysf.tx_dgid"]), "rx_dgid": int(v["ysf.rx_dgid"])}
+        if ("voice" in kw or "narrow" in kw) and "bench" not in kw and "ysf.rx_bench_off" in v:
+            cur["bench"] = int(v["ysf.rx_bench_off"])
+        if "narrow" in kw and "voice" not in kw and "ysf.voice_mode" in v:
+            cur["voice"] = int(v["ysf.voice_mode"])
         cur.update(kw)
         self.ysf_settings(**cur)
 
@@ -2267,7 +2283,7 @@ def cmd_radio(link, a):
             else:
                 raise SystemExit(usage)
         link.nxdn_settings_update(**kw)
-    elif op == "ysf":                 # ysf [dgid=N] [tx_dgid=N] [rx_dgid=N]
+    elif op == "ysf":                 # ysf [dgid=N] [tx_dgid=N] [rx_dgid=N] [voice=dn|vw|vd1] [dev=wide|narrow]
         kw = {}
         for a in args:
             k, _, val = a.partition("=")
@@ -2279,8 +2295,13 @@ def cmd_radio(link, a):
                 bit = {"eq": 1, "tone": 2, "dcs": 4}[k]
                 kw.setdefault("bench", 0)
                 kw["bench"] = (kw["bench"] | bit) if val == "off" else (kw["bench"] & ~bit)
+            elif k == "voice" and val in YSF_VOICES:
+                kw["voice"] = YSF_VOICES[val]
+            elif k == "dev" and val in ("wide", "narrow"):
+                kw["narrow"] = val == "narrow"
             else:
-                raise SystemExit("ysf [dgid=N] [tx_dgid=N] [rx_dgid=N] [eq=on|off] [tone=on|off] [dcs=on|off]")
+                raise SystemExit("ysf [dgid=N] [tx_dgid=N] [rx_dgid=N] [eq=on|off] [tone=on|off] [dcs=on|off] "
+                                 "[voice=dn|vw|vd1] [dev=wide|narrow]")
         link.ysf_settings_update(**kw)
     elif op == "cc":                  # cc 0..15
         link.dmr_fields(cc=num(0))

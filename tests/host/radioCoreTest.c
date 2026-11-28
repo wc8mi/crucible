@@ -10523,6 +10523,39 @@ static void test_ysf_vw_path(void)
 
 // A VW channel: the IMBE path is home from the start, PTT sends VW from P25's encoder, a DN call heard takes the AMBE
 // path for its length and PTT waits for IMBE to come back
+// The debug link's YSF op (44) changes only what it carries: DG-IDs alone keep the VFO's voice mode and deviation (the
+// Settings row's), and the optional bytes set them
+static void test_ysf_dl_settings(void)
+{
+	radio_ysf_settings_t s;
+
+	setup_codeplug();
+	start();
+	radio_ysf_settings(&s);
+	s.voice = YSF_CP_VOICE_VD1;
+	s.narrow = true;
+	radio_req_ysf_settings(&s);
+	static const uint8_t dgids[] = { 12, 34 };
+	CHECK(debuglink_radio_feature_op(DL_OP_YSF, dgids, sizeof dgids) == DL_ST_OK);
+	radio_ysf_settings(&s);
+	CHECK(s.tx_dgid == 12 && s.rx_dgid == 34 && s.voice == YSF_CP_VOICE_VD1 && s.narrow);
+	static const uint8_t voice[] = { 12, 34, 0, YSF_CP_VOICE_DN };
+	CHECK(debuglink_radio_feature_op(DL_OP_YSF, voice, sizeof voice) == DL_ST_OK);
+	radio_ysf_settings(&s);
+	CHECK(s.voice == YSF_CP_VOICE_DN && s.narrow);
+	static const uint8_t both[] = { 0, 0, 0, YSF_CP_VOICE_VD1, 0 };
+	CHECK(debuglink_radio_feature_op(DL_OP_YSF, both, sizeof both) == DL_ST_OK);
+	radio_ysf_settings(&s);
+	CHECK(s.tx_dgid == 0 && s.voice == YSF_CP_VOICE_VD1 && !s.narrow);
+	static const uint8_t bad_voice[] = { 0, 0, 0, 3, 0 }, bad_narrow[] = { 0, 0, 0, 0, 2 };
+	CHECK(debuglink_radio_feature_op(DL_OP_YSF, bad_voice, sizeof bad_voice) == DL_ST_BAD_ARG);
+	CHECK(debuglink_radio_feature_op(DL_OP_YSF, bad_narrow, sizeof bad_narrow) == DL_ST_BAD_ARG);
+	radio_ysf_settings(&s);
+	CHECK(s.voice == YSF_CP_VOICE_VD1 && !s.narrow);
+	s.voice = YSF_CP_VOICE_DN;
+	radio_req_ysf_settings(&s);
+}
+
 static void test_ysf_vw_tx(void)
 {
 	radio_ysf_stats_t s0, s1;
@@ -13287,6 +13320,7 @@ int main(void)
 #if CONFIG_YSF_VW
 	test_ysf_vw_path();
 	test_ysf_vw_tx();
+	test_ysf_dl_settings();
 #endif
 #if CONFIG_SCAN && CONFIG_DUAL_WATCH
 	test_ysf_dual();

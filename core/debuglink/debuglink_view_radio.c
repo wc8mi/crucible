@@ -520,12 +520,24 @@ uint8_t debuglink_radio_feature_op(uint8_t op, const uint8_t *a, uint16_t len)
 		// The YSF settings (radio_ysf_settings_t, RAM only; docs/spec/debuglink.md 3.8): u8 tx_dgid, u8 rx_dgid
 		// (0..99; rx 0 hears every DG-ID), optionally u8 bench: the soft modem's options turned off for an A/B
 		// (bit 0 the equalizer, bit 1 the tone notch, bit 2 the DCS remover; ysf.md 5.4). The callsign and the
-		// radio ID are not settable: the codeplug and the MCU give them (docs/spec/ysf.md 6)
-		if (len < 2 || a[0] > RADIO_YSF_DGID_MAX || a[1] > RADIO_YSF_DGID_MAX || (len >= 3 && (a[2] & 0xF8u) != 0)) {
+		// radio ID are not settable: the codeplug and the MCU give them (docs/spec/ysf.md 6). Then optionally u8 voice
+		// (ysf_cp_voice_t: 0 DN, 1 VW, 2 V/D mode 1) and u8 narrow (0 Wide, 1 Narrow), the VFO's as in Settings but RAM
+		// only; left out, they stay as they are
+		if (len < 2 || a[0] > RADIO_YSF_DGID_MAX || a[1] > RADIO_YSF_DGID_MAX || (len >= 3 && (a[2] & 0xF8u) != 0) ||
+		    (len >= 4 && a[3] > 2u) || (len >= 5 && a[4] > 1u)) {
 			return DL_ST_BAD_ARG;
 		}
 #if CONFIG_YSF
-		radio_ysf_settings_t y = { .tx_dgid = a[0], .rx_dgid = a[1] };
+		radio_ysf_settings_t y;
+		radio_ysf_settings(&y);
+		y.tx_dgid = a[0];
+		y.rx_dgid = a[1];
+		y.temp_chan = 0;	// the DG-IDs given are in force at once: a quick DG-ID on a channel goes
+		y.temp_dgid = 0;
+		if (len >= 4)
+			y.voice = a[3];
+		if (len >= 5)
+			y.narrow = a[4] != 0;
 #if CONFIG_AIR_RX_ADAPT
 		if (len >= 3)
 			air_softmodem_adapt_off = a[2];	// (without the options there is nothing to turn off)
