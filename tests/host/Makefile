@@ -879,8 +879,9 @@ beepReel: beepReel.c beep_names.awk $(UIDEPS) $(BEEP_DIR)/beep.c $(BEEP_DIR)/bee
 	$(CC) -I$(BEEPINC) $(UIFLAGS) -o $@ beepReel.c $(UIAPP) $(BEEP_DIR)/beep.c -lz
 
 # The highlight colors the gallery shows its color pages in: the list in .github/workflows/ui-gallery.yml, so the
-# committed gallery and a pull request's before / after pictures show the same colors
-UI_GALLERY_COLORS ?= $(shell sed -n 's/^ *UI_GALLERY_COLORS: *"\([^"]*\)".*/\1/p' $(ROOT)/.github/workflows/ui-gallery.yml)
+# committed gallery and a pull request's before / after pictures show the same colors. Without the workflow file
+# (Crucible deletes it), its list as last kept, so the gallery keeps its color pages
+UI_GALLERY_COLORS ?= $(or $(shell sed -n 's/^ *UI_GALLERY_COLORS: *"\([^"]*\)".*/\1/p' $(ROOT)/.github/workflows/ui-gallery.yml 2>/dev/null),red yellow light_blue)
 
 ui-gallery: uiSim uiSimParrot
 	rm -rf $(ROOT)/docs/ux/screens/*/
