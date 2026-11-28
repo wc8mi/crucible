@@ -4293,11 +4293,6 @@ msgid "Default squelch"
 msgstr "Squelch predet."
 
 #: core/ui/ui_menus.c
-msgctxt "SET_LABEL_PASS_SQUELCH"
-msgid "Pass squelch"
-msgstr "Squelch en paso"
-
-#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_VFO_STEP"
 msgid "VFO step"
 msgstr "Paso VFO"
@@ -4426,6 +4421,11 @@ msgstr "Entrada mic"
 msgctxt "SET_LABEL_P25_CONTACT_LOOKUP"
 msgid "P25 contact lookup"
 msgstr "Consulta de contactos P25"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_PASS_SQUELCH"
+msgid "Pass squelch"
+msgstr "Squelch en paso"
 
 #: core/ui/ui_menus.c
 msgctxt "SET_LABEL_PRIVACY_KEY_TYPE"

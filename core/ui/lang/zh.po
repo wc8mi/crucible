@@ -4295,11 +4295,6 @@ msgid "Default squelch"
 msgstr "默认静噪"
 
 #: core/ui/ui_menus.c
-msgctxt "SET_LABEL_PASS_SQUELCH"
-msgid "Pass squelch"
-msgstr "过境静噪"
-
-#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_VFO_STEP"
 msgid "VFO step"
 msgstr "VFO 步进"
@@ -4428,6 +4423,11 @@ msgstr "麦克风输入"
 msgctxt "SET_LABEL_P25_CONTACT_LOOKUP"
 msgid "P25 contact lookup"
 msgstr "P25 联系人查询"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_LABEL_PASS_SQUELCH"
+msgid "Pass squelch"
+msgstr "过境静噪"
 
 #: core/ui/ui_menus.c
 msgctxt "SET_LABEL_PRIVACY_KEY_TYPE"
