@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // YSF (C4FM) voice, DN mode (docs/spec/ysf.md): the frame and its channels, the framer's table for the
 // mode, and a voice call on top of them.
 //
@@ -92,6 +93,16 @@ int ysf_dch_get(const uint8_t *hard, const int8_t *soft, ysf_fec_work_t *w, uint
 // repeated bits whose copies disagreed (0..27)
 void ysf_vch_put(uint8_t *frame, uint8_t n, const uint8_t bits[AMBE_PARAM_BITS]);
 int ysf_vch_get(const uint8_t *hard, const int8_t *soft, uint8_t n, uint8_t bits[AMBE_PARAM_BITS]);
+// V/D mode 1 (ysf.md 3.5): the DCH (20 bytes, its content by the FICH's FN) and VCH n = 0..4, each the DMR side's
+// 72-bit AMBE+2 frame as it is (ambeFecDecode reads it)
+void ysf_vd1_dch_put(uint8_t *frame, const uint8_t in[YSF_CSD_BYTES]);
+int ysf_vd1_dch_get(const uint8_t *hard, const int8_t *soft, ysf_fec_work_t *w, uint8_t out[YSF_CSD_BYTES]);
+void ysf_vd1_vch_put(uint8_t *frame, uint8_t n, const uint8_t v[AMBE_FRAME_BYTES]);
+void ysf_vd1_vch_get(const uint8_t *hard, uint8_t n, uint8_t v[AMBE_FRAME_BYTES]);
+// VW sub-header (ysf.md 3.5, FN 0 and FT 1 of a VW call): its DCH (CSD3). Its two VCH and every VCH of the frames after
+// it are ysf_vw.h's
+void ysf_vw_dch_put(uint8_t *frame, const uint8_t in[YSF_CSD_BYTES]);
+int ysf_vw_dch_get(const uint8_t *hard, const int8_t *soft, ysf_fec_work_t *w, uint8_t out[YSF_CSD_BYTES]);
 
 // The parts of the codec, for tests and tools
 uint8_t ysf_pn(uint16_t i);				// the whitening sequence's bit i
