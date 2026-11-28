@@ -782,17 +782,18 @@ released; then 20 polls held in a row (2 s at the 100 ms poll) mean off. A short
 
 ### 5.6 Time of day
 
-RadioFoundry keeps no wall clock. `hal_time.h` gives only time since start-up, and that is what every record uses: the crash
-log's `uptime_ms`, messages (`ui_msg_t.age_ms`), call history and the APRS station list ("14m ago"). Nothing on the screen shows a time of day, so a
-radio never shows a made-up one after power-on.
+Records keep no wall clock. `hal_time.h` gives only time since start-up, and that is what every record uses: the crash
+log's `uptime_ms`, messages (`ui_msg_t.age_ms`), call history and the APRS station list ("14m ago"). Only the Date & time screen shows a time of day, and only once a
+source set it, so a radio never shows a made-up one after power-on.
 
-The only time of day is the UTC time a GPS or host NMEA fix carries. It travels with that position into DMR GPS and
-LRRP reports. A fixed position carries none, and the reports leave the time out (`utc_hms` 0xFFFFFFFF, date 0).
+The UTC time a GPS or host NMEA fix carries travels with that position into DMR GPS and LRRP reports. A fixed
+position carries none, and the reports leave the time out (`utc_hms` 0xFFFFFFFF, date 0).
 
 Some radios have a real-time clock, and some keep it running through power-off. `board.toml` `[hardware] clock`
 records which, with its source (`backed`, `unbacked`, `none`, or `unknown`), and the feature matrix and the site show
-it. A clock driver arrives behind a hardware switch (`CONFIG_RTC`, `hardware` in `tests/hil/features.toml`). Until GPS,
-the network or the user sets it, the radio shows "no time", and records keep using uptime or mark the time unknown.
+it. The UTC clock (`CONFIG_CLOCK`, [clock.md](clock.md)) keeps UTC for satellite prediction only: from a fix, the
+computer, the Date & time screen, or at start-up from the board's RTC (`rtc_get`). Until one of them sets it, the pass
+list says "No time", and records keep using uptime or mark the time unknown.
 
 ### 5.7 LEDs
 

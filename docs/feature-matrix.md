@@ -98,6 +98,7 @@ is `tools/bringup.py list --radio <id>`.
 | `vibrate` | off | ✕ | not recorded | ✕ | ✕ | ✕ | ✕ | ✕ |
 | `gps` | pass (seed) | not recorded | ✕ | not recorded | not recorded | not recorded | not recorded | ✕ |
 | `satellite_tle` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
+| `clock` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
 | `gps_icon` | not recorded | not recorded | ✕ | not recorded | not recorded | not recorded | not recorded | ✕ |
 | `position` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run |
 | `dmr_data_rx` | not recorded | pass (seed) | pass (seed) | not recorded | not recorded | not recorded | pass, needs re-run | pass, needs re-run |
@@ -208,7 +209,7 @@ has the part it needs (`board.toml` `[hardware] unconfirmed`). The rule:
 that needs hardware some radios lack (`hardware` in `tests/hil/features.toml`) is never ○. The last two rows are not
 switches. Voltage reading: what the radio measures, its battery, its DC input (Supply) or none (`board_volts()` in
 `hal/board.h`). Clock: whether the radio's real-time clock keeps time through power-off (`board.toml` `[hardware]
-clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](spec/radio-features.md) 5.6).
+clock`; ? = not known yet). The UTC clock (`CLOCK`) reads it on boards that give `rtc_get` ([clock.md](spec/clock.md)).
 
 <!-- generated: tools/boards.py docs feature-defaults; edit config/features.mk and boards/*/config.mk -->
 | Feature switch | DM-32UV | DM-1701 | DM-1801 Pro | DB25-D PRO | MD-380 | MD-UV380 | MD-9600 | RT10 |
@@ -314,6 +315,7 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | `APRS_IGATE` | ● | ○ | ● | … | … | ○ | ● | ● |
 | `GPS_SKY` | ● | ● | ✕ | ● | ● | ● | ● | ✕ |
 | `SATELLITE_TLE` | ● | ● | ● | ● | ● | ● | ● | ● |
+| `CLOCK` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `KEY_ASSIGN` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `TX_POWER_MENU` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `CHANNEL_LIST` | ● | ● | ● | ● | ● | ● | ● | ✕ |
@@ -489,6 +491,7 @@ The MD-UV380, MD-9600 and DB25-D PRO were not measured.
 | Settings menu on the radio | `UI_SETTINGS` | 13,984 | 11,000 |  |
 | Diagnostics page | `DIAG` | 4,216 | 4,556 |  |
 | Satellite TLE catalog, pass prediction and Doppler compensation | `SATELLITE_TLE` | 28,184 | 27,724 | Needs `DEBUGLINK`. RAM: 1,280 B on DM-1701 (656 B linked, 624 B from the existing heap), 1,272 B on MD-380 (648 B linked, 624 B heap), and 1,264 B on DM-32UV (656 B linked, 608 B heap). Heap figures include allocation overhead and are already reserved in linked RAM. The DM-1701 and MD-UV380 maximal builds keep it on; the MD-9600 maximal build leaves it off to fit app flash. Default builds keep it on ([satellite.md](spec/satellite.md)). |
+| UTC clock for satellite prediction without a GPS fix: Date & time screen, the board's real-time clock, the TLE push setting the time | `CLOCK` | 3,660 | 3,632 | Needs `SATELLITE_TLE` and `POSITION`; on by default with both. RAM: 92 B on DM-1701, 56 B on MD-380 (figures from this branch, not ci.sh) ([clock.md](spec/clock.md)). |
 | Support info on About and the debug link (build source, chips, image hash) | `SUPPORT_INFO` | 3,016 | 2,572 | About 515 bytes of RAM, most of it About's longer text. Read only when About opens or a host asks ([support-info.md](spec/support-info.md)) |
 | Backlight test pages | `BACKLIGHT_TEST` | 1,320* | 1,196* | Off by default; bench work ([backlight-curve.md](testing/backlight-curve.md)) |
 | Color screen settings (theme, highlight color, filled status bar) | `UI_COLOR` | 1,088 | 1,040 | Off on the DM-1801 Pro (monochrome screen) |
