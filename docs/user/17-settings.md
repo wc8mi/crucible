@@ -115,6 +115,24 @@ If the firmware was built without privacy, the Privacy row is dimmed and OK on i
 | Fixed position | Latitude, Longitude | Not set | A position you type in, for a radio without GPS or one that stays in place ([how to type it](13-aprs.md#position)) | Works |
 | Save GPS position | Action | | Save the current GPS fix as the fixed-position fallback. Requires a fresh fix | GPS builds |
 | Send in DMR calls | On, Off | Off | Put your position into your DMR voice calls ([DMR](09-dmr.md#position-in-calls)) | Works |
+| Date & time | UTC date, UTC time | Not set | The clock satellite prediction uses. A GPS or computer fix sets it; type it here when neither has. See Date & time below | Satellite builds |
+
+#### Date & time
+
+The radio keeps one UTC clock. A GPS fix or a computer's NMEA sets it, and so does a time you type here. The last one
+set wins, so a typed time holds until the next fix. The **Source** row says where the time came from and how long ago
+(GPS, Computer, Typed or RTC). On radios with a real-time clock the time is saved there and comes back after a restart.
+
+| Key | In the editor |
+|---|---|
+| **OK** | Open the row; then the next field; on the last field, save |
+| Long **OK** | Save at once |
+| Digits | Type the field. It moves on when full |
+| Up / Down, knob | Step the field |
+| **Back** | Take back a digit, then go to the field before, then leave unchanged |
+
+Type UTC, not local time. Saving the date keeps the clock's time of day; saving the time keeps its date. Years 2020 to
+2099 are accepted.
 
 #### Position
 

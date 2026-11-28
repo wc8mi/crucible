@@ -267,9 +267,12 @@ bool satellite_service_scan_request(satellite_service_t *service, bool enabled, 
 	int64_t utc_s;
 #if CONFIG_POSITION
 	uint8_t source = position_fix_for_satellite(&fix, now_ms);
-	if (source == POSITION_SRC_NONE || fix.alt_m == POSITION_ALT_NONE || !satellite_utc_now(&utc_s, now_ms)) {
+	bool have_time = satellite_utc_now(&utc_s, now_ms);
+	if (source == POSITION_SRC_NONE || fix.alt_m == POSITION_ALT_NONE || !have_time) {
+		// Which one is missing, so the pass list can open the screen that sets it
 		lock();
-		service->scan_status = SATELLITE_SERVICE_SCAN_UNAVAILABLE;
+		service->scan_status = source == POSITION_SRC_NONE || fix.alt_m == POSITION_ALT_NONE ?
+			SATELLITE_SERVICE_SCAN_NO_POSITION : SATELLITE_SERVICE_SCAN_NO_TIME;
 		unlock();
 		return stopped_tracking;
 	}
@@ -277,7 +280,7 @@ bool satellite_service_scan_request(satellite_service_t *service, bool enabled, 
 	(void)fix;
 	(void)utc_s;
 	lock();
-	service->scan_status = SATELLITE_SERVICE_SCAN_UNAVAILABLE;
+	service->scan_status = SATELLITE_SERVICE_SCAN_NO_POSITION;
 	unlock();
 	return stopped_tracking;
 #endif

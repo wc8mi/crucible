@@ -74,11 +74,13 @@ TLE available while entering it.
 ## Track a satellite
 
 Open **OK**, **6** (Tools), then choose **Satellite**. The radio uses the selected position source for coordinates
-and altitude, and fresh GPS or computer NMEA for UTC, to predict passes for the installed TLEs. A saved fixed position
-can therefore provide the observer location while the GPS is acquiring its first fix, once the receiver provides
-current date and time. A fixed position typed without altitude counts as sea level, which is close enough for pass
-times. Computer fixes and UTC do not survive a restart: send fresh NMEA again, including altitude and
-date/time. The list is ordered by time to AOS and shows each pass's maximum elevation. When prediction finishes, the
+and altitude, and the radio's UTC clock for the time, to predict passes for the installed TLEs. A GPS or computer fix
+sets the clock, or you type it in Settings > Location > **Date & time** ([Settings](17-settings.md#date--time)), so a
+radio indoors without a fix can still predict passes from a fixed position and a typed time. A fixed position typed
+without altitude counts as sea level, which is close enough for pass times. When something is missing, the list says
+**No position: set it** or **No time: set it**; **OK** on that row opens Fixed position or Date & time, and the list
+fills in once you come back. Computer fixes do not survive a restart. The clock does on radios with a real-time
+clock. The list is ordered by time to AOS and shows each pass's maximum elevation. When prediction finishes, the
 first pass is highlighted. Up and Down select a pass; **OK** opens its details and starts tracking. The selected
 satellite is remembered across power cycles.
 The firmware image contains no TLEs. Load selected records into the radio's flash store from the site's Satellite TLE

@@ -1129,6 +1129,76 @@ msgctxt "HINT_OK_CHOOSE_BACK"
 msgid "OK choose  Back"
 msgstr "OK 选  返回"
 
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_SRC_GPS"
+msgid "GPS"
+msgstr "GPS"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_SRC_COMPUTER"
+msgid "Computer"
+msgstr "电脑"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_SRC_TYPED"
+msgid "Typed"
+msgstr "输入"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_SRC_RTC"
+msgid "RTC"
+msgstr "RTC"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_LABEL_DATE"
+msgid "UTC date"
+msgstr "UTC 日期"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_LABEL_TIME"
+msgid "UTC time"
+msgstr "UTC 时间"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_LABEL_SOURCE"
+msgid "Source"
+msgstr "来源"
+
+#: core/ui/ui_clock.c core/ui/ui_menus.c core/ui/ui_position.c core/ui/ui_rooms.c
+msgctxt "VALUE_NOT_SET"
+msgid "Not set"
+msgstr "未设置"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_TOAST_REFUSED"
+msgid "Time not set"
+msgstr "时间未设置"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_TOAST_SET"
+msgid "Time set"
+msgstr "时间已设置"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_TOAST_YEAR"
+msgid "Year 2020 to 2099"
+msgstr "2020 至 2099"
+
+#: core/ui/ui_clock.c
+msgctxt "CLOCK_TOAST_RANGE"
+msgid "Out of range"
+msgstr "超出范围"
+
+#: core/ui/ui_clock.c core/ui/ui_menus.c
+msgctxt "SET_LABEL_DATE_TIME"
+msgid "Date & time"
+msgstr "日期和时间"
+
+#: core/ui/ui_clock.c core/ui/ui_menus.c core/ui/ui_position.c
+msgctxt "HINT_OK_CHANGE_BACK"
+msgid "OK change  Back"
+msgstr "OK 改  返回"
+
 #: core/ui/ui_dual.c core/ui/ui_screens.c
 msgctxt "HOME_CHIP_AIR_BAND_AM"
 msgid "Air Band AM"
@@ -3089,11 +3159,6 @@ msgctxt "MYID_LABEL_DMR_ID"
 msgid "DMR ID"
 msgstr "DMR ID"
 
-#: core/ui/ui_menus.c core/ui/ui_position.c core/ui/ui_rooms.c
-msgctxt "VALUE_NOT_SET"
-msgid "Not set"
-msgstr "未设置"
-
 #: core/ui/ui_menus.c
 msgctxt "MYID_LABEL_YSF_CALLSIGN"
 msgid "YSF callsign"
@@ -4844,11 +4909,6 @@ msgctxt "SET_BODY_NXDN_DEFAULT"
 msgid "For the VFO and channels in NXDN for now. Stored NXDN channels keep their own."
 msgstr "用于 VFO 和临时切换到 NXDN 的信道。已保存的 NXDN 信道保留其设置。"
 
-#: core/ui/ui_menus.c core/ui/ui_position.c
-msgctxt "HINT_OK_CHANGE_BACK"
-msgid "OK change  Back"
-msgstr "OK 改  返回"
-
 #: core/ui/ui_menus.c
 msgctxt "RESET_ROW_KEEP"
 msgid "No, keep settings"
@@ -5203,6 +5263,16 @@ msgstr "无TLE：请从网站加载"
 msgctxt "SATELLITE_TLE_AGE"
 msgid "TLE age"
 msgstr "TLE天数"
+
+#: core/ui/ui_satellite.c
+msgctxt "SATELLITE_NO_POSITION"
+msgid "No position: set it"
+msgstr "无位置：请设置"
+
+#: core/ui/ui_satellite.c
+msgctxt "SATELLITE_NO_TIME"
+msgid "No time: set it"
+msgstr "无时间：请设置"
 
 #: core/ui/ui_satellite.c
 msgctxt "GPS_TIME_UNAVAILABLE"

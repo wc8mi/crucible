@@ -85,6 +85,9 @@
 #include "audio/rx_agc.h"
 #if CONFIG_SATELLITE_TLE
 #include "satellite/store.h"
+#if CONFIG_CLOCK
+#include "clock/clock.h"
+#endif
 #endif
 // The board is changed at run time here (display, key map): this file defines it writable, the UI sees it const
 #define board board_as_declared
@@ -2503,6 +2506,7 @@ static bool sim_satellite_path_pending;
 static bool sim_satellite_los_pending;
 static bool sim_satellite_future_pass;
 static bool sim_satellite_empty;
+static uint8_t sim_satellite_missing;	// RADIO_SAT_SCAN_NO_POSITION / _NO_TIME: what the scan lacks (0: nothing)
 static uint16_t sim_satellite_tle_age_days;
 static uint32_t sim_satellite_test_id_offset;
 static const char *const sim_satellite_names[] = { "ISS", "NOAA 19", "SO-50", "AO-91", "AO-123" };
@@ -2625,8 +2629,44 @@ bool ui_svc_satellite_scan(bool enabled)
 
 void ui_svc_satellite_poll(void) { }
 
+#if CONFIG_CLOCK
+// The clock (ui_svc.h): unset until "clockgps" or the Date & time screen sets it; its age stands still
+static int64_t sim_clock_utc;
+static uint8_t sim_clock_src;
+bool ui_svc_clock_now(int64_t *utc_s, uint8_t *src, uint32_t *age_s)
+{
+	if (sim_clock_src == CLOCK_SRC_NONE)
+		return false;
+	if (utc_s != NULL) *utc_s = sim_clock_utc;
+	if (src != NULL) *src = sim_clock_src;
+	if (age_s != NULL) *age_s = sim_clock_src == CLOCK_SRC_GPS ? 180u : 0u;
+	return true;
+}
+
+bool ui_svc_clock_set(int64_t utc_s)
+{
+	if (utc_s < 1577836800)	// 2020-01-01, as the clock refuses
+		return false;
+	sim_clock_utc = utc_s;
+	sim_clock_src = CLOCK_SRC_MANUAL;
+	return true;
+}
+#endif
+
 void ui_svc_satellite_scan_state(uint8_t *status, uint8_t *completed, uint8_t *total, uint8_t *passes)
 {
+	uint8_t missing = sim_satellite_missing;
+#if CONFIG_CLOCK
+	if (missing == RADIO_SAT_SCAN_NO_TIME && sim_clock_src != CLOCK_SRC_NONE)
+		missing = 0;	// the next scan finds the time
+#endif
+	if (status != NULL && missing != 0u) {
+		*status = missing;
+		if (completed != NULL) *completed = 0u;
+		if (total != NULL) *total = ui_svc_satellite_count();
+		if (passes != NULL) *passes = 0u;
+		return;
+	}
 	if (status != NULL) *status = sim_satellite_predicting ? RADIO_SAT_SCAN_RUNNING : RADIO_SAT_SCAN_COMPLETE;
 	if (completed != NULL) *completed = sim_satellite_predicting ? 2u : ui_svc_satellite_count();
 	if (total != NULL) *total = ui_svc_satellite_count();
@@ -2933,7 +2973,12 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	sim_satellite_los_pending = false;
 	sim_satellite_future_pass = false;
 	sim_satellite_empty = false;
+	sim_satellite_missing = 0;
 	sim_satellite_tle_age_days = 1u;
+#if CONFIG_CLOCK
+	sim_clock_utc = 0;
+	sim_clock_src = CLOCK_SRC_NONE;
+#endif
 	memset(&satellite_view, 0, sizeof satellite_view);
 #endif
 	vfo_mode = RADIO_MODE_FM;	// a fresh VFO
@@ -4383,6 +4428,21 @@ static bool run_token(char *t, char *err, size_t len)
 		advance(200);
 		return true;
 	}
+	if (strcmp(t, "satnopos") == 0) {	// no GPS fix and no fixed position
+		sim_satellite_missing = RADIO_SAT_SCAN_NO_POSITION;
+		return true;
+	}
+	if (strcmp(t, "satnotime") == 0) {	// the clock is not set
+		sim_satellite_missing = RADIO_SAT_SCAN_NO_TIME;
+		return true;
+	}
+#if CONFIG_CLOCK
+	if (strcmp(t, "clockgps") == 0) {	// a GPS fix set the clock to 2026-11-27 13:05:09 UTC, 3 minutes ago
+		sim_clock_utc = 1795784709;
+		sim_clock_src = CLOCK_SRC_GPS;
+		return true;
+	}
+#endif
 	if (strcmp(t, "satnopasses") == 0) {
 		sim_satellite_no_passes = true;
 		return true;

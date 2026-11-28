@@ -2,6 +2,7 @@
 // Copyright (c) 2026 The RadioFoundry Authors
 // The UI's Position screen over core/position (ui_svc.h): the board GPS, whatever else is built. Without CONFIG_GPS
 // the weak stand-ins answer "no GPS" (ui_svc_stub.c)
+// The UTC clock's shims (CONFIG_CLOCK) are at the end: the clock needs no GPS
 #include "config.h"
 #if CONFIG_GPS
 #include "ui_svc.h"
@@ -60,4 +61,25 @@ bool ui_svc_gps_sat(uint8_t i, ui_gps_sat_t *out)
 	return true;
 }
 #endif
+#endif
+
+#if CONFIG_CLOCK
+// The UTC clock (ui_svc.h) for the Date & time screen and the pass list: core/clock takes its own lock
+#include "clock/clock.h"
+#include "hal_time.h"
+
+bool ui_svc_clock_now(int64_t *utc_s, uint8_t *src, uint32_t *age_s)
+{
+	uint32_t now = hal_millis();
+	if (!clock_now(utc_s, src, now))
+		return false;
+	if (age_s != NULL)
+		*age_s = clock_age_s(now);
+	return true;
+}
+
+bool ui_svc_clock_set(int64_t utc_s)
+{
+	return clock_set(utc_s, CLOCK_SRC_MANUAL, hal_millis());
+}
 #endif

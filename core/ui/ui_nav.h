@@ -46,6 +46,9 @@ typedef enum {
 	SCR_SATELLITE_PASSES,		// Tools > Satellite: predict and select the next installed-TLE passes
 	SCR_SATELLITE,			// selected satellite: live pass details and tracking controls
 	SCR_SATELLITE_TEXT,		// one 69-character TLE line
+#if CONFIG_CLOCK
+	SCR_CLOCK,			// Settings > Location > Date & time: the UTC clock (ui_clock.c)
+#endif
 	SCR_SIG_CHAIN,			// Settings > Signaling tones: one event's five steps (arg = sig_event_t)
 #if CONFIG_P25_PARROT
 	SCR_P25_PARROT,
@@ -90,6 +93,9 @@ typedef struct {
 #if CONFIG_SATELLITE_TLE
 void ui_menus_satellite_text(char *target, uint8_t line, void (*done)(void));
 void ui_satellite_passes_tick(void);
+#endif
+#if CONFIG_CLOCK
+void ui_clock_tick(uint32_t now_ms);
 #endif
 
 // A filtered list's raw row and its label (NULL: empty); false stops the pass

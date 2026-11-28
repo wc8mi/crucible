@@ -247,8 +247,14 @@ static void test_scan_cache_and_summary(void)
 	time_available = false;
 	CHECK(!satellite_service_scan_request(&service, true, 1000u, NULL));
 	satellite_service_scan_state(&service, &status, &completed, &total, &passes, &start_utc_s, &start_ms);
-	CHECK(status == SATELLITE_SERVICE_SCAN_UNAVAILABLE && total == 1u);
+	CHECK(status == SATELLITE_SERVICE_SCAN_NO_POSITION && total == 1u);	// the position is named first
 	CHECK(list_reads == 0u && summary_reads == 1u);
+	// A position without a time says the time is missing, so the pass list opens Date & time
+	fix_available = true;
+	CHECK(!satellite_service_scan_request(&service, true, 1100u, NULL));
+	satellite_service_scan_state(&service, &status, &completed, &total, &passes, &start_utc_s, &start_ms);
+	CHECK(status == SATELLITE_SERVICE_SCAN_NO_TIME && total == 1u);
+	fix_available = false;
 	satellite_record_brief_t summary;
 	CHECK(satellite_service_summary(&service, 0u, &summary));
 	CHECK(strcmp(summary.name, "ISS") == 0);

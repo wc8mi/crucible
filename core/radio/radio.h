@@ -18,6 +18,8 @@ typedef enum {
 	RADIO_SAT_SCAN_RUNNING,
 	RADIO_SAT_SCAN_COMPLETE,
 	RADIO_SAT_SCAN_UNAVAILABLE,
+	RADIO_SAT_SCAN_NO_POSITION,
+	RADIO_SAT_SCAN_NO_TIME,
 } radio_satellite_scan_status_t;
 typedef struct {
 	uint8_t record_index;

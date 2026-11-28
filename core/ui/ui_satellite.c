@@ -8,6 +8,7 @@
 #include "settings/settings.h"
 #include "fmt.h"
 #include "i18n.h"
+#include "hal_time.h"
 
 #if CONFIG_SATELLITE_TLE
 #include "satellite/tracking.h"
@@ -438,7 +439,21 @@ void ui_satellite_passes_tick(void)
 		return;
 	uint8_t status, total, passes;
 	ui_svc_satellite_scan_state(&status, NULL, &total, &passes);
-	if (status == RADIO_SAT_SCAN_COMPLETE && total != 0u && passes != 0u) {
+	bool missing = status == RADIO_SAT_SCAN_NO_POSITION || status == RADIO_SAT_SCAN_NO_TIME;
+	if (missing && total != 0u) {
+		// The row that opens the missing setting is picked. Ask again now and then, so the list fills in once the
+		// position or clock is set (a GPS fix arrives, or the user comes back from setting one)
+		static uint32_t asked_ms;
+		uint32_t now_ms = hal_millis();
+		if (now_ms - asked_ms >= 2000u) {
+			asked_ms = now_ms;
+			ui_svc_satellite_scan(true);
+		}
+		if (frame->focus != 1u) {
+			frame->focus = 1u;
+			ui_dirty();
+		}
+	} else if (status == RADIO_SAT_SCAN_COMPLETE && total != 0u && passes != 0u) {
 		if (frame->focus == 0u) {
 			frame->focus = 1u;
 			ui_dirty();
@@ -493,7 +508,13 @@ static void satellite_pass_item(uint16_t row_index, ui_item_t *item)
 	ui_svc_satellite_scan_state(&status, &completed, &total, &passes);
 	if (status != RADIO_SAT_SCAN_COMPLETE) {
 		item->flags = UI_ITEM_INFO;
-		if (status == RADIO_SAT_SCAN_UNAVAILABLE) {
+		if (status == RADIO_SAT_SCAN_NO_POSITION) {
+			item->flags = 0;	// OK opens Fixed position
+			str_copy(item->label, sizeof(item->label), TR(SATELLITE_NO_POSITION, "No position: set it"));
+		} else if (status == RADIO_SAT_SCAN_NO_TIME) {
+			item->flags = 0;	// OK opens Date & time
+			str_copy(item->label, sizeof(item->label), TR(SATELLITE_NO_TIME, "No time: set it"));
+		} else if (status == RADIO_SAT_SCAN_UNAVAILABLE) {
 			str_copy(item->label, sizeof(item->label), TR(GPS_TIME_UNAVAILABLE, "GPS/time unavailable"));
 		} else {
 			str_copy(item->label, sizeof(item->label), TR(PREDICTING_PASSES_2, "Predicting passes"));
@@ -541,6 +562,18 @@ static void satellite_pass_select(uint16_t row_index, bool hold)
 		return;
 	uint8_t status, passes;
 	ui_svc_satellite_scan_state(&status, NULL, NULL, &passes);
+#if CONFIG_POSITION
+	if (status == RADIO_SAT_SCAN_NO_POSITION) {
+		ui_push(SCR_FIXED_POS, 0);
+		return;
+	}
+#endif
+#if CONFIG_CLOCK
+	if (status == RADIO_SAT_SCAN_NO_TIME) {
+		ui_push(SCR_CLOCK, 0);
+		return;
+	}
+#endif
 	if (status != RADIO_SAT_SCAN_COMPLETE || passes == 0u || row_index > passes)
 		return;
 	radio_satellite_pass_t pass;

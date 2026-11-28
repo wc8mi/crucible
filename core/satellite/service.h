@@ -15,7 +15,9 @@ typedef enum {
 	SATELLITE_SERVICE_SCAN_IDLE,
 	SATELLITE_SERVICE_SCAN_RUNNING,
 	SATELLITE_SERVICE_SCAN_COMPLETE,
-	SATELLITE_SERVICE_SCAN_UNAVAILABLE,
+	SATELLITE_SERVICE_SCAN_UNAVAILABLE,	// the TLE store could not be read
+	SATELLITE_SERVICE_SCAN_NO_POSITION,	// no GPS fix and no fixed position
+	SATELLITE_SERVICE_SCAN_NO_TIME,		// the clock is not set (docs/spec/clock.md)
 } satellite_service_scan_status_t;
 
 typedef struct {
