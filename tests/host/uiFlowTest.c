@@ -338,6 +338,14 @@ static const flow_t flows[] = {
 	{ "W Rooms: the next page", "dlmode:ysf quick 3 down down down down down down ok wxrooms:3", "down down down ok", "wxcmd=3 wxarg=4", 4, false },
 	{ "E YSF DG-ID: saved with the channel", "ysf ok 5 ok down down ok down ok 4 2 ok", "long:ok",
 	  "screen=channel writes=1 shows=42", 1, true },
+	// Under the DG-ID, the deviation (Wide, Narrow) and the voice mode (DN, VW where the build sends it, V/D mode 1;
+	// this build has no VW): OK steps each, both go with the channel (ADR 005 6)
+	{ "E YSF deviation: Wide, OK makes it Narrow", "ysf ok 5 ok down down ok down down", "ok",
+	  "focus=Deviation shows=Narrow hides=Wide", 1, false },
+	{ "E YSF voice mode: DN, OK steps past VW to V/D mode 1", "ysf ok 5 ok down down ok down down down", "ok",
+	  "focus=Voice_mode shows=V/D_mode_1", 1, false },
+	{ "E YSF voice mode and deviation: saved with the channel", "ysf ok 5 ok down down ok down down ok down ok",
+	  "long:ok", "screen=channel writes=1 shows=Narrow shows=V/D_mode_1", 1, true },
 #endif
 #if CONFIG_P25
 	// P25 on Home: what PTT calls on the talk line, the NAC in the chips, the caller while a call comes in
@@ -1208,6 +1216,17 @@ static const flow_t flows[] = {
 	{ "S NXDN default talkgroup: past 65519 refused", "nxdn " TL_AGC_RX " up ok up ok", "6 5 5 2 0 ok",
 	  "toast=Not_changed:_1_to_65519", 6, false },
 	{ "S NXDN default without NXDN on the radio", TL_AGC_RX " up", "ok", "screen=group toast=Not_on_this_radio", 1,
+	  false },
+#endif
+#if CONFIG_YSF
+	// The VFO in YSF, a page under the row above NXDN's (or Digital AGC RX's): DN, Wide (ADR 005 6)
+	{ "S YSF VFO page", "ysf " TL_AGC_RX TL_NXDN " up", "ok",
+	  "screen=group focus=Voice_mode shows=For_the_VFO shows=DN shows=Wide", 1, false },
+	{ "S YSF VFO voice mode: V/D mode 1", "ysf " TL_AGC_RX TL_NXDN " up ok", "ok", "focus=Voice_mode shows=V/D_mode_1",
+	  1, false },
+	{ "S YSF VFO deviation: Narrow", "ysf " TL_AGC_RX TL_NXDN " up ok down", "ok", "focus=Deviation shows=Narrow", 1,
+	  false },
+	{ "S YSF VFO without YSF on the radio", TL_AGC_RX TL_NXDN " up", "ok", "screen=group toast=Not_on_this_radio", 1,
 	  false },
 #endif
 #endif

@@ -186,7 +186,7 @@ static int8_t mic_input_in_range(int8_t v) { return v >= HAL_MIC_INPUT_MIN && v 
 // Crucible release that kept mic_input at 399: it comes across and the APRS mark reads none yet
 static void nxdn_block_check(settings_t *s, size_t bytes)
 {
-	if (bytes < offsetof(settings_t, nxdn_reserved) + sizeof s->nxdn_reserved ||
+	if (bytes < offsetof(settings_t, ysf_vfo) + sizeof s->ysf_vfo ||
 	    s->nxdn_marker != SETTINGS_NXDN_MARKER) {
 		int8_t mic = 0;
 		if (bytes > UPSTREAM_BYTES) {
@@ -199,9 +199,12 @@ static void nxdn_block_check(settings_t *s, size_t bytes)
 		s->nxdn_tx_ran = SETTINGS_NXDN_TX_RAN;
 		s->nxdn_tg = SETTINGS_NXDN_TG;
 		s->mic_input = mic_input_in_range(mic);
-		memset(s->nxdn_reserved, 0, sizeof s->nxdn_reserved);
+		s->ysf_vfo = 0;
 		return;
 	}
+	s->ysf_vfo &= SETTINGS_YSF_VOICE | SETTINGS_YSF_NARROW;
+	if ((s->ysf_vfo & SETTINGS_YSF_VOICE) == SETTINGS_YSF_VOICE)
+		s->ysf_vfo &= (uint8_t)~SETTINGS_YSF_VOICE;	// 3 is no mode: DN
 	s->nxdn_flags &= SETTINGS_NXDN_9600;
 	if (s->nxdn_rx_ran > SETTINGS_NXDN_RAN_MAX)
 		s->nxdn_rx_ran = 0;

@@ -295,7 +295,9 @@ typedef struct {
 	// sits here rather than in a byte upstream may take: a Crucible release kept it at 399, now aprs_cp_freq, and a
 	// record longer than upstream's 412 bytes without this marker has it read from there at load (ADR 004)
 	int8_t mic_input;
-	uint8_t nxdn_reserved[1];	// 0; later Crucible fields
+	// The VFO in YSF (ADR 005 6): SETTINGS_YSF_*, the voice mode and deviation the VFO and a channel in YSF for now
+	// run on (radio_ysf_init seeds the radio core with it). Was nxdn_reserved[0], which every release wrote 0: DN Wide
+	uint8_t ysf_vfo;
 } settings_t;
 #define SETTINGS_AGC_MARKER	0xA6u
 #define SETTINGS_AGC_RX_MANUAL	0x01u	// Digital AGC RX is Off: each mode's RX AGC row is in force
@@ -307,6 +309,8 @@ typedef struct {
 #define SETTINGS_NXDN_TG	1u
 #define SETTINGS_NXDN_TG_MAX	65519u	// a group ID; the IDs above are special (NXDN TS 1-B) ...
 #define SETTINGS_NXDN_TG_ALL	0xFFFFu	// ... but all groups (NXDN_ID_ALL)
+#define SETTINGS_YSF_VOICE	0x03u	// ysf_vfo: the voice mode, a ysf_cp_voice_t (0 DN, 1 VW, 2 V/D mode 1; 3 reads DN)
+#define SETTINGS_YSF_NARROW	0x04u	// ysf_vfo: half deviation
 
 // Pages: settings_t is stored as records of SETTINGS_PAGE_BYTES each (settings-store.md 2.1). Only the pages its size
 // needs are written, each with its own length, so settings_t grows by appending fields; the record's page field

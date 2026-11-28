@@ -545,6 +545,9 @@ typedef enum {
 	// Scan: the resume mode (scan_resume_t: 0 time, 1 carrier, 2 stop) and time mode's hold, s (0 to
 	// RADIO_SCAN_HOLD_MAX_S); radio_settings_t.scan_resume and scan_hold_s, CONFIG_SCAN. Appended like the ones above
 	UI_SET_SCAN_RESUME, UI_SET_SCAN_HOLD_S,
+	// The VFO in YSF (CONFIG_YSF; ADR 005 6): the voice mode (ysf_cp_voice_t: 0 DN, 1 VW, 2 V/D mode 1) and Narrow
+	// (1: half deviation) the VFO and a channel in YSF for now run on. Stored, and to the radio at once. Appended
+	UI_SET_YSF_VOICE, UI_SET_YSF_NARROW,
 	UI_SET_COUNT
 } ui_setting_t;
 
