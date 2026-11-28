@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2026 lyra XE1POC
 // Copyright (c) 2026 David Behnke
-// YSF VW voice channel (ysf_vw.h). The interleave table is from the DM32-nxdn-p25 fork's ysf_voice.c, which gives it as
+// YSF VW voice channel (ysf_vw.h). The interleave table is from lyra XE1POC's GPL fork's ysf_voice.c, which gives it as
 // MMDVMHost's AMBEFEC::regenerateIMBE and DSD-FME's fr_interleave permutation (CREDITS.md).
 #include "ysf_vw.h"
 
