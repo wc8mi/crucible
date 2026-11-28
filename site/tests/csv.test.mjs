@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The codeplug editor's CSV tables (static/js/codeplug/csv.js): parsing, export and import round trips on cpsSim's
 // populated codeplug, matching rows to existing records, references by name, partial files and problems.
 
@@ -12,6 +13,7 @@ import { CodeplugImage, CODEPLUG_SPAN } from "../static/js/codeplug/image.js";
 import { decode, encode, empty, newChannel, newContact } from "../static/js/codeplug/model.js";
 import { channelAddr } from "../static/js/codeplug/records.js";
 import { parse, stringify, detect, exportTable, importTable, exportAll, importAll, ORDER } from "../static/js/codeplug/csv.js";
+import { setKind, newSystem } from "../static/js/codeplug/channelmodes.js";
 
 const DIR = process.env.RFOUNDRY_SITE_FIXTURES || "build/site-tests";
 const sim = () => decode(CodeplugImage.from(new Uint8Array(readFileSync(join(DIR, "codeplug_sim.bin"))).slice(0, CODEPLUG_SPAN)));
@@ -178,4 +180,97 @@ test("a CSV TX timeout rounds up to the 15 s steps the record stores (#924)", ()
 	const img = encode(m);
 	assert.equal(img.bytes[channelAddr(1) + 0x1B], 7);
 	assert.deepEqual(decode(img).channels.map((c) => c.tot), [105, 3825, 15, 0]);
+});
+
+// --- Channel modes (P25, NXDN, YSF and the trunked kinds) ---
+
+// A codeplug with a channel of each kind a file can make, and a trunked one
+function kinds() {
+	const m = empty();
+	const add = (name, kind, hz, params = null) => {
+		const c = newChannel({ name, rxHz: hz, txHz: hz });
+		m.channels.push(c);
+		if (kind) setKind(m, c, kind);
+		if (params) Object.assign(c.params, params);
+		return c;
+	};
+	add("FM", 0, 146520000);
+	add("YSF VW", 103, 145587500, { txDgid: 12, rxDgid: 0, voice: "vw", narrow: true });
+	add("YSF VD1", 103, 438500000, { txDgid: 0, rxDgid: 40, voice: "vd1", narrow: false });
+	add("P25", 2, 441000000);
+	add("NXDN", 4, 441100000);
+	m.systems.push(newSystem(m, 1, "Site"));
+	add("T3", 1, 851012500);
+	m.channels.forEach((c, i) => { c.number = i + 1; });
+	m.channels[2].tagTx = false;	// receive only, as the channel form sets it
+	return m;
+}
+const row = (text, name) => {
+	const rows = parse(text);
+	const r = rows.find((x) => x[rows[0].indexOf("Name")] === name);
+	return Object.fromEntries(rows[0].map((h, i) => [h, r[i]]));
+};
+
+test("a channel's mode is its kind in a file, with its YSF fields, and RX Only as the channel form shows it", () => {
+	const text = exportTable(kinds(), "channels");
+	assert.deepEqual(["FM", "YSF VW", "YSF VD1", "P25", "NXDN", "T3"].map((n) => row(text, n).Mode), ["FM", "YSF", "YSF", "P25", "NXDN", "T3"]);
+	const vw = row(text, "YSF VW");
+	assert.deepEqual([vw["YSF TX DG-ID"], vw["YSF RX DG-ID"], vw["YSF Voice Mode"], vw["YSF Deviation"], vw["RX Only"]], ["12", "0", "VW", "Narrow", "No"]);
+	const vd1 = row(text, "YSF VD1");
+	assert.deepEqual([vd1["YSF Voice Mode"], vd1["YSF Deviation"], vd1["RX Only"]], ["V/D 1", "Wide", "Yes"]);
+	assert.equal(row(text, "FM")["YSF Voice Mode"], "", "other channels leave the YSF columns blank");
+});
+
+test("channels of every kind read back from their file unchanged, into the same codeplug and into a blank one", () => {
+	const m = kinds();
+	const text = exportTable(m, "channels");
+	const view = (x) => x.channels.map((c) => [c.name, c.kind || 0, c.mode, c.kind ? !c.tagTx : c.rxOnly, c.kind === 103 ? { ...c.params } : null]);
+	const before = view(m);
+	const same = importTable(m, text);
+	assert.deepEqual(same.problems, []);
+	assert.deepEqual(view(m), before);
+	// a blank codeplug has no system for the trunked channel: it is left out, with its reason; the rest arrive whole
+	const blank = empty();
+	const r = importTable(blank, text);
+	assert.deepEqual(r.problems.map((p) => [p.row, p.column, p.code]), [[7, "Mode", "mode_system"]]);
+	assert.deepEqual(view(blank).filter(([n]) => n !== "T3"), before.filter(([n]) => n !== "T3"));
+	// and the image holds them: encoded and decoded, the YSF block is the editor's
+	const back = decode(encode(blank));
+	assert.deepEqual(back.channels.filter((c) => c.kind === 103).map((c) => c.params),
+		[{ txDgid: 12, rxDgid: 0, voice: "vw", narrow: true }, { txDgid: 0, rxDgid: 40, voice: "vd1", narrow: false }]);
+});
+
+test("a YSF file from another tool: its column names, C4FM, the YSF fields before Mode", () => {
+	const m = empty();
+	const r = importTable(m, "Channel Name,YSF DT,Deviation,DG-ID,RX DG-ID,Channel Mode,RX Frequency,TX Frequency\n" +
+		"Room,VW,Narrow,22,22,C4FM,439.5,439.5\nLocal,2,Wide,0,0,C4FM,145.6,145.6\nOld,V/D mode 1,W,,,YSF,438.1,438.1\n");
+	assert.deepEqual(r.problems, []);
+	assert.deepEqual(m.channels.map((c) => [c.name, c.kind, c.params]), [
+		["Room", 103, { txDgid: 22, rxDgid: 22, voice: "vw", narrow: true }],
+		["Local", 103, { txDgid: 0, rxDgid: 0, voice: "dn", narrow: false }],
+		["Old", 103, { txDgid: 0, rxDgid: 0, voice: "vd1", narrow: false }],
+	]);
+	assert.ok(m.channels.every((c) => c.tagTx), "a channel from a file transmits unless RX Only says otherwise");
+});
+
+test("YSF values a channel can't take are problems naming row and column; the row is kept", () => {
+	const m = empty();
+	const r = importTable(m, "Name,Mode,RX Frequency,YSF Voice Mode,YSF Deviation,YSF TX DG-ID\n" +
+		"A,FM,146.52,VW,,\nB,YSF,145.6,Turbo,Medium,100\n");
+	assert.deepEqual(r.problems.map((p) => [p.row, p.column, p.code, !!p.skipped]), [
+		[2, "YSF Voice Mode", "not_ysf", false],
+		[3, "YSF Voice Mode", "bad_value", false],
+		[3, "YSF Deviation", "bad_value", false],
+		[3, "YSF TX DG-ID", "range", false],
+	]);
+	assert.deepEqual(m.channels.map((c) => [c.name, c.kind || 0]), [["A", 0], ["B", 103]]);
+	assert.deepEqual(m.channels[1].params, { txDgid: 0, rxDgid: 0, voice: "dn", narrow: false }, "bad cells leave the defaults");
+	// a channel made plain by its file drops its kind; a bad Mode word lists what a file can make
+	const k = kinds();
+	const plain = importTable(k, "Number,Name,Mode\n2,YSF VW,FM\n", "channels");
+	assert.deepEqual(plain.problems, []);
+	assert.equal(k.channels.find((c) => c.name === "YSF VW").kind, 0);
+	const bad = importTable(empty(), "Name,Mode,RX Frequency\nX,D-Star,145.6\n").problems[0];
+	assert.equal(bad.code, "bad_value");
+	assert.match(bad.params.allowed, /^FM, DMR, P25, NXDN, YSF/);
 });

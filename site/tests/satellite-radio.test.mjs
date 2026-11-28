@@ -170,6 +170,21 @@ test("rejects ten profiles on protocol-v5 before starting a transaction", async 
 	assert.deepEqual(link.calls.map((call) => call[0]), [0]);
 });
 
+test("listen-only or six-digit satellites need protocol v8; a listen-only uplink skips the band check", async () => {
+	const listen = { ...profile, tx_hz: 0, tx_tone_tenths: 0 };
+	for (const [records, profiles] of [[[record], [listen]],
+		[[{ ...record, catalog_id: 101102 }], [{ ...profile, catalog_id: 101102 }]]]) {
+		const link = new FakeLink(7, records, profiles);
+		await assert.rejects(() => pushSatelliteBundle(link, { schema_version: 3, records, profiles }),
+			{ translationKey: "tools.satellite.status.wide_version" });
+		assert.deepEqual(link.calls.map((call) => call[0]), [0]);
+	}
+	const link = new FakeLink(8, [record], [listen]);
+	link.bands = "136000000-174000000";	// RX only on this band: no uplink to check
+	await pushSatelliteBundle(link, { schema_version: 3, records: [record], profiles: [listen] });
+	assert.deepEqual(link.profiles, [listen]);
+});
+
 test("rejects older firmware before starting a transaction", async () => {
 	const link = new FakeLink(4);
 	await assert.rejects(() => pushSatelliteBundle(link, bundle), /protocol version 5/);
