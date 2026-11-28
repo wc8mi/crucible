@@ -4,6 +4,7 @@
 #include <string.h>
 #include "position/position.h"
 #include "satellite/service.h"
+#include "clock/clock.h"
 
 static int failures, checks;
 static bool fix_available, time_available, record_available, summary_available;
@@ -115,13 +116,15 @@ uint8_t position_fix_for_satellite(position_fix_t *out, uint32_t now_ms)
 	return POSITION_SRC_FIXED;
 }
 
-bool position_utc_fields(uint32_t *date_ddmmyy, uint32_t *utc_hms, uint32_t now_ms)
+// The clock (core/clock) the service reads its UTC from: 2000-06-27 18:50:19
+bool clock_now(int64_t *utc_s, uint8_t *src, uint32_t now_ms)
 {
 	(void)now_ms;
-	if (!time_available || date_ddmmyy == NULL || utc_hms == NULL)
+	if (!time_available)
 		return false;
-	*date_ddmmyy = 270600u;
-	*utc_hms = 185019u;
+	CHECK(satellite_utc_from_fields(270600u, 185019u, utc_s));
+	if (src != NULL)
+		*src = CLOCK_SRC_GPS;
 	return true;
 }
 

@@ -4,6 +4,10 @@
 #include <string.h>
 #include "satellite/store.h"
 #include "satellite/tracking.h"
+#include "clock/utc.h"
+#if CONFIG_CLOCK
+#include "clock/clock.h"
+#endif
 
 #define TRACKING_UPDATE_MS 1000u
 #define SATELLITE_OBSERVER_POSITION_TOLERANCE_E7 32000
@@ -11,11 +15,6 @@
 
 _Static_assert(sizeof(satellite_tracking_workspace_t) >= sizeof(satellite_record_t),
 	       "satellite tracking workspace must hold a catalog record");
-
-static bool leap_year(uint32_t year)
-{
-	return year % 4u == 0u && (year % 100u != 0u || year % 400u == 0u);
-}
 
 static bool observer_moved(const satellite_pass_search_t *search, const position_fix_t *fix)
 {
@@ -32,30 +31,22 @@ static bool observer_moved(const satellite_pass_search_t *search, const position
 
 bool satellite_utc_from_fields(uint32_t date_ddmmyy, uint32_t utc_hms, int64_t *utc_s)
 {
-	if (utc_s == NULL || date_ddmmyy > 999999u || utc_hms > 999999u)
-		return false;
-	uint32_t day = date_ddmmyy / 10000u;
-	uint32_t month = date_ddmmyy / 100u % 100u;
-	uint32_t short_year = date_ddmmyy % 100u;
-	uint32_t year = short_year >= 80u ? 1900u + short_year : 2000u + short_year;
-	uint32_t hour = utc_hms / 10000u;
-	uint32_t minute = utc_hms / 100u % 100u;
-	uint32_t second = utc_hms % 100u;
-	static const uint8_t month_days[] = { 31u, 28u, 31u, 30u, 31u, 30u,
-					      31u, 31u, 30u, 31u, 30u, 31u };
-	if (month == 0u || month > 12u || day == 0u || hour > 23u || minute > 59u || second > 59u)
-		return false;
-	uint32_t month_day_limit = month_days[month - 1u] + (month == 2u && leap_year(year) ? 1u : 0u);
-	if (day > month_day_limit)
-		return false;
-	int64_t days = 0;
-	for (uint32_t y = 1970u; y < year; y++)
-		days += leap_year(y) ? 366 : 365;
-	for (uint32_t m = 1u; m < month; m++)
-		days += month_days[m - 1u] + (m == 2u && leap_year(year) ? 1u : 0u);
-	days += day - 1u;
-	*utc_s = days * 86400 + (int64_t)hour * 3600 + (int64_t)minute * 60 + second;
-	return true;
+	return utc_s != NULL && utc_from_nmea(date_ddmmyy, utc_hms, utc_s);
+}
+
+bool satellite_utc_now(int64_t *utc_s, uint32_t now_ms)
+{
+#if CONFIG_CLOCK
+	return clock_now(utc_s, NULL, now_ms);
+#elif CONFIG_POSITION
+	uint32_t date_ddmmyy, utc_hms;
+	return position_utc_fields(&date_ddmmyy, &utc_hms, now_ms) &&
+	       satellite_utc_from_fields(date_ddmmyy, utc_hms, utc_s);
+#else
+	(void)utc_s;
+	(void)now_ms;
+	return false;
+#endif
 }
 
 bool satellite_tle_age_days(uint32_t epoch, int64_t utc_s, uint16_t *age_days)
@@ -213,10 +204,8 @@ satellite_tracking_status_t satellite_tracking_tick(satellite_tracking_t *tracki
 #if CONFIG_POSITION
 	position_fix_t fix;
 	uint8_t source = position_fix_for_satellite(&fix, now_ms);
-	uint32_t date_ddmmyy, utc_hms;
 	int64_t utc_s;
-	if (source == POSITION_SRC_NONE || !position_utc_fields(&date_ddmmyy, &utc_hms, now_ms) ||
-	    !satellite_utc_from_fields(date_ddmmyy, utc_hms, &utc_s))
+	if (source == POSITION_SRC_NONE || !satellite_utc_now(&utc_s, now_ms))
 		return satellite_tracking_update(tracking, NULL, POSITION_SRC_NONE, -1, now_ms, tuning_step_hz);
 	return satellite_tracking_update(tracking, &fix, source, utc_s, now_ms, tuning_step_hz);
 #else

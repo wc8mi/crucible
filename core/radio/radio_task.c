@@ -35,6 +35,9 @@
 #if CONFIG_SATELLITE_TLE
 #include "satellite/service.h"
 #endif
+#if CONFIG_CLOCK
+#include "clock/clock.h"
+#endif
 #if CONFIG_ZONE_WRITE
 #include "codeplug/zone_edit.h"
 #endif
@@ -270,6 +273,9 @@ static void satellite_run(uint32_t now_ms)
 static void radio_task(void *arg)
 {
 	(void)arg;
+#if CONFIG_CLOCK
+	clock_init(hal_millis());
+#endif
 #if CONFIG_SATELLITE_TLE
 	satellite_service_init(satellite_service);
 #endif
@@ -369,6 +375,9 @@ static void radio_task(void *arg)
 				next_tick = now + tick_period;	// a wake's tick counts as the next one
 			}
 		}
+		#if CONFIG_CLOCK
+		clock_tick(hal_millis());
+		#endif
 		#if CONFIG_SATELLITE_TLE
 		satellite_run(hal_millis());
 		#endif
@@ -416,6 +425,9 @@ void radio_core_start(void)
 #endif
 #if CONFIG_POSITION
 	position_set_lock(copy_lock, copy_unlock);
+#endif
+#if CONFIG_CLOCK
+	clock_set_lock(copy_lock, copy_unlock);
 #endif
 #if CONFIG_DMR_DATA_CORE
 	dmrDataServiceSetLock(data_lock, data_unlock);

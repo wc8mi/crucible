@@ -264,13 +264,10 @@ bool satellite_service_scan_request(satellite_service_t *service, bool enabled, 
 	unlock();
 
 	position_fix_t fix;
-	uint32_t date_ddmmyy, utc_hms;
 	int64_t utc_s;
 #if CONFIG_POSITION
 	uint8_t source = position_fix_for_satellite(&fix, now_ms);
-	if (source == POSITION_SRC_NONE || fix.alt_m == POSITION_ALT_NONE ||
-	    !position_utc_fields(&date_ddmmyy, &utc_hms, now_ms) ||
-	    !satellite_utc_from_fields(date_ddmmyy, utc_hms, &utc_s)) {
+	if (source == POSITION_SRC_NONE || fix.alt_m == POSITION_ALT_NONE || !satellite_utc_now(&utc_s, now_ms)) {
 		lock();
 		service->scan_status = SATELLITE_SERVICE_SCAN_UNAVAILABLE;
 		unlock();
@@ -278,8 +275,6 @@ bool satellite_service_scan_request(satellite_service_t *service, bool enabled, 
 	}
 #else
 	(void)fix;
-	(void)date_ddmmyy;
-	(void)utc_hms;
 	(void)utc_s;
 	lock();
 	service->scan_status = SATELLITE_SERVICE_SCAN_UNAVAILABLE;

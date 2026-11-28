@@ -6,6 +6,10 @@
 #include "position/position.h"
 #include "position/nmea.h"
 #include "board.h"
+#if CONFIG_CLOCK
+#include "clock/clock.h"
+#include "clock/utc.h"
+#endif
 
 typedef struct {
 	bool valid;
@@ -419,6 +423,14 @@ void position_nmea(const char *s, size_t n, bool gps, uint32_t now_ms)
 		}
 	}
 	UNLOCK();
+#if CONFIG_CLOCK
+	// The clock takes a receiver's time only with a fix (RMC status A): before one it may send its own unsynced
+	// time, a week-rollover date or GPS time without the leap seconds. Outside the lock: the clock has its own
+	int64_t utc_s;
+	if (x.kind == NMEA_RMC && x.fix && x.date_valid && x.utc_valid && utc_from_nmea(x.date, x.utc_hms, &utc_s)) {
+		(void)clock_set(utc_s, gps ? CLOCK_SRC_GPS : CLOCK_SRC_HOST, now_ms);
+	}
+#endif
 }
 #endif
 
