@@ -82,6 +82,10 @@ function radioReads(sim, flash) {
 		for (const m of r.stdout.matchAll(/^channel (\d+) "([^"]*)" rx (\d+) tx (\d+) mode (\d+) bw \d+ power (\d+)/gm)) {
 			out[m[1]] = { name: m[2], rx: Number(m[3]), tx: Number(m[4]), mode: Number(m[5]), power: Number(m[6]) };
 		}
+		// a YSF channel's block as the radio's own codec reads it (ysf_chan_load)
+		for (const m of r.stdout.matchAll(/^ysf (\d+) txdgid (\d+) rxdgid (\d+) voice (\d+) narrow (\d+)/gm)) {
+			out[m[1]].ysf = { txDgid: Number(m[2]), rxDgid: Number(m[3]), voice: ["dn", "vw", "vd1"][Number(m[4])], narrow: m[5] === "1" };
+		}
 		return out;
 	} finally {
 		rmSync(d, { recursive: true, force: true });
@@ -127,6 +131,8 @@ function everyRadio() {
 		m.channels.push(c);
 		setKind(m, c, kind);
 	}
+	// the YSF channel away from every default: DG-IDs both ways, VW, Narrow (byte 2, ADR 005 6)
+	Object.assign(m.channels.at(-1).params, { txDgid: 12, rxDgid: 40, voice: "vw", narrow: true });
 	m.channels.forEach((c, i) => { c.number = i + 1; });
 	m.zones.push({ number: 1, name: "Everything", channels: m.channels.slice(0, 16) });
 	syncModes(m);
@@ -137,7 +143,7 @@ function everyRadio() {
 // keeps them, keepIdentity)
 const summary = (m) => ({
 	channels: m.channels.map((c) => [c.number, c.name, c.rxHz, c.txHz, c.mode, c.kind || 0, c.power, c.rxOnly, c.contact?.name ?? null,
-		c.rxList?.name ?? null, c.txTone || ""]),
+		c.rxList?.name ?? null, c.txTone || "", c.kind === 103 ? c.params : null]),
 	contacts: m.contacts.map((c) => [c.name, c.id, c.type, c.timeslot]),
 	zones: m.zones.map((z) => [z.name, z.channels.map((c) => c.name)]),
 });
@@ -182,6 +188,7 @@ for (const sim of sims) {
 			assert.deepEqual([got.name, got.rx, got.tx], [c.name, c.rxHz, c.txHz], `${c.name}: name and frequencies`);
 			const want = powerOn(target, c.power, c.txHz);
 			assert.equal(got.power, c.power ? want.level : DEFAULT, `${c.name}: power byte ${c.power} on ${sim.key}`);
+			if (c.kind === 103) assert.deepEqual(got.ysf, c.params, `${c.name}: the YSF block the radio reads`);
 		}
 
 		// read back by the editor from the radio as it is now
