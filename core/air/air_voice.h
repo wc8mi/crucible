@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The part every air-framed voice engine shares (NXDN, YSF): the session, the call in hand and whether it plays, the
 // view the radio core reads, and transmit: voice frames from the encoder into the protocol's call layer, silence when
 // the encoder falls behind, its symbols into the session. The protocol keeps what differs: its call layer, which calls
@@ -12,7 +13,7 @@
 #include <stdint.h>
 #include "air_session.h"
 
-#define AIR_VOICE_FRAME_MAX	9	// the largest voice frame a protocol hands on (DMR's 72-bit AMBE+2 frame)
+#define AIR_VOICE_FRAME_MAX	11	// the largest voice frame a protocol hands on (an IMBE frame, 88 bits: YSF VW)
 
 // The protocol's engine as tx_fill drives it. Its air_voice_t is the engine's first member, so eng (the engine) and
 // the air_voice_t are one address; tx: its transmit call layer state. A const table: nothing of it costs RAM

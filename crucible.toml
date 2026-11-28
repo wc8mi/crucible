@@ -31,7 +31,7 @@ boards = ["db25d", "dm1701", "dm32", "md9600", "mduv380"]
 # configurations: each switch here built off, so a release can drop it cleanly. Every other switch keeps its default and
 # is never built off: upstream's CI covers those. Host tests all run.
 [ci]
-matrix = ["P25", "NXDN", "YSF", "DMR_IP_GATEWAY", "USB_NETWORK", "APRS", "SATELLITE_TLE"]
+matrix = ["P25", "NXDN", "YSF", "YSF_VW", "DMR_IP_GATEWAY", "USB_NETWORK", "APRS", "SATELLITE_TLE"]
 # Best effort: features upstream maintains that Crucible ships but doesn't test on its radios. Their host tests run;
 # a failure is a warning in the release notes, not a blocker on its own (CRUCIBLE.md, "Releases")
 best_effort = ["DMR_IP_GATEWAY", "USB_NETWORK", "SATELLITE_TLE"]
