@@ -140,7 +140,7 @@ function renderOptions() {
 	for (const record of matching) {
 		const satellite = profileById.get(record.catalog_id);
 		const row = document.createElement("div");
-		row.className = "tle-profile";
+		row.className = satellite.txHz ? "tle-profile" : "tle-profile tle-profile-listen";
 		row.dataset.id = String(record.catalog_id);
 		const checkbox = document.createElement("input");
 		checkbox.type = "checkbox";
@@ -164,8 +164,10 @@ function renderOptions() {
 		name.textContent = profileLabel(record);
 		const detail = document.createElement("small");
 		detail.className = "tle-profile-detail";
-		detail.textContent = t("tools.satellite.option", { id: record.catalog_id, rx: (satellite.rxHz / 1e6).toFixed(3),
-			tx: (satellite.txHz / 1e6).toFixed(3) });
+		const rx = (satellite.rxHz / 1e6).toFixed(3);
+		detail.textContent = satellite.txHz ?
+			t("tools.satellite.option", { id: record.catalog_id, rx, tx: (satellite.txHz / 1e6).toFixed(3) }) :
+			t("tools.satellite.option_listen", { id: record.catalog_id, rx });
 		const age = record.line1 ? ageDays(record) : null;
 		if (age !== null)
 			detail.textContent += ` · ${t("tools.satellite.option_age", { age: age < 1 ? "<1" : Math.round(age),
