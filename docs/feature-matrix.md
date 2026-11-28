@@ -64,6 +64,8 @@ is `tools/bringup.py list --radio <id>`.
 | `nxdn_default` | not recorded | not recorded | not recorded | not recorded | not written | not recorded | not recorded | not recorded |
 | `nxdn_scrambler` | not recorded | not recorded | not recorded | not recorded | not written | not recorded | not recorded | not recorded |
 | `ysf` | not recorded | not recorded | not recorded | not recorded | not written | not recorded | not recorded | not recorded |
+| `ysf_vw` | not recorded | not recorded | not recorded | not recorded | off | not recorded | not recorded | not recorded |
+| `m17` | off | off | off | off | off | off | off | off |
 | `mbe2400` | off | off | off | off | off | off | off | off |
 | `dmr_voice` | pass (seed) | pass (seed) | pass (seed) | pass (seed) | pass (seed) | not recorded | partial, needs re-run | partial, needs re-run |
 | `dmr_privacy` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | partial, needs re-run |
@@ -105,9 +107,9 @@ is `tools/bringup.py list --radio <id>`.
 | `dmr_lrrp` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | off |
 | `dmr_udp_compress` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | partial, needs re-run |
 | `dmr_confirmed` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass | partial |
-| `sfr` | not recorded | pass (seed) | pass (seed) | not recorded | ✕ | not recorded | ✕ | partial |
-| `sfr_dualpath_rx` | not recorded | not recorded | not recorded | not recorded | ✕ | not recorded | not recorded | not recorded |
-| `sfr_cwid` | not recorded | not recorded | not recorded | not recorded | ✕ | not recorded | pass, needs re-run | pass, needs re-run |
+| `sfr` | off | off | off | off | ✕ | off | ✕ | off |
+| `sfr_dualpath_rx` | off | off | off | off | ✕ | off | off | off |
+| `sfr_cwid` | off | off | off | off | ✕ | off | off | off |
 | `aprs` | pass (seed) | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | partial, needs re-run |
 | `aprs_afsk` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | partial, needs re-run |
 | `aprs_dmr` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | partial, needs re-run |
@@ -117,8 +119,8 @@ is `tools/bringup.py list --radio <id>`.
 | `gps_sky` | not recorded | not recorded | ✕ | not recorded | not recorded | not recorded | not recorded | ✕ |
 | `usb` | ✕ | pass (seed) | ✕ | ✕ | not recorded | not recorded | not recorded | ✕ |
 | `hostlink` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
-| `hotspot` | pass (seed) | pass (seed) | pass (seed) | pass (seed) | not recorded | not recorded | pass, needs re-run | off |
-| `split_duplex` | pass (seed) | pass (seed) | pass (seed) | not written | not written | not recorded | partial, needs re-run | not written |
+| `hotspot` | off | off | off | off | off | off | off | off |
+| `split_duplex` | off | off | off | not written | not written | off | off | not written |
 | `debuglink` | pass (seed) | pass (seed) | pass (seed) | pass (seed) | pass (seed) | not recorded | pass, needs re-run | partial, needs re-run |
 | `task_stacks` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass | pass |
 | `cps_openfw` | not recorded | pass (seed) | not recorded | pass (seed) | pass (seed) | not recorded | pass, needs re-run | pass, needs re-run |
@@ -134,7 +136,7 @@ is `tools/bringup.py list --radio <id>`.
 | `usb_serial_request` | off | not recorded | off | off | not recorded | not recorded | not recorded | off |
 | `dmr_ip_gateway` | not recorded | not recorded | pass (seed) | not recorded | not recorded | not recorded | pass, needs re-run | off |
 | `dmr_tx_spacing` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | partial, needs re-run |
-| `zone_share` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | partial, needs re-run | ✕ |
+| `zone_share` | off | off | off | off | off | off | off | ✕ |
 | `dmr_control_station` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | off |
 | `net_tcp` | not recorded | not recorded | pass (seed) | pass (seed) | not recorded | not recorded | pass, needs re-run | off |
 | `net_kiss` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | off |
@@ -233,7 +235,7 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | `DMR_TRUNK_GW` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | `VOICE_CAPTURE` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | `DMR_IP_GATEWAY` | ● | ● | ● | ● | ● | ● | ● | ○ |
-| `ZONE_SHARE` | ● | ● | ● | ● | ● | ● | ● | ✕ |
+| `ZONE_SHARE` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ✕ |
 | `DMR_UDP_COMPRESS` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `NET_TCP` | ● | ● | ● | ● | ● | ● | ● | ○ |
 | `NET_KISS` | ● | ● | ● | ● | ● | ● | ● | ○ |
@@ -249,16 +251,16 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | `IDDB_COMPACT` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `DMR_CONTROL_STATION` | ● | ● | ● | ● | ● | ● | ● | ○ |
 | `SNMP` | ● | ● | ● | ● | ● | ● | ● | ○ |
-| `SFR` | ● | ● | ● | ● | ✕ | ● | ● | ● |
-| `SFR_DUALPATH_RX` | ● | ● | ● | ● | ✕ | ● | ● | ● |
-| `SFR_CWID` | ● | ● | ● | ● | ✕ | ● | ● | ● |
+| `SFR` | ○ | ○ | ○ | ○ | ✕ | ○ | ○ | ○ |
+| `SFR_DUALPATH_RX` | ○ | ○ | ○ | ○ | ✕ | ○ | ○ | ○ |
+| `SFR_CWID` | ○ | ○ | ○ | ○ | ✕ | ○ | ○ | ○ |
 | `TASK_STACKS` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `USB` | ✕ | ● | ✕ | ✕ | ● | ● | ● | ✕ |
 | `HOSTLINK` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `USB_NETWORK` | ✕ | ● | ✕ | ✕ | ● | ● | ● | ✕ |
 | `NET_PPP` | ● | ○ | ● | ● | ○ | ○ | ○ | ○ |
-| `HOTSPOT` | ● | ● | ● | ● | ● | ● | ● | ○ |
-| `HOTSPOT_SPLIT` | ● | ● | ● | … | … | ● | ● | … |
+| `HOTSPOT` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
+| `HOTSPOT_SPLIT` | ○ | ○ | ○ | … | … | ○ | ○ | … |
 | `DEBUGLINK` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `DEBUGLINK_DMRIP` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | `CPS_OPENFW` | ● | ● | ● | ● | ● | ● | ● | ● |
@@ -333,7 +335,9 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | `AIR_RAW` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | `AIR_RX_ADAPT` | ● | ● | ● | ● | ○ | ● | ● | ● |
 | `YSF` | ● | ● | ● | ● | … | ● | ● | ● |
+| `YSF_VW` | ● | ● | ● | ● | ○ | ● | ● | ● |
 | `MBE2400` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
+| `M17` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | Voltage reading (board, no switch) | Battery | Battery | Battery | None | Battery | Battery | Supply | Battery |
 | Clock kept through power-off (board, no switch) | Yes | ? | Yes | ? | ? | ? | ? | No (only while on) |
 <!-- end generated -->
@@ -364,8 +368,10 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | NXDN Scrambler (15-bit) | `NXDN_SCRAMBLER` | 448 | — | Needs `NXDN`; supports conventional voice calls. The NXDN air interface must support the requested direction. Checked on air against another radio running RadioFoundry and a commercial portable ([bring-up record](testing/dm32-bringup.md#nxdn-scrambler-interoperability)). |
 | Soft modem receive options: an equalizer, a CTCSS notch and a DCS remover, for a mode that asks for them | `AIR_RX_ADAPT` | — | — | HR_C7000 only so far (not written on these two radios). On the DM-32UV: 4,104 B flash, of which about 1.1 KB is copied to RAM (`RFOUNDRY_HOT_CODE`), and 20 B of static RAM; the options' state (about 1.6 KB) is lent by the mode's engine. Needs `SUBTONE` ([air-interface.md](spec/air-interface.md) 6.1). Measured 2026-11-25 |
 | YSF (C4FM) DN voice: the frame codec, receive, the call layer, the engine, the YSF mode in the radio core, the radio ID and rooms | `YSF` | — | — | Needs `DMR` (its voice goes through the DMR vocoder path, as NXDN's) and a board with an air interface provider (`board.air`). The VFO's mode tile, the debug link or a stored YSF channel sets it ([ysf.md](spec/ysf.md) 5, [ysf-codeplug.md](spec/ysf-codeplug.md)). The radio ID comes from the MCU's unique ID ([ysf.md](spec/ysf.md) 6). Checked on air on a DM-32UV: direct, through a repeater and a hotspot ([bring-up](testing/dm32-bringup.md#ysf-c4fm)). DM-32UV: 19,556 B flash, 3,392 B RAM with the room commands ([ysf.md](spec/ysf.md) 9) and the soft modem's equalizer and tone notch ([air-interface.md](spec/air-interface.md) 6.1, 3.1 KB and 1.2 KB of it); the engine shares NXDN's block; ARM sizes not measured yet |
+| YSF VW and V/D mode 1: VW calls received and sent through P25's full-rate IMBE voice path, which the radio core switches to for the call (and keeps on a VW channel); V/D mode 1 through the DMR vocoder path | `YSF_VW` | — | — | Needs `YSF` and `P25`. V/D mode 1 comes with `YSF`; the switch adds VW ([ysf.md](spec/ysf.md) 3.5, 4.4, 5.5). VW transmits at P25's TX level. A radio without a lending vocoder gives the YSF engine a block of its own, as P25's memory holds the VW call's voice: about 4.2 KB of CCM taken from the RTOS heap, which keeps 4 KB above its floor. About 0.8 KB of flash on an ARM radio. Untested on air |
 | Digital receive audio AGC with per-mode targets and recent-caller memory | `RX_AGC` | 3,892 | — | Digital AGC RX (on by default) sets each radio's target ([defaults](#digital-agc-defaults)); Off, each mode's row. DM-1701 figure with LTO, GCC 13.3 (2026-11-22); hardware listening and timing untested ([receive AGC](spec/rx-agc.md)) |
 | The 2400 bit/s MBE voice codec, compatible with D-STAR's voice frames | `MBE2400` | ~0* | ~0* | No mode uses the codec yet, so the link leaves the codec out; the code is about 6 KB, more without P25 (the MBE core) ([mbe-2400.md](spec/mbe-2400.md)) |
+| M17 voice, being written: the frames and station addresses, the Codec 2 3200 codec (codec2-fixed-point) and the debug link's Codec 2 benchmark | `M17` | 27,712 | 28,752 | Builds the air interface. Nothing a user sees yet: no receive, transmit or channels ([m17.md](spec/m17.md), [ADR 006](crucible/adr/006-m17.md)). The codec runs in the vocoder's lent memory or P25's, no new RAM; the benchmark's task takes 2 KB of the RTOS heap while it runs. Not yet run on a radio |
 | Basic privacy, 8-bit and 16-bit keys | `DMR_PRIVACY` | 6,260 | 7,340 |  |
 | AES-256 DMR voice, PI header and late-entry signaling | `DMR_AES` | 3,484 | 4,692 | Requires `DMR_PRIVACY`. DM-1701: 480 B RAM. TX to a receiver of another make needs the modem driver's burst F field (`set_burst_f`, [dmr-voice.md](spec/dmr-voice.md) 5.1): only the HR_C7000 driver has it (DM-32UV); on the HR_C6000 and other radios our AES overs reach radios running RadioFoundry only (#864). |
 | Talker alias receive and send | `DMR_TALKER_ALIAS` | 1,088 | 1,068 |  |

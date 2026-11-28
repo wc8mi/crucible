@@ -12,6 +12,9 @@ record's supporting material (prototypes, screens) goes in a folder with the sam
 | [002](002-tx-level-on-air.md) | TX level: one on-air target, a trim per radio | Superseded by 003 |
 | [003](003-digital-agc.md) | Digital AGC: two switches, defaults per radio | Accepted |
 | [004](004-nxdn-radio-default.md) | NXDN radio default: stored, 4800 bit/s, a quick rate switch | Proposed |
+| [005](005-ysf-vw-vd1.md) | YSF VW and V/D mode 1: extend our engine, take the fork's self-contained parts | Accepted |
+| [006](006-m17.md) | M17 voice: a new air mode on core/air, Codec 2 from codec2-fixed-point | Accepted |
+| [007](007-nxdn-conventional.md) | Conventional NXDN: repeater access, digital monitor (NXDN and P25), dual watch | Accepted |
 
 ## How to add one
 

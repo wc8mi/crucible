@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // A YSF DN voice call (ysf.h, docs/spec/ysf.md 4): on receive, the frames of ysf_rx.c become a call with
 // its fields and its voice frames in order; on transmit, the frames are built and released symbol by symbol.
 #include "ysf.h"
 
 #include <string.h>
+
+#include "config.h"
 
 // ── Fields ──
 #define CM_RADIO_ID	1	// call mode a radio sends with a destination of "*****" and its radio ID (ysf.md 4.2)
@@ -156,21 +159,67 @@ static void on_dch(ysf_call_rx_t *c, uint8_t fn, const uint8_t d[YSF_DCH_BYTES])
 		changed(c);
 }
 
-static void voice(ysf_call_rx_t *c, const ysf_rx_frame_t *f)
+// The frame's VCH to the sink by the call's data type (ysf.md 3.4, 3.5). sub: a VW sub-header, whose VCH are only its
+// last blocks
+static void voice(ysf_call_rx_t *c, const ysf_rx_frame_t *f, bool sub)
 {
-	for (uint8_t n = 0; n < YSF_VCH_PER_FRAME; n++) {
-		uint8_t bits[AMBE_PARAM_BITS], v[YSF_VOICE_BYTES];
+	uint8_t n = 0;
 
-		if (c->call.dt != YSF_DT_VD2) {
-			c->stats.voice_held++;
-			continue;
+	switch (c->call.dt) {
+	case YSF_DT_VD2:
+		for (; n < YSF_VCH_PER_FRAME; n++) {
+			uint8_t bits[AMBE_PARAM_BITS], v[YSF_VOICE_BYTES];
+
+			c->stats.vch_fixed += (uint32_t)ysf_vch_get(f->hard, f->soft, n, bits);
+			ambeFecEncode(bits, v);
+			c->stats.voice++;
+			if (c->sink->voice)
+				c->sink->voice(v, c->ctx);
 		}
-		c->stats.vch_fixed += (uint32_t)ysf_vch_get(f->hard, f->soft, n, bits);
-		ambeFecEncode(bits, v);
-		c->stats.voice++;
-		if (c->sink->voice)
-			c->sink->voice(v, c->ctx);
+		return;
+	case YSF_DT_VD1:
+		// The DMR side's 72-bit frame as it is: its FEC is the voice path's (ambeFecDecode)
+		for (; n < YSF_VCH_PER_FRAME; n++) {
+			uint8_t v[YSF_VOICE_BYTES];
+
+			ysf_vd1_vch_get(f->hard, n, v);
+			c->stats.voice++;
+			c->stats.vd1_frames++;
+			if (c->sink->voice)
+				c->sink->voice(v, c->ctx);
+		}
+		return;
+#if CONFIG_YSF_VW
+	case YSF_DT_VW:
+		if (c->sink->vw == NULL)
+			break;
+		for (n = sub ? YSF_VW_SUB_VCH : 0; n < YSF_VCH_PER_FRAME; n++) {
+			uint8_t imbe[YSF_VW_BYTES], errs = ysf_vw_get(f->hard, n, imbe);
+
+			c->stats.voice++;
+			c->stats.vw_frames++;
+			c->stats.vw_fec_bits += errs & 15u;
+			c->sink->vw(imbe, errs, c->ctx);
+		}
+		return;
+#endif
+	default:
+		break;
 	}
+	(void)sub;
+	c->stats.voice_held += YSF_VCH_PER_FRAME;
+}
+
+// V/D mode 1's DCH (ysf.md 3.5): FN 0 is the destination and the source; downlink, uplink and remarks (FN 1, 2) are
+// not shown, and data units (FN 3-7) are not supported
+static void on_vd1_dch(ysf_call_rx_t *c, uint8_t fn, const uint8_t d[YSF_CSD_BYTES])
+{
+	if (fn != 0)
+		return;
+	bool dst = take_dst(c, d), src = field_get(c->call.src, d + YSF_CS_LEN);
+
+	if (dst || src)
+		changed(c);
 }
 
 static void on_data(ysf_call_rx_t *c, const ysf_rx_frame_t *f)
@@ -243,11 +292,12 @@ static void on_frame(const ysf_rx_frame_t *f, void *ctx)
 		c->wx.broken = true;
 		if (!c->active)
 			return;
-		errs = ysf_dch_get(f->hard, f->soft, w, buf);
-		if (errs >= 0 && c->call.dt == YSF_DT_VD2)
+		if (c->call.dt == YSF_DT_VD2 && ysf_dch_get(f->hard, f->soft, w, buf) >= 0)
 			on_dch(c, c->next_fn, buf);
+		else if (c->call.dt == YSF_DT_VD1 && ysf_vd1_dch_get(f->hard, f->soft, w, buf) >= 0)
+			on_vd1_dch(c, c->next_fn, buf);
 		c->next_fn = (uint8_t)(c->next_fn >= YSF_FT_DN ? 0 : c->next_fn + 1);
-		voice(c, f);
+		voice(c, f, false);	// (a VW sub-header is a call's first frame, not one placed by its order)
 		return;
 	}
 	c->stats.fec_bits += (uint32_t)f->fich_errs;
@@ -284,16 +334,21 @@ static void on_frame(const ysf_rx_frame_t *f, void *ctx)
 			changed(c);
 		}
 		c->next_fn = (uint8_t)(f->fich.fn >= f->fich.ft ? 0 : f->fich.fn + 1);
-		if (f->fich.dt == YSF_DT_VD2) {
-			errs = ysf_dch_get(f->hard, f->soft, w, buf);
+		if (f->fich.dt == YSF_DT_VD2 || f->fich.dt == YSF_DT_VD1) {
+			errs = f->fich.dt == YSF_DT_VD2 ? ysf_dch_get(f->hard, f->soft, w, buf) :
+							  ysf_vd1_dch_get(f->hard, f->soft, w, buf);
 			if (errs < 0) {
 				c->stats.dch_fail++;
 			} else {
 				c->stats.fec_bits += (uint32_t)errs;
-				on_dch(c, f->fich.fn, buf);
+				if (f->fich.dt == YSF_DT_VD2)
+					on_dch(c, f->fich.fn, buf);
+				else
+					on_vd1_dch(c, f->fich.fn, buf);
 			}
 		}
-		voice(c, f);
+		// A VW call's sub-header (FN 0, FT 1) carries CSD3 and two VCH; its content is not used (ysf.md 3.5)
+		voice(c, f, f->fich.dt == YSF_DT_VW && f->fich.fn == 0 && f->fich.ft == 1);
 		break;
 	case YSF_FI_TERM:
 		call_end(c);
@@ -330,12 +385,40 @@ static void fich_for(const ysf_call_tx_t *t, uint8_t fi, ysf_fich_t *f)
 	f->cs = CS_RADIO;
 	f->cm = CM_RADIO_ID;
 	f->fn = fi == YSF_FI_COMMS ? t->fn : 0;
-	f->ft = YSF_FT_DN;
 	f->mr = t->id.mr;
-	f->dt = t->data ? YSF_DT_DATA : YSF_DT_VD2;
+	f->dt = t->data ? YSF_DT_DATA : t->dt;
 	f->dgid = t->id.dgid;
-	if (t->data)
+	f->dev = t->narrow;
+	if (t->data) {
 		f->ft = t->data_ft;
+		return;
+	}
+	// Each data type's cycle (ysf.md 4.4): DN FN 0-6; V/D mode 1 FN 0-2; VW FN 0 throughout, FT 1 in its sub-header
+	// and 0 after it. V/D mode 1's and VW's FT follow the fork's reading of Yaesu's tables, unverified on air
+	switch (t->dt) {
+	case YSF_DT_VD1:
+		f->ft = YSF_FT_VD1;
+		break;
+	case YSF_DT_VW:
+		f->fn = 0;
+		f->ft = fi == YSF_FI_COMMS && t->sub ? 1 : 0;
+		break;
+	default:
+		f->ft = YSF_FT_DN;
+		break;
+	}
+}
+
+// V/D mode 1's DCH at FN 0-2: destination and source, then downlink and uplink, then remarks (ysf.md 3.5)
+static void vd1_dch(const ysf_tx_id_t *id, uint8_t fn, uint8_t out[YSF_CSD_BYTES])
+{
+	uint8_t other[YSF_CSD_BYTES];
+
+	if (fn == 0) {
+		ysf_head_csd(id, out, other);
+		return;
+	}
+	memset(out, ' ', YSF_CSD_BYTES);
 }
 
 // A data frame's two 20-byte channels: header, FN 0 and terminator carry the callsigns as a DN header does; FN 1 the
@@ -400,13 +483,30 @@ static void tx_frame(ysf_call_tx_t *t, uint8_t state)
 			t->ready = YSF_FRAME_SYMS;
 			break;
 		}
-		// The DCH spreads over all five blocks, so it is written first; each VCH releases its block. Nothing goes
-		// out before the first VCH: an end that comes first sends the terminator right after the frame before
+		// The DCH spreads over the blocks, so it is written first; each VCH releases its block. Nothing goes out
+		// before the first VCH: an end that comes first sends the terminator right after the frame before
 		ysf_frame_begin(t->frame);
 		fich_for(t, YSF_FI_COMMS, &f);
 		ysf_fich_put(t->frame, &f);
-		ysf_dch_content(&t->id, t->fn, a);
-		ysf_dch_put(t->frame, a);
+		switch (t->dt) {
+		case YSF_DT_VD1:
+			vd1_dch(&t->id, t->fn, a);
+			ysf_vd1_dch_put(t->frame, a);
+			break;
+		case YSF_DT_VW:
+			// The sub-header's DCH (CSD3, remarks 1-4) holds blocks 0-2: spaces, as receivers don't use it
+			// (ysf.md 3.5); its voice is blocks 3 and 4. The frames after it are voice only
+			if (t->sub) {
+				memset(a, ' ', YSF_CSD_BYTES);
+				ysf_vw_dch_put(t->frame, a);
+				t->nvoice = YSF_VW_SUB_VCH;
+			}
+			break;
+		default:
+			ysf_dch_content(&t->id, t->fn, a);
+			ysf_dch_put(t->frame, a);
+			break;
+		}
 		t->ready = 0;
 		break;
 	default:
@@ -415,10 +515,13 @@ static void tx_frame(ysf_call_tx_t *t, uint8_t state)
 	}
 }
 
-void ysf_call_tx_begin(ysf_call_tx_t *t, const ysf_tx_id_t *id)
+void ysf_call_tx_begin(ysf_call_tx_t *t, const ysf_tx_id_t *id, uint8_t dt, bool narrow)
 {
 	memset(t, 0, sizeof *t);
 	t->id = *id;
+	t->dt = dt == YSF_DT_VD1 || (CONFIG_YSF_VW && dt == YSF_DT_VW) ? dt : YSF_DT_VD2;	// no VW: DN
+	t->narrow = narrow;
+	t->sub = t->dt == YSF_DT_VW;
 	tx_frame(t, TX_PRE);
 }
 
@@ -457,7 +560,8 @@ void ysf_call_tx_sent(ysf_call_tx_t *t, uint16_t n)
 			}
 			break;
 		}
-		t->fn = (uint8_t)(t->fn >= YSF_FT_DN ? 0 : t->fn + 1);
+		t->sub = false;
+		t->fn = (uint8_t)(t->fn >= (t->dt == YSF_DT_VD1 ? YSF_FT_VD1 : YSF_FT_DN) ? 0 : t->fn + 1);
 		tx_frame(t, t->ending ? TX_TERM : TX_COMMS);
 		break;
 	default:
@@ -485,27 +589,42 @@ bool ysf_call_tx_wants_voice(const ysf_call_tx_t *t)
 	return !t->data && t->state == TX_COMMS && t->nvoice < YSF_VCH_PER_FRAME;
 }
 
-bool ysf_call_tx_voice(ysf_call_tx_t *t, const uint8_t v[YSF_VOICE_BYTES])
+bool ysf_call_tx_voice(ysf_call_tx_t *t, const uint8_t *v)
 {
 	uint8_t bits[AMBE_PARAM_BITS];
+	uint16_t dch = 20;	// the next block's DCH part, which goes with this block
 
 	if (!ysf_call_tx_wants_voice(t))
 		return false;
-	ambeFecDecode(v, bits, NULL);
-	ysf_vch_put(t->frame, t->nvoice, bits);
+	switch (t->dt) {
+	case YSF_DT_VD1:
+		ysf_vd1_vch_put(t->frame, t->nvoice, v);
+		dch = 36;
+		break;
+#if CONFIG_YSF_VW
+	case YSF_DT_VW:
+		ysf_vw_put(t->frame, t->nvoice, v);
+		dch = 0;
+		break;
+#endif
+	default:
+		ambeFecDecode(v, bits, NULL);
+		ysf_vch_put(t->frame, t->nvoice, bits);
+		break;
+	}
 	t->nvoice++;
-	// Block n is whole with its VCH; the next block's DCH part goes with it
-	t->ready = t->nvoice < YSF_VCH_PER_FRAME ? (uint16_t)(YSF_BLOCK_SYM(t->nvoice) + 20) : YSF_FRAME_SYMS;
+	// Block n is whole with its VCH
+	t->ready = t->nvoice < YSF_VCH_PER_FRAME ? (uint16_t)(YSF_BLOCK_SYM(t->nvoice) + dch) : YSF_FRAME_SYMS;
 	return true;
 }
 
-void ysf_call_tx_end(ysf_call_tx_t *t, const uint8_t silence[YSF_VOICE_BYTES])
+void ysf_call_tx_end(ysf_call_tx_t *t, const uint8_t *silence)
 {
 	if (t->data)
 		return;		// a data transmission ends by itself
 	t->ending = true;
 	// A communications frame with nothing on air yet is not sent at all
-	if (t->state == TX_COMMS && t->nvoice == 0) {
+	if (t->state == TX_COMMS && t->ready == 0) {
 		tx_frame(t, TX_TERM);
 		return;
 	}

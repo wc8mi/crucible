@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // YSF channels in the codeplug (docs/spec/ysf-codeplug.md): the codec from the stored bytes to a plain
 // struct the radio core sets the YSF engine up from. Bytes in, values out: no engine here. Built with CONFIG_YSF
 #ifndef RFOUNDRY_YSF_CODEPLUG_H
@@ -12,14 +13,32 @@
 #define YSF_CP_DGID_MAX		99u
 #define YSF_CP_CALL_LEN		10u	// the radio-wide record's callsign field
 
-// A channel's parameter block (2)
-#define YSF_CP_CHAN_LEN		2u
+// A channel's parameter block (2): the DG-IDs, then byte 2, the transmit data type and deviation
+#define YSF_CP_CHAN_LEN		3u
+
+// Byte 2's data type field (bits 0-1), the FICH DT codes
+#define YSF_CP_DT_VD1		0u
+#define YSF_CP_DT_DATA		1u	// not a voice mode: reads as DN
+#define YSF_CP_DT_DN		2u
+#define YSF_CP_DT_VW		3u
+#define YSF_CP_NARROW		0x04u	// byte 2 bit 2
+
+// The voice mode a channel transmits in. DN is 0, so a zeroed ysf_chan_t is DN Wide, as a block without byte 2
+typedef enum {
+	YSF_CP_VOICE_DN = 0,	// V/D mode 2
+	YSF_CP_VOICE_VW,	// Voice Wide (full rate)
+	YSF_CP_VOICE_VD1,	// V/D mode 1
+} ysf_cp_voice_t;
+
 typedef struct {
 	uint8_t tx_dgid;	// 0..99
 	uint8_t rx_dgid;	// 0..99; 0 hears every DG-ID
+	uint8_t voice;		// ysf_cp_voice_t
+	bool narrow;		// half deviation (ADR 005 5); Wide otherwise
 } ysf_chan_t;
 
-// Decode len bytes of a block (a short one, or none, takes the defaults: 0 and 0); a value out of range reads as 0
+// Decode len bytes of a block (a short one, or none, takes the defaults: DG-ID 0 both ways, DN Wide); a DG-ID out of
+// range reads as 0, data type 1 as DN, byte 2's reserved bits are ignored
 void ysf_chan_decode(const uint8_t *b, int len, ysf_chan_t *out);
 void ysf_chan_encode(const ysf_chan_t *c, uint8_t out[YSF_CP_CHAN_LEN]);
 

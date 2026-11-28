@@ -29,6 +29,7 @@ import "./parts.js";
 import * as diag from "../diag.js";
 import { initReporting, reportedLine } from "../report.js";
 import { updateFor } from "../flasher/version.js";
+import { radioTargets, targetFor, targetProblems } from "../codeplug/targets.js";
 
 const TABS = ["radio", "channels", "zones", "contacts", "rxLists", "dtmfContacts", "aprs", "systems", "iddb", "problems"];
 const TABLE_MAX = { channels: LIMITS.channels, zones: LIMITS.zones, contacts: LIMITS.contacts, rxLists: LIMITS.rxLists, dtmfContacts: LIMITS.dtmfContacts, aprs: LIMITS.aprs };
@@ -41,6 +42,8 @@ const S = {
 	tab: "channels",
 	grid: null,
 	radios: [],
+	targets: [],		// one per radio image the codeplug may be made for (targets.js), from radios.json
+	targetKey: "",		// the one picked: "" none, "all", or a target's key (madeFor)
 	conn: null,		// {transport, radio, image: the radio's bytes as last read or written, cable}
 	lastRadioImage: null,	// the last connection's image, for a bug report after it closed
 	areaSource: null,	// only a read/write on this connection establishes a settings merge baseline
@@ -117,12 +120,77 @@ function say(text, kind = "info", { report = null } = {}) {
 // --- Rendering ---
 
 function problems() {
-	return validate(S.model, { bands: S.conn?.radio?.bands_hz || null, features: features() });
+	const on = madeFor();
+	// with a radio on the line its own features check the modes (validate); its target adds the frequencies
+	return [...validate(S.model, { features: S.conn ? features() : null }),
+		...targetProblems(S.model, S.conn ? on.map((x) => ({ ...x, features: null })) : on, t("editor.target.all", { n: radioCount() }))];
+}
+
+// The radios the codeplug is made for (targets.js): the radio on the line, else the one picked, else every radio the
+// site offers ("all"), else none. Every radio stores the same codeplug; these say what a channel does on each
+const TARGET_PREF = "rfoundry-editor-target";
+function madeFor() {
+	if (S.conn) {
+		const x = targetFor(S.targets, S.conn.transport?.probe?.board, S.conn.radio?.id);
+		return x ? [x] : [];
+	}
+	if (S.targetKey === "all") return S.targets;
+	const x = S.targets.find((y) => y.key === S.targetKey);
+	return x ? [x] : [];
+}
+
+// The power levels the choices name: the radio on the line reports its own (transport.js); a single radio picked has
+// its profile; with all of them or none, the portable scale's generic names
+function powerProfile() {
+	if (S.conn) return S.conn.transport?.power ?? madeFor()[0]?.power ?? null;
+	const on = madeFor();
+	return on.length === 1 ? on[0].power : null;
+}
+
+// radios, not images: a radio with a build option (two power ratings) is one radio
+const radioCount = () => new Set(S.targets.map((x) => x.radio)).size;
+
+function pickTarget(key) {
+	S.targetKey = key;
+	try {
+		localStorage.setItem(TARGET_PREF, key);
+	} catch { /* a private window: the choice lasts this page */ }
+	S.grid = null;
+	refresh();
+}
+
+// One option per radio; a radio with several images (two power ratings) is a group of its images, so "All 5 radios"
+// lists five radios
+function targetOptions() {
+	const by = new Map();
+	for (const x of S.targets) by.set(x.radio, [...(by.get(x.radio) || []), x]);
+	return [...by.values()].map((xs) => xs.length === 1 ? h("option", { value: xs[0].key }, xs[0].name)
+		: h("optgroup", { label: S.radios.find((r) => r.id === xs[0].radio)?.name || xs[0].radio },
+			...xs.map((x) => h("option", { value: x.key }, x.name))));
+}
+
+// The Made For picker: none, all of them, or one radio. With a radio on the line it shows that radio, fixed
+function targetPicker() {
+	if (!S.targets.length) return null;
+	const sel = h("select", { id: "ed-target", onchange: () => pickTarget(sel.value) },
+		h("option", { value: "" }, t("editor.target.any")),
+		S.targets.length > 1 ? h("option", { value: "all" }, t("editor.target.all", { n: radioCount() })) : null,
+		...targetOptions());
+	if (S.conn) {
+		const x = madeFor()[0];
+		sel.replaceChildren(h("option", { value: "" }, x ? x.name : S.conn.radio.name));
+		sel.disabled = true;
+	} else sel.value = S.targets.some((x) => x.key === S.targetKey) || S.targetKey === "all" ? S.targetKey : "";
+	return h("div", { class: "ed-group ed-target" }, h("label", { for: "ed-target" }, t("editor.target.label")), sel);
 }
 
 // The connected radio's firmware features (its probe), which say the channel modes it runs; null without a radio
+// The features the editor offers modes and systems for: the radio on the line's, else those of any radio the codeplug is
+// made for (a channel mode one of them has), else null (no radio: everything)
 function features() {
-	return S.conn ? S.conn.probe?.features ?? "" : null;
+	if (S.conn) return S.conn.probe?.features ?? "";
+	const on = madeFor();
+	return on.length && on.every((x) => x.features) ? [...new Set(on.flatMap((x) => x.features))] : null;
 }
 
 function refresh() {
@@ -176,6 +244,7 @@ function renderToolbar(errors) {
 		h("div", { class: "ed-group" },
 			button(t("editor.undo"), undo, { disabled: !S.history.canUndo, quiet: true }),
 			button(t("editor.redo"), redo, { disabled: !S.history.canRedo, quiet: true })),
+		targetPicker(),
 	);
 }
 
@@ -192,7 +261,7 @@ function renderView(p) {
 		return;
 	}
 	const g = new Grid({
-		columns: columns(tab, S.model, t, { features: features(), power: S.conn?.transport?.power ?? null }), rows: S.model[tab], t, empty: t(`editor.empty.${tab}`),
+		columns: columns(tab, S.model, t, { features: features(), power: powerProfile() }), rows: S.model[tab], t, empty: t(`editor.empty.${tab}`),
 		onChange: (row, col, value) => {
 			let err = null;
 			change(t("editor.undo.edit"), () => {
@@ -224,7 +293,7 @@ function tableActions(tab, g) {
 	const numbered = tab !== "zones";
 	const out = [
 		// first, so it sits above the row checkboxes it acts on; not on a table with nothing it can set (zones, RX lists)
-		bulkColumns(tab, S.model, t, { features: features(), power: S.conn?.transport?.power ?? null }).length ? button(sel.length ? t("editor.bulk_edit_n", { n: sel.length }) : t("editor.bulk_edit"), () => bulkSet(tab, g), { disabled: sel.length < 2 }) : null,
+		bulkColumns(tab, S.model, t, { features: features(), power: powerProfile() }).length ? button(sel.length ? t("editor.bulk_edit_n", { n: sel.length }) : t("editor.bulk_edit"), () => bulkSet(tab, g), { disabled: sel.length < 2 }) : null,
 		button(t("editor.add"), () => addRecord(tab, g), { disabled: full }),
 		button(t("editor.duplicate"), () => duplicate(tab, g), { disabled: full || !g.targets().length }),
 		button(t("editor.delete"), () => del(tab, g), { disabled: !g.targets().length, danger: true }),
@@ -324,7 +393,7 @@ function renumber(tab) {
 
 function bulkSet(tab, g) {
 	const rows = g.selection();
-	const cols = bulkColumns(tab, S.model, t, { features: features(), power: S.conn?.transport?.power ?? null });
+	const cols = bulkColumns(tab, S.model, t, { features: features(), power: powerProfile() });
 	if (!cols.length) return;
 	const pickCol = h("select", {}, ...cols.map((c, i) => h("option", { value: String(i) }, c.label)));
 	const slot = h("div");
@@ -365,7 +434,7 @@ function bulkSet(tab, g) {
 function openRecord(tab, r) {
 	if (tab === "channels") {
 		// a channel of a kind keeps its stand-in record (channelmodes.js syncModes), whatever the form's hidden fields hold
-		formDialog(t("editor.channel_title", { name: r.name }), channelForm(S.model, t, { features: features(), power: S.conn?.transport?.power ?? null }), r, t, (work) => change(t("editor.undo.edit"), () => {
+		formDialog(t("editor.channel_title", { name: r.name }), channelForm(S.model, t, { features: features(), power: powerProfile(), targets: madeFor() }), r, t, (work) => change(t("editor.undo.edit"), () => {
 			Object.assign(r, work);
 			syncModes(S.model);
 		}));
@@ -940,7 +1009,9 @@ let releaseList = null;
 
 // After a read: a newer release for this radio (releases.json, updateFor), offered once per tab for each radio, running
 // build and release
+// <div id="editor" data-update="off">: a page for builds other than the project's releases offers none of them
 async function offerUpdate(c) {
+	if (root.dataset.update === "off") return;
 	const v = c.transport.probe?.version || {};
 	const gitTime = Number(v.git_time) || 0;
 	if (!v.release && !gitTime) return;
@@ -1255,6 +1326,14 @@ async function start() {
 	} catch {
 		S.radios = [];
 	}
+	S.targets = radioTargets(S.radios);
+	try {
+		S.targetKey = localStorage.getItem(TARGET_PREF) ?? root.dataset.targets ?? "";
+	} catch {
+		S.targetKey = root.dataset.targets ?? "";
+	}
+	// a key from another site's radios, or "all" with only one: no choice
+	if (!(S.targetKey === "all" ? S.targets.length > 1 : S.targets.some((x) => x.key === S.targetKey))) S.targetKey = "";
 	const draft = await loadDraft();
 	if (draft?.bytes) {
 		load(decode(imageFrom(draft.bytes)), draft.name || "codeplug");

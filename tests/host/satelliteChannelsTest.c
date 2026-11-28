@@ -66,7 +66,7 @@ bool satellite_store_summary_get(uint8_t index, satellite_record_summary_t *summ
 
 bool satellite_store_profile_selected(uint32_t catalog_id)
 {
-	return catalog_id == 25544u;
+	return catalog_id == 25544u || catalog_id == 59112u;
 }
 
 bool satellite_store_profile_get(uint32_t catalog_id, satellite_frequency_profile_t *frequency)
@@ -248,6 +248,17 @@ static void test_sync_creates_zone_and_safe_editable_channels(void)
 	CHECK(iss.mode == RADIO_MODE_FM && !iss.rx_only && iss.contact == 0u);
 }
 
+static void test_sync_listen_only_channel_is_rx_only(void)
+{
+	reset();
+	add_record(59112u, "SONATE-2");
+	CHECK(satellite_channels_sync());
+	channel_t sonate;
+	CHECK(zone_count == 1u && codeplug_channel(zones[0].channels[0], &sonate));
+	CHECK(sonate.rx_hz == 145880000u && sonate.tx_hz == 145880000u && sonate.rx_only);
+	CHECK(sonate.tx_tone.type == TONE_NONE);
+}
+
 static void test_repeat_sync_preserves_channel_edits_and_adds_new_records(void)
 {
 	reset();
@@ -284,6 +295,7 @@ int main(void)
 	test_sync_creates_zone_and_safe_editable_channels();
 	test_repeat_sync_preserves_channel_edits_and_adds_new_records();
 	test_sync_reuses_existing_channel();
+	test_sync_listen_only_channel_is_rx_only();
 	test_sync_job_reports_completion_and_failure();
 	printf("satelliteChannelsTest: %u checks, %u failures\n", checks, failures);
 	return failures != 0u;

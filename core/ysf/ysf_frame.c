@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The YSF frame's channels (ysf.h, docs/spec/ysf.md 2-3): the FICH, the long channels (CSD), the DCH and
 // the VCH, with their CRC, Golay and convolutional codes, whitening and interleaving.
 #include "ysf.h"
@@ -91,6 +92,10 @@ typedef struct {
 static const chan_t fich_ch = { 5, YSF_FICH_SYM, false };
 static const chan_t dch_ch = { 5, 0, true };
 static const chan_t csd_ch[2] = { { 9, 0, true }, { 9, 36, true } };
+// V/D mode 1 sends its DCH where a header sends CSD1. A VW sub-header's DCH runs through the payload without gaps:
+// symbols 0-179, blocks 0 and 1 and the first half of block 2
+#define vd1_dch_ch	csd_ch[0]
+static const chan_t vw_dch_ch = { 9, YSF_BLOCK_SYM(0), false };
 
 // The frame symbol of channel position p
 static uint16_t chan_sym(const chan_t *c, uint16_t p)
@@ -264,6 +269,46 @@ void ysf_dch_put(uint8_t *frame, const uint8_t in[YSF_DCH_BYTES])
 int ysf_dch_get(const uint8_t *hard, const int8_t *soft, ysf_fec_work_t *w, uint8_t out[YSF_DCH_BYTES])
 {
 	return data_get(&dch_ch, hard, soft, w, out, YSF_DCH_BYTES);
+}
+
+// ── V/D mode 1 (ysf.md 3.5): each block is 36 symbols of the DCH, then a VCH of 36 symbols, the DMR side's 72-bit
+// AMBE+2 frame as it is ──
+#define VD1_VCH_SYM(n)	(YSF_BLOCK_SYM(n) + 36)
+
+void ysf_vd1_dch_put(uint8_t *frame, const uint8_t in[YSF_CSD_BYTES])
+{
+	data_put(&vd1_dch_ch, frame, in, YSF_CSD_BYTES);
+}
+
+int ysf_vd1_dch_get(const uint8_t *hard, const int8_t *soft, ysf_fec_work_t *w, uint8_t out[YSF_CSD_BYTES])
+{
+	return data_get(&vd1_dch_ch, hard, soft, w, out, YSF_CSD_BYTES);
+}
+
+void ysf_vd1_vch_put(uint8_t *frame, uint8_t n, const uint8_t v[AMBE_FRAME_BYTES])
+{
+	air_syms_copy(frame, VD1_VCH_SYM(n), v, 0, AMBE_FRAME_BITS / 2);
+}
+
+void ysf_vd1_vch_get(const uint8_t *hard, uint8_t n, uint8_t v[AMBE_FRAME_BYTES])
+{
+	air_syms_copy(v, 0, hard, VD1_VCH_SYM(n), AMBE_FRAME_BITS / 2);
+}
+
+// ── VW sub-header (ysf.md 3.5): the DCH (CSD3) in symbols 0-179 of the payload, 36 symbols kept zero, then VCH in
+// blocks 3 and 4 ──
+#define VW_DCH_SYMS	180
+
+void ysf_vw_dch_put(uint8_t *frame, const uint8_t in[YSF_CSD_BYTES])
+{
+	data_put(&vw_dch_ch, frame, in, YSF_CSD_BYTES);
+	for (uint16_t i = VW_DCH_SYMS; i < 3 * YSF_BLOCK_SYMS; i++)
+		air_sym_put(frame, (uint16_t)(YSF_BLOCK_SYM(0) + i), 0);
+}
+
+int ysf_vw_dch_get(const uint8_t *hard, const int8_t *soft, ysf_fec_work_t *w, uint8_t out[YSF_CSD_BYTES])
+{
+	return data_get(&vw_dch_ch, hard, soft, w, out, YSF_CSD_BYTES);
 }
 
 // ── VCH (ysf.md 3.4): parameter bits 0-26 sent three times in a row, 27-48 once, a zero bit; whitened; written 4 to

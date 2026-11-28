@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // P25 conventional on a channel, the radio core's side (radio_p25.h)
 #include "config.h"
 #if CONFIG_P25	// the whole file
@@ -286,7 +287,7 @@ bool radio_p25_parrot_open(void)
 	    board.audio->speaker_pcm == NULL) return false;
 	p25_mem_t *workspace = mem_get();
 	if (workspace == NULL) return false;
-	p25VoiceBegin(&workspace->voice);
+	p25VoiceBegin(&workspace->voice, P25_VOICE_PRIME, RX_AGC_P25);
 	p25VoiceParrotReady((uint8_t (*)[IMBE_BYTES])workspace, PARROT_SHARED_FRAMES, (uint8_t (*)[IMBE_BYTES])parrot_extra);
 #if CONFIG_TX_DC_BLOCK
 	p25VoiceParrotPcm(parrot_pcm, sizeof parrot_pcm / sizeof parrot_pcm[0]);
@@ -651,7 +652,7 @@ bool radio_p25_begin(const channel_t *ch, uint16_t number, uint32_t own_id)
 #endif
 		radio_p25_params(ch, number, own_id, &cfg);
 #if CONFIG_IMBE
-	p25VoiceBegin(&mem->voice);
+	p25VoiceBegin(&mem->voice, P25_VOICE_PRIME, RX_AGC_P25);
 	hooks = p25VoiceHooks();
 #endif
 	conv_hz = ch->rx_hz;

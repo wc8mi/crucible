@@ -375,8 +375,16 @@
 #ifndef CONFIG_YSF
 #define CONFIG_YSF			0
 #endif
+// YSF VW: its calls through P25's IMBE voice path (docs/spec/ysf.md). Needs YSF and P25
+#ifndef CONFIG_YSF_VW
+#define CONFIG_YSF_VW			0
+#endif
+// M17 voice (core/m17, docs/spec/m17.md): frames, addresses, the Codec 2 3200 codec. Its own codec: needs no DMR
+#ifndef CONFIG_M17
+#define CONFIG_M17			0
+#endif
 #ifndef CONFIG_AIR
-#define CONFIG_AIR			(CONFIG_P25 || CONFIG_NXDN || CONFIG_YSF)
+#define CONFIG_AIR			(CONFIG_P25 || CONFIG_NXDN || CONFIG_YSF || CONFIG_M17)
 #endif
 // P25 trunked: the codec of its systems and channels (docs/spec/p25-codeplug.md 3), the control channel decoded, voice
 // channel grants followed and, where the system allows it, registration and transmit on a grant (core/p25/p25_follow.c)
@@ -560,13 +568,13 @@
 #error "CONFIG_NET_PPP needs CONFIG_HOSTLINK and CONFIG_DMR_IP_GATEWAY"
 #endif
 #if CONFIG_AIR_RAW && !CONFIG_AIR
-#error "CONFIG_AIR_RAW needs CONFIG_P25, CONFIG_NXDN or CONFIG_YSF (an air-framed mode)"
+#error "CONFIG_AIR_RAW needs CONFIG_P25, CONFIG_NXDN, CONFIG_YSF or CONFIG_M17 (an air-framed mode)"
 #endif
 #if CONFIG_AIR_RAW && !CONFIG_DEBUGLINK
 #error "CONFIG_AIR_RAW needs CONFIG_DEBUGLINK"
 #endif
 #if CONFIG_AIR_RX_ADAPT && !CONFIG_AIR
-#error "CONFIG_AIR_RX_ADAPT needs CONFIG_P25, CONFIG_NXDN or CONFIG_YSF (an air-framed mode)"
+#error "CONFIG_AIR_RX_ADAPT needs CONFIG_P25, CONFIG_NXDN, CONFIG_YSF or CONFIG_M17 (an air-framed mode)"
 #endif
 #if CONFIG_AIR_RX_ADAPT && !CONFIG_SUBTONE
 #error "CONFIG_AIR_RX_ADAPT needs CONFIG_SUBTONE (the standard tone and code lists, core/radio/tones.c)"

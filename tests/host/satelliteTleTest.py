@@ -39,8 +39,10 @@ def make_record(catalog_id, name=None, day=None):
     now = dt.datetime.now(dt.timezone.utc)
     day = now.timetuple().tm_yday if day is None else day
     epoch = f"{now.year % 100:02d}{day:03d}.00000000"
-    line1 = f"1 {catalog_id:05d}U 98067A   {epoch}  .00000000  00000-0  00000-0 0 0999"
-    line2 = f"2 {catalog_id:05d}  51.6400 120.0000 0005000  10.0000  20.0000 15.5000000012345"
+    number = f"{catalog_id:05d}" if catalog_id < 100000 else \
+        tle.ALPHA5_LETTERS[catalog_id // 10000 - 10] + f"{catalog_id % 10000:04d}"
+    line1 = f"1 {number}U 98067A   {epoch}  .00000000  00000-0  00000-0 0 0999"
+    line2 = f"2 {number}  51.6400 120.0000 0005000  10.0000  20.0000 15.5000000012345"
     if len(line1) != 68 or len(line2) != 68:
         raise AssertionError((len(line1), len(line2), line1, line2))
     return {"catalog_id": catalog_id, "name": name or f"SAT-{catalog_id}",
@@ -386,7 +388,38 @@ def test_protocol_versions():
         chunks = [payload for _, payload in radio.calls if payload[0] == tle.OP_PROFILE_STAGE_CHUNK]
         check(result["frequency_profiles"] == profiles and capacity == 10 and len(entries) == 10 and len(chunks) == 3,
               f"protocol-v{version} installs and reads ten profiles using chunks")
-    radio = FakeRadio(protocol_version=8)
+    wide = tle.validate_records([make_record(101102, "HADES-L"), make_record(59112, "SONATE-2")])
+    listen = [{"catalog_id": 59112, "rx_hz": 145880000, "tx_hz": 0, "tx_tone_tenths": 0},
+              {"catalog_id": 101102, "rx_hz": 436665000, "tx_hz": 0, "tx_tone_tenths": 0}]
+    check(wide[0]["catalog_id"] == 59112 and wide[1]["catalog_id"] == 101102 and
+          wide[1]["line1"][2:7] == "A1102", "Alpha-5 records validate as six-digit catalog numbers")
+    radio = FakeRadio(capacity=10, protocol_version=8)
+    result = tle.install_records(radio, wide, [59112, 101102], listen)
+    check(result["frequency_profiles"] == listen and set(radio.installed) == {59112, 101102},
+          "protocol-v8 installs six-digit and listen-only satellites")
+    for selection, profiles in (([59112, 101102], listen), ([59112], listen[:1])):
+        radio = FakeRadio(capacity=10, protocol_version=7)
+        try:
+            tle.install_records(radio, [row for row in wide if row["catalog_id"] in selection], selection, profiles)
+            check(False, "protocol-v7 refuses six-digit or listen-only satellites")
+        except tle.SatelliteTleError as exc:
+            check("version 8" in str(exc) and not radio.installed,
+                  "protocol-v7 refuses six-digit or listen-only satellites")
+    try:
+        tle.set_radio_profile_ids(FakeRadio(protocol_version=7), [25544, 59112], 7)
+        check(False, "protocol-v7 refuses new built-in profiles")
+    except tle.SatelliteTleError as exc:
+        check("version 8" in str(exc), "protocol-v7 refuses new built-in profiles")
+    bad_tone = [dict(listen[0], tx_tone_tenths=670)]
+    try:
+        tle.validate_frequency_profiles(bad_tone)
+        check(False, "listen-only profile with a tone rejected")
+    except tle.SatelliteTleError:
+        check(True, "listen-only profile with a tone rejected")
+    check(tle.tle_catalog_id("Z9999") == 339999 and tle.tle_catalog_id("J0000") == 180000 and
+          tle.tle_catalog_id("I0000") is None and tle.tle_catalog_id("O1234") is None,
+          "Alpha-5 letters skip I and O")
+    radio = FakeRadio(protocol_version=9)
     try:
         tle.radio_inventory(radio)
         check(False, "unknown protocol is rejected")

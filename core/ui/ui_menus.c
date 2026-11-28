@@ -2965,6 +2965,12 @@ static void ced_air_read(uint16_t number, const channel_t *ch)
 		if (v->ch.mode == RADIO_MODE_YSF && here) {
 			c->rx_dgid = v->ysf.rx_dgid;
 			c->tx_dgid = v->ysf.tx_dgid;
+			// voice mode and deviation from the channel's own block: what runs is DN for a VW channel in a build
+			// without VW
+			ysf_chan_t own = { .voice = v->ysf.voice, .narrow = v->ysf.narrow };
+			(void)ysf_chan_load(number, ch, &own);
+			c->voice = own.voice;
+			c->narrow = own.narrow;
 		} else if (!ysf_chan_load(number, ch, c)) {
 			ced_air_default(RADIO_MODE_YSF);
 		}

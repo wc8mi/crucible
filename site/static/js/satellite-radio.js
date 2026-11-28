@@ -85,7 +85,7 @@ async function radioBands(link) {
 	const text = new TextDecoder().decode(reply.subarray(5));
 	const match = /^bands=([^\r\n]*)$/m.exec(text);
 	if (!match || !match[1]) throw new Error("Radio did not report its supported frequency bands");
-	// The view includes RX-only ranges; no catalog satellite uplink currently falls in one.
+	// The view includes RX-only ranges; no catalog satellite uplink currently falls in one. TX 0 is listen only.
 	return match[1].split(",").map((range) => {
 		const parsed = /^(\d+)-(\d+)$/.exec(range);
 		if (!parsed || Number(parsed[1]) > Number(parsed[2]))
@@ -96,7 +96,7 @@ async function radioBands(link) {
 
 async function checkProfileBands(link, profiles) {
 	const bands = await radioBands(link);
-	const unsupported = profiles.some((profile) => [profile.rx_hz, profile.tx_hz].some((frequency) =>
+	const unsupported = profiles.some((profile) => [profile.rx_hz, profile.tx_hz].some((frequency) => frequency &&
 		!bands.some(([low, high]) => frequency >= low && frequency <= high)));
 	if (unsupported) {
 		const translationKey = bands.length === 1 ? SINGLE_BAND_ERROR : OTHER_BAND_ERROR;
@@ -114,6 +114,11 @@ export async function pushSatelliteBundle(link, bundle, onProgress = () => {}) {
 	if (bundle.profiles.length > 4 && info[0] < 6)
 		throw Object.assign(new Error("Radio firmware needs satellite protocol version 6 or newer for more than four profiles"),
 			{ translationKey: "tools.satellite.status.profile_version" });
+	// Older firmware refuses both; say why instead of letting the transfer fail
+	if (info[0] < 8 && (bundle.records.some((record) => record.catalog_id > 99999) ||
+	    bundle.profiles.some((profile) => profile.tx_hz === 0)))
+		throw Object.assign(new Error("Radio firmware needs satellite protocol version 8 or newer for these satellites"),
+			{ translationKey: "tools.satellite.status.wide_version" });
 	if (get16(new DataView(info.buffer, info.byteOffset, info.byteLength), 1) < bundle.records.length)
 		throw new Error("The radio cannot store this many satellites");
 	await checkProfileBands(link, bundle.profiles);

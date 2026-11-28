@@ -148,10 +148,27 @@ nxdnTest: nxdnTest.c $(NXDN) $(wildcard $(CORE)/nxdn/*.h) $(CORE)/air/air_framer
 nxdnEngineTest: nxdnEngineTest.c $(CORE)/nxdn/nxdn_engine.c $(CORE)/air/air_voice.c $(NXDN) $(CORE)/nxdn/nxdn_scramble.c $(CORE)/dmr/ambe/ambeFec.c $(wildcard $(CORE)/nxdn/*.h) $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(CORE)/air/air_softmodem.c $(FEC)
 	$(CC) $(CFLAGS) -DCONFIG_NXDN_SCRAMBLER=1 -I$(ROOT)/hal -Wshadow -o $@ nxdnEngineTest.c $(CORE)/nxdn/nxdn_engine.c $(CORE)/air/air_voice.c $(NXDN) $(CORE)/nxdn/nxdn_scramble.c $(CORE)/dmr/ambe/ambeFec.c $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(CORE)/air/air_softmodem.c $(FEC) -lm
 # YSF frames, their FEC, calls through the framer and the engine on two made-up providers (core/ysf)
-YSF     := $(CORE)/ysf/ysf_frame.c $(CORE)/ysf/ysf_rx.c $(CORE)/ysf/ysf_call.c $(CORE)/ysf/ysf_id.c $(CORE)/ysf/ysf_wx.c
+YSF     := $(CORE)/ysf/ysf_frame.c $(CORE)/ysf/ysf_vw.c $(CORE)/ysf/ysf_rx.c $(CORE)/ysf/ysf_call.c $(CORE)/ysf/ysf_id.c $(CORE)/ysf/ysf_wx.c
 TESTS   += ysfTest
-ysfTest: ysfTest.c $(YSF) $(CORE)/ysf/ysf_engine.c $(CORE)/air/air_voice.c $(wildcard $(CORE)/ysf/*.h) $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
-	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ ysfTest.c $(YSF) $(CORE)/ysf/ysf_engine.c $(CORE)/air/air_voice.c $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
+ysfTest: ysfTest.c ../vectors/ysf-vw-vd1.txt $(YSF) $(CORE)/ysf/ysf_engine.c $(CORE)/air/air_voice.c $(wildcard $(CORE)/ysf/*.h) $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -DCONFIG_YSF_VW=1 -o $@ ysfTest.c $(YSF) $(CORE)/ysf/ysf_engine.c $(CORE)/air/air_voice.c $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
+
+# M17 frames and addresses (core/m17), against libm17's vectors
+M17     := $(CORE)/m17/m17_frame.c $(CORE)/m17/m17_addr.c
+TESTS   += m17Test
+m17Test: m17Test.c ../vectors/m17-frames.txt $(M17) $(wildcard $(CORE)/m17/*.h) $(FEC)
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ m17Test.c $(M17) $(FEC)
+
+# M17 voice and the Codec 2 benchmark (core/m17), on codec2-fixed-point: this tree's submodule, else
+# RFOUNDRY_THIRD_PARTY's (docs/dev/building.md "Worktrees")
+C2      := $(if $(wildcard $(ROOT)/third_party/codec2-fixed-point/src/codec2_fxp.c),$(ROOT)/third_party,$(RFOUNDRY_THIRD_PARTY))/codec2-fixed-point
+C2SRC   := $(addprefix $(C2)/src/,analysis.c codec2_fxp.c delta_lsp_cb.c fxp_analysis_tables.c fxp_fft.c \
+	fxp_fft_tables.c fxp_lpc_tables.c fxp_lpcspec.c fxp_math.c fxp_math_tables.c fxp_nlp_tables.c fxp_rdft.c interp.c \
+	lpc.c nlp.c quantise.c synthesis.c)
+M17V    := $(CORE)/m17/m17_voice.c $(CORE)/m17/m17_bench.c
+TESTS   += m17VoiceTest
+m17VoiceTest: m17VoiceTest.c ../data/voice/test_transmission.pcm $(M17V) $(wildcard $(CORE)/m17/*.h) $(C2SRC)
+	$(CC) $(CFLAGS) -O2 -I$(C2)/include -o $@ m17VoiceTest.c $(M17V) $(C2SRC) -lm
 
 # The MBE synthesis core and the full-rate voice decoder on it (core/mbe), against golden vectors
 MBE2400 := $(wildcard $(CORE)/mbe/mbe2400*.c)
@@ -296,6 +313,8 @@ run: $(TESTS)
 	./nxdnTest | tail -1
 	./nxdnEngineTest | tail -1
 	./ysfTest | tail -1
+	./m17Test | tail -1
+	./m17VoiceTest | tail -1
 	./p25TrunkTest
 	./p25VoiceTest
 	./p25VoiceLevelTest
@@ -431,7 +450,7 @@ radioCoreTestAir: $(RCAIR) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/
                   $(CORE)/ui/ui_svc.h $(wildcard $(CORE)/nxdn/*.h) $(wildcard $(CORE)/p25/*.h) $(wildcard $(CORE)/ysf/*.h) \
                   $(wildcard $(CORE)/air/*.h) $(wildcard $(CORE)/dmr/ambe/*.h)
 	$(CC) $(CFLAGS) $(CORE_HAL) -I. -DDMR_RX_TRACE=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_SFR=1 -DCONFIG_APRS=0 \
-		-DCONFIG_P25=1 -DCONFIG_NXDN=1 -DCONFIG_NXDN_SCRAMBLER=1 -DCONFIG_YSF=1 -DCONFIG_AIR_RAW=1 -o $@ $(RCAIR) -lm
+		-DCONFIG_P25=1 -DCONFIG_NXDN=1 -DCONFIG_NXDN_SCRAMBLER=1 -DCONFIG_YSF=1 -DCONFIG_YSF_VW=1 -DCONFIG_AIR_RAW=1 -o $@ $(RCAIR) -lm
 
 # The same with APRS: what the data service hears goes into the station list (a DMR APRS position, docs/spec/aprs.md 8.2)
 TESTS   += radioCoreTestAprs
@@ -1788,10 +1807,18 @@ run-cpsfast: cpsFastTest
 # debug link's VERSION, CODEPLUG and IDDB, for tools/cps_fast.py (cpsFastClientTest.py)
 PYTHON  ?= $(shell command -v python3)
 TESTS   += cpsSim
-SIMDL   := $(CPSF) $(CORE)/debuglink/dl_frame.c $(CORE)/debuglink/debuglink_iddb.c
+SIMDL   := $(CPSF) $(CORE)/debuglink/dl_frame.c $(CORE)/debuglink/debuglink_iddb.c $(CORE)/debuglink/dl_fmt.c \
+	   $(CORE)/debuglink/debuglink_view_power.c
 
 cpsSim: cpsSim.c $(CPS) $(SIMDL) $(CORE)/codeplug/dmr_iddb.c $(wildcard $(CORE)/cps/*.h $(CORE)/codeplug/*.h $(CORE)/settings/*.h $(CORE)/storage/*.h)
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -I. -Wshadow -DCONFIG_TFTP=0 -o $@ cpsSim.c $(CPS) $(SIMDL) $(CORE)/codeplug/dmr_iddb.c
+
+# cpsSim as one real radio (site/tests/fixtures.py): SIM_RADIO_H its generated header (name, flash map, power levels,
+# features), SIM_DEFS the board's codeplug base defines (board.mk MCU_DEFS), SIM_OUT the program
+sim-radio: cpsSim.c $(CPS) $(SIMDL) $(CORE)/codeplug/dmr_iddb.c $(SIM_RADIO_H)
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -I. -Wshadow -DCONFIG_TFTP=0 -DSIM_RADIO_H='"$(SIM_RADIO_H)"' $(SIM_DEFS) -o $(SIM_OUT) \
+		cpsSim.c $(CPS) $(SIMDL) $(CORE)/codeplug/dmr_iddb.c
+.PHONY: sim-radio
 
 run: run-cpsclient
 run-cpsclient: cpsSim
