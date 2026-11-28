@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 David Behnke -->
 
 # Programming the Radio
 
@@ -237,6 +238,11 @@ Pick **YSF** in the channel form's **Mode** for YSF (C4FM DN voice). Using it on
 |---|---|
 | TX DG-ID | DG-ID sent, 0-99 |
 | RX DG-ID | DG-ID heard, 0-99. 0 hears every DG-ID |
+| Voice mode | How PTT sends: **DN** (V/D mode 2, the default), **VW** (Voice Wide, full rate) or **V/D 1** |
+| Deviation | **Wide** (the default) or **Narrow**. Use Narrow only where the system asks for it |
+
+Firmware older than these two fields reads every YSF channel as DN Wide. Some firmware does not send VW or V/D 1 yet,
+and the radio then sends DN. CSV files carry both fields as **YSF Voice Mode** and **YSF Deviation**.
 
 **Radio tab:**
 
