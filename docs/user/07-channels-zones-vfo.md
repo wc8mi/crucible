@@ -437,14 +437,14 @@ they say "NXDN: set in the channel".
 ### YSF in the VFO
 
 On a radio that runs YSF, YSF is one of the VFO's modes, after NXDN ("VFO: YSF"). It is YSF
-digital voice in DN mode (C4FM, 12.5 kHz), through the radio's DMR voice codec. Other YSF radios, repeaters
+digital voice (C4FM, 12.5 kHz): DN by default, through the radio's DMR voice codec. Other YSF radios, repeaters
 and room nodes hear it as they hear a commercial portable.
 
 - It hears voice calls in DN, V/D mode 1 and, where the radio runs P25, VW (full rate), with every DG-ID. A VW call
   takes the P25 voice path for its length, so its first fraction of a second is lost. A call in data mode shows on
   Home but stays silent.
-- PTT sends in the channel's voice mode: DN by default, VW or V/D 1 where set ([YSF channel](04-programming.md)). VW
-  is sent at the **P25 TX level**. VW and V/D 1 transmit have not been checked on air yet.
+- PTT sends in the voice mode set for the VFO (below) or the channel: DN by default. VW is sent at the **P25 TX
+  level**. VW and V/D 1 transmit have not been checked on air yet.
 - PTT sends with DG-ID 0, your callsign and your radio ID. The callsign is the codeplug's YSF callsign, else the first
   word of the radio name when it reads as a callsign. Set it in **Settings > My radio > YSF callsign**. Without one,
   Home says "No callsign" and PTT is refused.
