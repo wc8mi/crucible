@@ -186,7 +186,8 @@ The result is `build/crucible-site/`. Copy it to `/crucible/` on the tinker host
   On the tinker host these are `/crucible/api/amsat-tle` and `/crucible/api/pe0sat-tle`: GET-only proxies in Caddy
   that send no visitor headers. PE0SAT (`http://tle.pe0sat.nl/kepler/amateur.txt`) serves HTTP only; the proxy gives the
   page HTTPS. The page
-  allows requests to this site only. The satellite frequencies are the page's own table, not a download
+  allows requests to this site only. The satellite frequencies are the page's own table, not a download (it matches
+  `core/satellite/frequency.c`; its listen-only and six-digit satellites need firmware with satellite protocol 8)
 - fails the build if a page links to a local file that is not there
 
 The look lives in `site/crucible/` (`crucible.css`, the self-hosted Barlow Condensed heading face, OFL-1.1). It loads
