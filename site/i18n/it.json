@@ -138,6 +138,7 @@
  "tools.satellite.selection": "Satelliti FM AMSAT",
  "tools.satellite.option": "NORAD {id} · RX {rx} MHz · TX {tx} MHz",
  "tools.satellite.option_age": "TLE di {age} g fa ({source})",
+ "tools.satellite.option_listen": "NORAD {id} · RX {rx} MHz · solo ascolto, niente TX",
  "tools.satellite.search": "Filtra per nome o ID NORAD",
  "tools.satellite.no_matches": "Nessun satellite corrisponde al filtro.",
  "tools.satellite.push": "Invia alla radio via USB/seriale",
@@ -160,6 +161,7 @@
  "tools.satellite.status.push_failed": "Sincronizzazione radio non riuscita: {error}",
  "tools.satellite.status.profile_version": "Per sincronizzare più di quattro satelliti è necessaria la versione 6 o successiva del protocollo satellitare della radio.",
  "tools.satellite.status.single_band": "Questa radio a banda singola non può usare i profili di frequenza satellitare selezionati. Usa una radio dual band oppure esegui satellite_tle.py sync per installare i TLE senza profili di frequenza.",
+ "tools.satellite.status.wide_version": "I numeri di catalogo a sei cifre e i satelliti di solo ascolto richiedono la versione 8 o successiva del protocollo satellitare della radio. Aggiorna il firmware della radio.",
  "tools.satellite.status.band_error": "Le bande supportate dalla radio non coprono i profili di frequenza satellitare selezionati.",
  "tools.satellite.status.radio_connecting": "Scegli e collega la radio via USB/seriale…",
  "tools.satellite.status.radio_checking": "Verifica della radio selezionata…",
@@ -1741,6 +1743,7 @@
  "editor.call.private": "Privata",
  "editor.call.all": "Chiamata a tutti",
  "editor.power.default": "Predefinita della radio",
+ "editor.power.factory": "Di fabbrica: {power}",
  "editor.power.min": "Minima",
  "editor.power.low": "Bassa",
  "editor.power.mid": "Media",
@@ -2472,5 +2475,13 @@
  "screen.caller_database_dual_p25": "Identità del chiamante P25 in doppio ascolto",
  "screen.channel_power_default": "Editor canale: uso della potenza predefinita della radio",
  "screen.power_default": "Impostazioni: scelta della potenza di trasmissione predefinita",
- "screen.power_quick": "Impostazioni rapide: scelta di qualsiasi potenza di trasmissione supportata"
+ "screen.power_quick": "Impostazioni rapide: scelta di qualsiasi potenza di trasmissione supportata",
+ "editor.target.label": "Fatto per",
+ "editor.target.any": "Qualsiasi radio",
+ "editor.target.all": "Tutte le {n} radio",
+ "editor.power.across": "Potenza su ogni radio",
+ "editor.problem.target_rx": "{radios}: non può ricevere su questa frequenza RX.",
+ "editor.problem.target_rx_ext": "{radios}: riceve questa frequenza RX solo con RX fuori banda attivo.",
+ "editor.problem.target_tx": "{radios}: non può trasmettere su questa frequenza TX.",
+ "editor.problem.target_mode": "{radios}: il firmware non ha {mode}."
 }

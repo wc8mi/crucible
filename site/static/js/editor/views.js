@@ -15,6 +15,7 @@ import { setKind } from "../codeplug/channelmodes.js";
 import { specField } from "./modefields.js";
 import { combo, comboText } from "./combo.js";
 import { radioPowerOptions } from "../codeplug/power.js";
+import { powerAcross } from "../codeplug/targets.js";
 
 // --- Parsers shared by the columns and the forms ---
 
@@ -146,7 +147,8 @@ export const toneCombo = (t) => () => ({
 export function powerOptions(t, power = null, row = {}, rows = null) {
 	if (power) return radioPowerOptions(t, power, row, rows);
 	const opts = [[0, t("editor.power.default")]];
-	for (let n = 1; n <= 10; n++) opts.push([n, POWER_NAMES[n] ? t(`editor.power.${POWER_NAMES[n].toLowerCase()}`) : t("editor.power.level", { n: n - 1 })]);
+	// a step without a name is its number on the portable scale, the number a CSV file writes for it
+	for (let n = 1; n <= 10; n++) opts.push([n, POWER_NAMES[n] ? t(`editor.power.${POWER_NAMES[n].toLowerCase()}`) : t("editor.power.level", { n })]);
 	return opts;
 }
 
@@ -305,8 +307,30 @@ export function systemOptions(m, t, type, current, optional = false) {
 	return out;
 }
 
-// features: the connected radio's (null: none), which says the kinds a channel may be made
-export function channelForm(m, t, { features = null, power = null } = {}) {
+// The channel's power on each radio it is made for (targets.js): the stored byte is the portable scale, so one
+// channel is a different level, and a different label, on each radio. Hidden for a channel that doesn't transmit
+export function powerAcrossField(t, targets) {
+	let list = null;	// drawn when the form opens (render), so the form's description builds without a page
+	return {
+		type: "custom", key: "powerAcross", parse: () => [],
+		render: () => {
+			list = h("ul", { class: "power-list" });
+			return h("div", { class: "form-row power-across" }, h("span", { class: "power-across-head" }, t("editor.power.across")), list);
+		},
+		show: (w, value) => !w.rxOnly && !listening(value),
+		sync: (w, value) => {
+			const hz = parseFreq(value("txHz")) ?? w.txHz;
+			list?.replaceChildren(...powerAcross(targets, w.power, hz).map((x) => h("li", {},
+				h("span", { class: "power-radio" }, x.target.name),
+				h("strong", {}, x.label ?? t("editor.power.default")),
+				x.factory ? h("span", { class: "power-note" }, t("editor.power.factory", { power: x.factory })) : null)));
+		},
+	};
+}
+
+// features: the connected radio's (null: none), which says the kinds a channel may be made. power: the power profile
+// the choices name (power.js). targets: the radios the codeplug is made for (targets.js), for the power on each
+export function channelForm(m, t, { features = null, power = null, targets = null } = {}) {
 	const sel = (key, label, options, extra = {}) => ({ key, label: t(label), type: "select", options, ...extra });
 	const chk = (key, label) => ({ key, label: t(label), type: "bool" });
 	const txt = (key, label, parse, format) => ({ key, label: t(label), type: "text", parse, format });
@@ -365,6 +389,8 @@ export function channelForm(m, t, { features = null, power = null } = {}) {
 		sel("tot", "editor.col.tot", () => totOptions(t), { disabled: noTx }),
 		// a receive-only band makes the channel RX only on save (rxFreq): the box shows it as the RX frequency is typed
 		{ ...chk("rxOnly", "editor.col.rx_only"), implied: listening, get: rxOnlyGet, set: rxOnlySet },
+		// after RX Only and the frequencies, whose values it reads as they are typed
+		...(targets && targets.length > 1 ? [powerAcrossField(t, targets)] : []),
 		{ group: t("editor.form.mode_params"), show: (r) => !!r.kind },
 		...kindFields,
 		fm({ group: t("editor.form.analog") }),

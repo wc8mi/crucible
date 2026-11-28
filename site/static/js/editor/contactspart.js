@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The DMR ID Database tab: build the database, or private-call contacts, from RadioID.net users. Users come from a
 // user.csv the user downloads, or from RadioID's API for a few regions. The user picks regions, filters and the text
 // each record shows. The choices and the user's own RadioID API key are kept in this browser (localStorage), never
@@ -57,6 +58,10 @@ const B = {
 };
 
 const save = () => store(PREFS, B.prefs);
+// <div id="editor" data-rid="file">: a page whose policy lets it reach only its own site offers user.csv alone, since the
+// API goes through RadioID and a public proxy
+const FILE_ONLY = typeof document !== "undefined" && document.getElementById("editor")?.dataset.rid === "file";
+if (FILE_ONLY) B.prefs.mode = "file";
 
 register({
 	iddbTab(api) {
@@ -94,7 +99,7 @@ function build(api) {
 			B.prefs.mode = mode;
 			changed();
 		} }, h("strong", {}, title), h("span", { class: "small muted" }, text));
-	P.modes = h("div", { class: "choice-grid" },
+	P.modes = h("div", { class: "choice-grid", hidden: FILE_ONLY },
 		modeBtn("file", t("editor.rid.mode_file"), t("editor.rid.mode_file_help")),
 		modeBtn("api", t("editor.rid.mode_api"), t("editor.rid.mode_api_help")));
 	const picker = h("input", { type: "file", accept: ".csv,.txt", hidden: true, onchange: async () => {

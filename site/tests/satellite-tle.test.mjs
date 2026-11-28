@@ -5,8 +5,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { AMSAT_API, amsatEndpoint, buildTleBundle, DEFAULT_SELECTED_IDS, filterFmSatellites, MAX_SELECTED_PROFILES,
-	mergeNewest, parseTleCatalog, PE0SAT_API, PE0SAT_CATALOG, pe0satEndpoint, SATELLITES } from "../static/js/satellite-tle.js";
+import { AMSAT_API, amsatEndpoint, buildTleBundle, CATALOG_ID_MAX, DEFAULT_SELECTED_IDS, filterFmSatellites, MAX_SELECTED_PROFILES,
+	mergeNewest, parseTleCatalog, PE0SAT_API, PE0SAT_CATALOG, pe0satEndpoint, SATELLITES, tleCatalogField, tleCatalogId } from "../static/js/satellite-tle.js";
 
 const SAMPLE = `ISS (ZARYA)\n1 25544U 98067A   26317.20662175  .00008559  00000+0  16132-3 0  9990\n2 25544  51.6325 282.6584 0007349  20.2588 339.8690 15.49346920594859\nSO-50\n1 27607U 02058C   26316.49281663  .00001582  00000+0  20311-3 0  9999\n2 27607  64.5539  30.0380 0068124 235.0518 124.4178 14.83333417286454\nAO-91\n1 43017U 17073E   26317.60524444  .00008151  00000+0  33970-3 0  9990\n2 43017  97.4443 181.7665 0144887 171.0350 189.3523 15.14807395487992\n`;
 
@@ -149,6 +149,13 @@ test("the page refreshes AMSAT before export and retains checked satellites thro
 			getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value),
 		} });
 		await import("../static/js/tletool.js");
+		const startRows = elements["satellite-tle-options"].children;
+		const row = (id) => startRows.find((item) => item.dataset.id === String(id));
+		assert.equal(startRows.length, SATELLITES.length, "before a list loads, every built-in satellite is offered");
+		assert.match(row(59112).className, /tle-profile-listen/);
+		assert.match(row(59112).children[2].textContent, /RX 145\.880 MHz · listen only, no TX/);
+		assert.doesNotMatch(row(25544).className, /tle-profile-listen/);
+		assert.match(row(25544).children[2].textContent, /TX 145\.990 MHz/);
 		responseText = catalogAt(8);
 		const fetchCatalog = globalThis.fetch;
 		const pending = [];
@@ -384,12 +391,38 @@ test("merging keeps each satellite's newest lines, the first list's name, and th
 	assert.equal(older[0].source, "AMSAT", "an older copy does not replace a newer one");
 });
 
-test("an Alpha-5 catalog number is skipped, a malformed one rejected", () => {
+test("an Alpha-5 catalog number reads as six digits, a malformed one is rejected", () => {
 	const alpha = "NEW OBJECT\n1 A0240U 26179A   26331.58728273  .00000456  00000-0  42087-4 0  9998\n" +
 		"2 A0240  97.4000 100.0000 0010000  90.0000 270.0000 15.00000000  1234\n";
-	assert.deepEqual(parseTleCatalog(alpha + SAMPLE).map(({ catalog_id }) => catalog_id), [25544, 27607, 43017]);
+	assert.deepEqual(parseTleCatalog(alpha + SAMPLE).map(({ catalog_id }) => catalog_id), [100240, 25544, 27607, 43017]);
 	assert.throws(() => parseTleCatalog(alpha.replaceAll("A0240", "I0240") + SAMPLE), /invalid NORAD catalog ID/);
-	assert.throws(() => parseTleCatalog(alpha), /No TLE records/);
+	assert.throws(() => parseTleCatalog(alpha.replaceAll("A0240", "O0240") + SAMPLE), /invalid NORAD catalog ID/);
+	for (const [field, id] of [["00005", 5], ["A1101", 101101], ["H9999", 179999], ["J0000", 180000],
+		["P0000", 230000], ["Z9999", CATALOG_ID_MAX]]) {
+		assert.equal(tleCatalogId(field), id);
+		assert.equal(tleCatalogField(id), field);
+	}
+	assert.equal(tleCatalogId("I0000"), null);
+});
+
+test("a six-digit, listen-only satellite builds a bundle; a listen-only profile can't carry a tone", () => {
+	const line = (text) => {
+		const body = text.padEnd(68).slice(0, 68);
+		let sum = 0;
+		for (const char of body) sum += char >= "0" && char <= "9" ? Number(char) : char === "-" ? 1 : 0;
+		return body + (sum % 10);
+	};
+	const catalog = [{ catalog_id: 101102, name: "HADES-L",
+		line1: line("1 A1102U 25135BV  26317.20662175  .00008559  00000+0  16132-3 0  999"),
+		line2: line("2 A1102  97.4325 282.6584 0007349  20.2588 339.8690 15.4934692059485") }];
+	assert.deepEqual(parseTleCatalog(`HADES-L\n${catalog[0].line1}\n${catalog[0].line2}\n`), catalog);
+	const now = new Date("2026-11-14T00:00:00Z");
+	const bundle = buildTleBundle(catalog, [101102], { now });
+	assert.deepEqual(bundle.profiles, [{ catalog_id: 101102, rx_hz: 436665000, tx_hz: 0, tx_tone_tenths: 0 }]);
+	assert.throws(() => buildTleBundle(catalog, [101102], { now,
+		profiles: [{ catalog_id: 101102, rx_hz: 436665000, tx_hz: 0, tx_tone_tenths: 670 }] }), /enter valid RX/);
+	const listen = SATELLITES.filter((satellite) => satellite.txHz === 0);
+	assert.ok(listen.length >= 10 && listen.every((satellite) => satellite.toneHz === 0));
 });
 
 test("accepts bulletin satellites with manually supplied frequency profiles", () => {
