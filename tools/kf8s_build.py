@@ -339,7 +339,7 @@ def package_readme(version, parrot, without_aes, ysf=False, product=None, prerel
            if product else 'Use each image with its JSON manifest in the RadioFoundry web flasher.\n') +
         'Images contain no AMBE codec. Follow the flasher instructions to preserve or supply your codec.\n'
         'P25 remains unavailable where upstream has not implemented it. See the feature matrix.\n'
-        'Keep LICENSE, AUTHORS, CONTRIBUTORS, LICENSES/ and notices/ with redistributed downloads.\n')
+        'Keep LICENSE, LICENSE-MIT, CREDITS.md, AUTHORS, CONTRIBUTORS, LICENSES/ and notices/ with redistributed downloads.\n')
 
 
 def test_release_notices():
@@ -629,7 +629,7 @@ def main():
     (package / 'README.txt').write_text(package_readme(version, args.parrot, args.without_aes,
                                                        ysf=prefix in ('kf8sysf', 'crucible'), product=product,
                                                        prerelease=not product or crucible.is_prerelease(version)))
-    for name in ('LICENSE', 'AUTHORS', 'CONTRIBUTORS'):
+    for name in ('LICENSE', 'LICENSE-MIT', 'CREDITS.md', 'AUTHORS', 'CONTRIBUTORS'):
         shutil.copy2(ROOT / name, package / name)
     shutil.copytree(ROOT / 'LICENSES', package / 'LICENSES')
     copy_firmware_notices(package, images, build_env)
