@@ -6,6 +6,8 @@
 #include "config.h"
 #include "debuglink/debuglink.h"
 #include "debuglink/debuglink_proto.h"
+#include "hal_time.h"
+#include "clock/clock.h"
 #include "satellite/channels.h"
 #include "satellite/store.h"
 
@@ -171,6 +173,18 @@ size_t debuglink_cmd_satellite(const uint8_t *req, uint16_t len, uint8_t *out, s
 #if CONFIG_SATELLITE_TLE
 	if (len == 0u)
 		return status(out, DL_ST_BAD_ARG);
+	// The computer's time before a TLE push, so a radio without a GPS fix can predict passes at once. It needs no
+	// satellite store, so it comes before that check
+	if (req[0] == DL_SAT_OP_CLOCK_SET) {
+#if CONFIG_CLOCK
+		if (len != 5u)
+			return status(out, DL_ST_BAD_ARG);
+		return status(out, clock_set((int64_t)get32(req + 1u), CLOCK_SRC_HOST, hal_millis()) ? DL_ST_OK :
+				   DL_ST_REFUSED);
+#else
+		return status(out, DL_ST_UNAVAILABLE);
+#endif
+	}
 	if (!satellite_store_available())
 		return status(out, DL_ST_UNAVAILABLE);
 	switch (req[0]) {

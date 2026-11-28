@@ -1112,7 +1112,8 @@ requests answer at once. Bad argument (2) for any other operation or a longer pa
 `DL_CMD_SATELLITE` (`0x26`) stores explicitly selected TLE records when `CONFIG_SATELLITE_TLE` is enabled and the
 board map has a dedicated satellite area. It has no raw-address access. The operation layouts, record encoding,
 capacity and atomic commit behavior are specified in [satellite.md](satellite.md) 6. The command returns
-`DL_ST_UNAVAILABLE` when the feature or usable area is absent.
+`DL_ST_UNAVAILABLE` when the feature or usable area is absent. Operation `CLOCK_SET` (protocol v9) sets the UTC clock
+([clock.md](clock.md)) and works without the satellite area.
 
 ## 4. Safety
 

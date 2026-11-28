@@ -246,10 +246,10 @@ Every entry is validated before any install begins. Duplicate IDs, malformed ent
 omits or adds an ID reject the complete batch.
 
 Install uses debug-link command `0x26` (`SATELLITE`) and is available only when capability operation `INFO` succeeds.
-Protocol v9 adds `PROFILE_SET_CHUNK=14` to the operations: `INFO=0`, `LIST=1`, `BEGIN=2`, `DATA=3`,
+Protocol v9 adds `PROFILE_SET_CHUNK=14` and `CLOCK_SET=15` to the operations: `INFO=0`, `LIST=1`, `BEGIN=2`, `DATA=3`,
 `COMMIT=4`, `ABORT=5`, `SYNC_CHANNELS=6`, `PROFILE_GET=7`, `PROFILE_SET=8`, `REPLACE_BEGIN=9`,
-`PROFILE_STAGE=10`, `PROFILE_VALUES_GET=11`, `PROFILE_STAGE_CHUNK=12`, `SYNC_CHANNELS_STATUS=13` and
-`PROFILE_SET_CHUNK=14`. `INFO` reports protocol version, record capacity (`18`), installed count and profile capacity
+`PROFILE_STAGE=10`, `PROFILE_VALUES_GET=11`, `PROFILE_STAGE_CHUNK=12`, `SYNC_CHANNELS_STATUS=13`,
+`PROFILE_SET_CHUNK=14` and `CLOCK_SET=15`. `INFO` reports protocol version, record capacity (`18`), installed count and profile capacity
 (`18`) as `u8, u16, u16, u8`. Protocol v8 and older send the first three fields only and keep 10 profiles; a host
 checks a selection against both capacities before it starts a transfer. `INFO` is unavailable when the feature is
 off or the board has no valid dedicated satellite-data flash area. `LIST` takes a start index `u16` and returns
@@ -287,7 +287,11 @@ v6 to v8 support ten and protocol v9 eighteen. The host reads both back before r
 up to 15 IDs from the built-in catalog for the legacy profile-only workflow, the most one 64-byte request holds.
 `PROFILE_SET_CHUNK=14` (protocol v9) sends a longer list: total count `u8`, starting index `u8`, chunk count `u8`,
 then up to 15 IDs `u32`. Chunks start at index 0 and follow each other with no gap; a gap is refused and drops the
-partial list. The radio applies the list only with its last chunk, and keeps the old list if the new one is refused. The PC utility uses replacement for every install
+partial list. The radio applies the list only with its last chunk, and keeps the old list if the new one is refused.
+`CLOCK_SET=15` (protocol v9) takes UTC seconds `u32` and sets the UTC clock as a computer time (`HOST`,
+[clock.md](clock.md)). It answers `DL_ST_REFUSED` for a time the clock refuses, and `DL_ST_UNAVAILABLE` in a build
+without `CONFIG_CLOCK`; it needs no satellite area. The PC utility and the web page send it before `REPLACE_BEGIN` on a
+protocol v9 radio, so a radio without a GPS fix predicts passes at once; either refusal leaves the push going. The PC utility uses replacement for every install
 and sync, including schema-v1 bundles, and requires protocol v4 or later. PC TLE synchronization does not invoke
 `SYNC_CHANNELS` and does not create, modify, or remove codeplug zones or channels. The separate `SYNC_CHANNELS`
 operation remains explicit and is not part of PC install. Removing a TLE from the satellite inventory removes it from

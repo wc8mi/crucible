@@ -115,7 +115,8 @@ enum {
 	DL_SAT_OP_PROFILE_VALUES_GET,	// -> count u8, then (ID, RX Hz, TX Hz u32, tone tenths u16) records
 	DL_SAT_OP_PROFILE_STAGE_CHUNK,	// transaction ID u16, total u8, offset u8, count u8, then profile records
 	DL_SAT_OP_SYNC_CHANNELS_STATUS,	// -> satellite_channels_sync_status_t
-	DL_SAT_OP_PROFILE_SET_CHUNK	// v9: total u8, start u8, count u8, then IDs u32; applied with the last chunk
+	DL_SAT_OP_PROFILE_SET_CHUNK,	// v9: total u8, start u8, count u8, then IDs u32; applied with the last chunk
+	DL_SAT_OP_CLOCK_SET		// v9: UTC seconds u32; sets the clock as a computer time
 };
 
 // DL_CMD_HWOPT operations (first payload byte; docs/spec/debuglink.md 3.25)

@@ -165,7 +165,7 @@ class SatelliteTleTest(unittest.TestCase):
                 return struct.pack("<H", struct.unpack_from("<H", payload, 2)[0] + len(payload) - 4)
             if operation == satellite_tle.OP_COMMIT:
                 return b""
-            if operation == satellite_tle.OP_SYNC_CHANNELS:
+            if operation in (satellite_tle.OP_SYNC_CHANNELS, satellite_tle.OP_CLOCK_SET):
                 return b""
             raise AssertionError(f"unexpected operation {operation}")
 

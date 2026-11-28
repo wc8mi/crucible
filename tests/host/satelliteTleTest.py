@@ -10,6 +10,7 @@ import random
 import struct
 import sys
 import tempfile
+import time
 import urllib.parse
 import zlib
 
@@ -70,8 +71,10 @@ class FakeResponse:
 
 class FakeRadio:
     def __init__(self, installed=None, capacity=8, fail_data=False, protocol_version=tle.SATELLITE_PROTOCOL_VERSION,
-                 profile_max=None):
+                 profile_max=None, clock_status=0):
         self.capacity = capacity
+        self.clock_status = clock_status
+        self.clock_utc = None
         self.profile_max = profile_max if profile_max is not None else \
             tle.MAX_PROFILES if protocol_version >= tle.PROFILE_SET_CHUNK_PROTOCOL_VERSION else tle.LEGACY_MAX_PROFILES
         self.profile_set = None
@@ -168,6 +171,15 @@ class FakeRadio:
                 raise DebugLinkError("profile operations unsupported", 1)
             count = args[0]
             self.profiles = list(struct.unpack_from(f"<{count}I", args, 1))
+            return 0, b""
+        if operation == tle.OP_CLOCK_SET:
+            if self.protocol_version < tle.PROFILE_SET_CHUNK_PROTOCOL_VERSION:
+                raise DebugLinkError("unknown operation", 3)
+            if len(args) != 4:
+                raise AssertionError("invalid clock set")
+            if self.clock_status:
+                raise DebugLinkError("clock refused", self.clock_status)
+            (self.clock_utc,) = struct.unpack("<I", args)
             return 0, b""
         if operation == tle.OP_PROFILE_SET_CHUNK:
             if self.protocol_version < tle.PROFILE_SET_CHUNK_PROTOCOL_VERSION:
@@ -574,6 +586,14 @@ def test_eighteen():
                  "tx_tone_tenths": 670} for index, catalog_id in enumerate(ids)]
     radio = FakeRadio(capacity=18)
     result = tle.install_records(radio, records, ids, profiles)
+    ops = [payload[0] for _, payload in radio.calls]
+    check(radio.clock_utc is not None and abs(radio.clock_utc - time.time()) < 60 and
+          ops.index(tle.OP_CLOCK_SET) < ops.index(tle.OP_REPLACE_BEGIN), "protocol v9 sets the clock before the push")
+    refused = FakeRadio(capacity=18)
+    refused.clock_status = 6
+    check(tle.install_records(refused, records, ids, profiles)["count"] == 18 and refused.clock_utc is None,
+          "a radio without a clock still takes the push")
+    check(not tle.set_radio_clock(FakeRadio(capacity=18, clock_status=7), 1795824000), "a refused time returns False")
     chunks = [payload for _, payload in radio.calls if payload[0] == tle.OP_PROFILE_STAGE_CHUNK]
     check(result["count"] == 18 and result["frequency_profiles"] == profiles and len(chunks) == 5,
           "protocol v9 installs 18 records and profiles")
