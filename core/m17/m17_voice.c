@@ -173,20 +173,22 @@ static void tx_block(m17_voice_mem_t *m, const int16_t *mic)
 	STORE(tq_in, in + 1u);
 }
 
-void m17_voice_block(const int16_t *mic, int16_t *spk)
+bool m17_voice_block(const int16_t *mic, int16_t *spk)
 {
 	m17_voice_mem_t *m = LOAD(mem);
 
 	if (m == NULL) {
 		if (spk)
 			memset(spk, 0, M17_VOICE_SAMPLES * sizeof spk[0]);
-		return;
+		return false;
 	}
 	if (LOAD(tx_on)) {
 		tx_block(m, mic);
 		if (spk)
 			memset(spk, 0, M17_VOICE_SAMPLES * sizeof spk[0]);
-	} else if (spk) {
-		rx_block(m, spk);
+		return false;
 	}
+	if (spk)
+		rx_block(m, spk);
+	return playing;
 }

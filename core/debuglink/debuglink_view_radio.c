@@ -438,12 +438,13 @@ uint8_t debuglink_radio_feature_op(uint8_t op, const uint8_t *a, uint16_t len)
 	case DL_OP_DMR_FIELDS:
 		// mode (0xFF = keep, else radio_mode_t), color code (0xFF = keep), timeslot (0 = keep): on a channel they are
 		// temporary changes, in the VFO the VFO's own settings. The radio core refuses what it can't do
-		if (len < 3 || (a[0] != 0xFF && a[0] > RADIO_MODE_YSF) || (a[1] != 0xFF && a[1] > 15) || a[2] > 2) {
+		if (len < 3 || (a[0] != 0xFF && a[0] > RADIO_MODE_M17) || (a[1] != 0xFF && a[1] > 15) || a[2] > 2) {
 			return DL_ST_BAD_ARG;
 		}
 #if CONFIG_DMR || CONFIG_P25
 		if ((a[0] == RADIO_MODE_DMR && !CONFIG_DMR) || (a[0] == RADIO_MODE_P25 && !CONFIG_P25) ||
 		    (a[0] == RADIO_MODE_NXDN && !CONFIG_NXDN) || (a[0] == RADIO_MODE_YSF && !CONFIG_YSF) ||
+		    (a[0] == RADIO_MODE_M17 && !CONFIG_M17) ||
 		    ((a[1] != 0xFF || a[2] != 0) && !CONFIG_DMR)) {
 			return DL_ST_UNAVAILABLE;
 		}
@@ -544,6 +545,28 @@ uint8_t debuglink_radio_feature_op(uint8_t op, const uint8_t *a, uint16_t len)
 #else
 		return DL_ST_UNAVAILABLE;
 #endif
+	case DL_OP_M17: {
+		// The M17 settings (radio_m17_settings_t, RAM only; docs/spec/debuglink.md 3.8): u8 CAN (0..15), u8 flags
+		// (bit 0: hear every CAN), then the destination, 0 to 9 ASCII characters (none or "ALL": broadcast). A
+		// stored M17 channel keeps its own; the callsign is the codeplug's (docs/spec/m17-codeplug.md)
+		if (len < 2 || len > 2 + RADIO_M17_DEST_LEN || a[0] > 15 || (a[1] & 0xFEu) != 0) {
+			return DL_ST_BAD_ARG;
+		}
+#if CONFIG_M17
+		radio_m17_settings_t m = { .can = a[0], .hear_any = (a[1] & 1u) != 0 };
+
+		for (uint16_t i = 2; i < len; i++) {
+			if (a[i] < 0x20 || a[i] > 0x7E) {
+				return DL_ST_BAD_ARG;
+			}
+			m.dest[i - 2] = (char)a[i];
+		}
+		radio_req_m17_settings(&m);
+		return DL_ST_OK;
+#else
+		return DL_ST_UNAVAILABLE;
+#endif
+	}
 	case DL_OP_VFO_SFR:
 		// u8: the VFO's SFR role as a channel's SFR byte A (sfr.h; role bits 0 = none). The radio core refuses it
 		// outside the VFO; dmr.sfr_role shows what it took

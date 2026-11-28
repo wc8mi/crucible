@@ -272,5 +272,5 @@ test("YSF values a channel can't take are problems naming row and column; the ro
 	assert.equal(k.channels.find((c) => c.name === "YSF VW").kind, 0);
 	const bad = importTable(empty(), "Name,Mode,RX Frequency\nX,D-Star,145.6\n").problems[0];
 	assert.equal(bad.code, "bad_value");
-	assert.match(bad.params.allowed, /^FM, DMR, P25, NXDN, YSF/);
+	assert.match(bad.params.allowed, /^FM, DMR, P25, NXDN, M17, YSF/);
 });

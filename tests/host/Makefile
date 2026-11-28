@@ -158,6 +158,11 @@ M17     := $(CORE)/m17/m17_frame.c $(CORE)/m17/m17_addr.c
 TESTS   += m17Test
 m17Test: m17Test.c ../vectors/m17-frames.txt $(M17) $(wildcard $(CORE)/m17/*.h) $(FEC)
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ m17Test.c $(M17) $(FEC)
+# M17 receive: the call layer and the engine through the framer and the session, on a made-up provider
+M17RX   := $(CORE)/m17/m17_call.c $(CORE)/m17/m17_engine.c $(CORE)/air/air_voice.c $(CORE)/air/air_session.c $(CORE)/air/air_framer.c
+TESTS   += m17EngineTest
+m17EngineTest: m17EngineTest.c $(M17) $(M17RX) $(wildcard $(CORE)/m17/*.h) $(FEC)
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ m17EngineTest.c $(M17) $(M17RX) $(FEC) -lm
 
 # M17 voice and the Codec 2 benchmark (core/m17), on codec2-fixed-point: this tree's submodule, else
 # RFOUNDRY_THIRD_PARTY's (docs/dev/building.md "Worktrees")
@@ -314,6 +319,7 @@ run: $(TESTS)
 	./nxdnEngineTest | tail -1
 	./ysfTest | tail -1
 	./m17Test | tail -1
+	./m17EngineTest | tail -1
 	./m17VoiceTest | tail -1
 	./p25TrunkTest
 	./p25VoiceTest
@@ -452,6 +458,25 @@ radioCoreTestAir: $(RCAIR) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/
 	$(CC) $(CFLAGS) $(CORE_HAL) -I. -DDMR_RX_TRACE=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_SFR=1 -DCONFIG_APRS=0 \
 		-DCONFIG_P25=1 -DCONFIG_NXDN=1 -DCONFIG_NXDN_SCRAMBLER=1 -DCONFIG_YSF=1 -DCONFIG_YSF_VW=1 -DCONFIG_AIR_RAW=1 -o $@ $(RCAIR) -lm
 
+# Every air mode with M17 (CONFIG_M17): its channels, the engine on the fake board.air, its voice on the PCM stream, and
+# memory placement beside YSF VW without a lending vocoder
+TESTS   += radioCoreTestM17
+RCM17   := $(RCAIR) $(CORE)/radio/radio_m17.c $(CORE)/radio/radio_m17_mem.c $(CORE)/m17/m17_call.c \
+           $(CORE)/m17/m17_engine.c $(CORE)/debuglink/debuglink_view_m17.c m17BenchStub.c \
+           $(M17V) $(M17) out/c2/libc2fxp.a
+# codec2-fixed-point as an archive, built with its own flags: the radio core tests' -Wshadow is for our code
+C2OBJ   := $(patsubst %.c,out/c2/%.o,$(notdir $(C2SRC)))
+out/c2/%.o: $(C2)/src/%.c
+	@mkdir -p out/c2
+	$(CC) $(CFLAGS) -O2 -I$(C2)/include -c $< -o $@
+out/c2/libc2fxp.a: $(C2OBJ)
+	ar rcs $@ $(C2OBJ)
+radioCoreTestM17: $(RCM17) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/call/*.h) $(CORE)/dmr/dmrDataService.h \
+                  $(CORE)/ui/ui_svc.h $(wildcard $(CORE)/m17/*.h) $(wildcard $(CORE)/ysf/*.h) $(wildcard $(CORE)/air/*.h)
+	$(CC) $(CFLAGS) $(CORE_HAL) -I. -I$(C2)/include -DDMR_RX_TRACE=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_SFR=1 -DCONFIG_APRS=0 \
+		-DCONFIG_P25=1 -DCONFIG_NXDN=1 -DCONFIG_NXDN_SCRAMBLER=1 -DCONFIG_YSF=1 -DCONFIG_YSF_VW=1 -DCONFIG_M17=1 \
+		-DCONFIG_AIR_RAW=1 -o $@ $(RCM17) -lm
+
 # The same with APRS: what the data service hears goes into the station list (a DMR APRS position, docs/spec/aprs.md 8.2)
 TESTS   += radioCoreTestAprs
 RCAPRS  := $(RCORE) $(CORE)/aprs/aprs.c $(CORE)/aprs/aprs_ax25.c $(CORE)/aprs/aprs_dmr.c $(CORE)/aprs/aprs_host.c $(APRSLIB) \
@@ -579,7 +604,7 @@ boardBandTest: boardBandTest.c $(ROOT)/hal/board.h
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ boardBandTest.c
 
 run: run-core
-run-core: radioCoreTest radioCoreTestNoVfoDmr radioCoreTestNoAm radioCoreTestP25 radioCoreTestP25NoAgc radioCoreTestP25T radioCoreTestNxdn radioCoreTestP25Nxdn radioCoreTestAir radioCoreTestAprs radioCoreTestAprsDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest inputTest switchFollowTest aprsRadioTest quadratureTest serialmicTest miclevelTest resampleTest \
+run-core: radioCoreTest radioCoreTestNoVfoDmr radioCoreTestNoAm radioCoreTestP25 radioCoreTestP25NoAgc radioCoreTestP25T radioCoreTestNxdn radioCoreTestP25Nxdn radioCoreTestAir radioCoreTestM17 radioCoreTestAprs radioCoreTestAprsDmr radioFeaturesTest radioFeaturesTestNoDual roamTest radioListenBandsTest inputTest switchFollowTest aprsRadioTest quadratureTest serialmicTest miclevelTest resampleTest \
           rx2LinkTest keyassignTest volumePotTest powerSwitchTest powerKeyTest boardBandTest batteryTest
 	./aprsRadioTest
 	./radioCoreTest
@@ -590,6 +615,7 @@ run-core: radioCoreTest radioCoreTestNoVfoDmr radioCoreTestNoAm radioCoreTestP25
 	./radioCoreTestNxdn
 	./radioCoreTestP25Nxdn
 	./radioCoreTestAir
+	./radioCoreTestM17
 	./radioCoreTestP25T
 	./radioCoreTestAprs
 	./radioCoreTestAprsDmr
@@ -823,7 +849,7 @@ uiFlowTestNoPowerMenu: uiFlowTest.c $(UIDEPS)
 
 
 uiFlowTest: uiFlowTest.c $(UIDEPS) $(CORE)/p25/p25_parrot.h $(CORE)/dsp/tx_level.h
-	$(CC) $(UIFLAGS) -DCONFIG_P25=1 -DCONFIG_P25_TX_AGC=1 -DCONFIG_TX_DC_BLOCK=1 -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_P25_PARROT=1 -DCONFIG_P25_TRUNK=1 -DCONFIG_NXDN=1 -DCONFIG_YSF=1 -o $@ uiFlowTest.c $(UIAPP) -lz
+	$(CC) $(UIFLAGS) -DCONFIG_P25=1 -DCONFIG_P25_TX_AGC=1 -DCONFIG_TX_DC_BLOCK=1 -DCONFIG_TX_MIC_LIMITER=1 -DCONFIG_P25_PARROT=1 -DCONFIG_P25_TRUNK=1 -DCONFIG_NXDN=1 -DCONFIG_YSF=1 -DCONFIG_M17=1 -o $@ uiFlowTest.c $(UIAPP) -lz
 
 TESTS   += uiFlowTestP25NoAgc
 uiFlowTestP25NoAgc: uiFlowTest.c $(UIDEPS) $(CORE)/p25/p25_parrot.h $(CORE)/dsp/tx_level.h
@@ -1737,6 +1763,17 @@ run: run-ysfcp
 run-ysfcp: ysfCodeplugTest
 	./ysfCodeplugTest
 .PHONY: run-ysfcp
+
+TESTS   += m17CodeplugTest
+M17CP   := $(CPTAG) $(CORE)/codeplug/codeplug_talk.c $(CORE)/codeplug/codeplug_tag.c $(CORE)/codeplug/codeplug_records.c $(CORE)/m17/m17_codeplug.c
+
+m17CodeplugTest: m17CodeplugTest.c $(M17CP) $(wildcard $(CORE)/codeplug/*.h $(CORE)/m17/*.h)
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -I. -Wshadow -DCONFIG_AIR=1 -DCONFIG_M17=1 -o $@ m17CodeplugTest.c $(M17CP)
+
+run: run-m17cp
+run-m17cp: m17CodeplugTest
+	./m17CodeplugTest
+.PHONY: run-m17cp
 
 # Zone editing (core/codeplug/zone_edit.c) on the real codeplug over a simulated flash: add, move, remove, copy,
 # rename, delete, a new channel added in one step, the limits

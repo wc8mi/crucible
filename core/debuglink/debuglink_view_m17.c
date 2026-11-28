@@ -1,101 +1,71 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2026 David Behnke
-// The m17 section and RADIO op 45, the Codec 2 benchmark (docs/spec/debuglink.md 3.8; ADR 006 5, the CPU gate).
-// The codec needs more stack than the debug link's task has, so the op starts a task of its own (its stack from the
-// RTOS heap, freed when the run ends); the reply doesn't wait. The codec runs in the block M17's voice will run in
-// (radio_m17_voice_mem), so it is timed in that memory; the block is free only on an FM channel, without a scan. The
-// run pauses a tick between frames, so the radio goes on; the timing is hal_micros (the CPU's cycle counter on both
-// platforms).
-// "m17.built=0" without CONFIG_M17
+// The m17 section: M17 on the channel (docs/spec/m17.md 6, core/radio/radio_m17.h): the call heard, the settings in
+// force, what the board's provider gives M17, the engine's and the voice path's counters; then the Codec 2 benchmark's
+// keys (debuglink_m17_bench.c). "m17.built=0" without CONFIG_M17
 #include "config.h"
 #include "debuglink/debuglink.h"
-#include "debuglink/debuglink_proto.h"
 #if CONFIG_M17
-#include "FreeRTOS.h"
-#include "task.h"
-#include "hal_time.h"
-#include "debuglink/dlog.h"
-#include "m17/m17_bench.h"
-#include "hostlink/hostlink_view.h"
-#include "radio/radio.h"
 #include "radio/radio_m17.h"
+#include "m17/m17_call.h"
+#include "m17/m17_engine.h"
+#endif
 
-// make stack-check: 1,460 B deep on Cortex-M4 (the decoder), with room for the port and the margin
-#define M17_BENCH_STACK		512u	// words
-// Above the UI, input and host link tasks, so their work doesn't count in a frame's time; the radio task and the
-// audio task still run at their own priority, and everything runs in the pause between frames
-#define M17_BENCH_PRIORITY	(tskIDLE_PRIORITY + 4)
-
-enum { BENCH_IDLE, BENCH_RUNNING, BENCH_DONE, BENCH_NOMEM, BENCH_NOT_FM };
-static const char *const bench_names[] = { "idle", "running", "done", "nomem", "not_fm" };
-
-static volatile uint8_t bench_state;
-static uint16_t bench_runs;
-static m17_bench_result_t bench_res;
-
-static void bench_pause(void)
+#if CONFIG_M17
+static const char *deny_key(uint8_t d)
 {
-	vTaskDelay(1);
-}
-
-static void bench_task(void *arg)
-{
-	static const m17_bench_io_t io = { hal_micros, bench_pause };
-	m17_bench_run(arg, &io, &bench_res);	// the block goes back as it is: its next user sets it up again
-	bench_runs++;
-	bench_state = BENCH_DONE;
-	vTaskDelete(NULL);
-}
-
-uint8_t debuglink_m17_bench(void)
-{
-	if (bench_state == BENCH_RUNNING) {
-		return DL_ST_BUSY;
-	}
-	const radio_view_t *v = &hostlink_view;	// the debug link's own copy: large, and refreshed here
-	size_t len = 0;
-
-	radio_get_view(&hostlink_view);
-	if (v->ch.mode != RADIO_MODE_FM || v->scan != 0 || v->hotspot) {
-		bench_state = BENCH_NOT_FM;	// another mode, or one a scan may switch to, holds the block
-		return DL_ST_REFUSED;
-	}
-	void *m = radio_m17_voice_mem(&len);
-	if (m == NULL || len < sizeof(m17_bench_mem_t) || ((uintptr_t)m & 7u) != 0) {
-		dlog("debuglink: m17 bench, voice block %u of %u bytes", (unsigned)len, (unsigned)sizeof(m17_bench_mem_t));
-		bench_state = BENCH_NOMEM;
-		return DL_ST_UNAVAILABLE;
-	}
-	bench_state = BENCH_RUNNING;	// before the task: it runs at once, above this one
-	if (xTaskCreate(bench_task, "m17b", M17_BENCH_STACK, m, M17_BENCH_PRIORITY, NULL) != pdPASS) {
-		dlog("debuglink: m17 bench, no heap for its stack");
-		bench_state = BENCH_NOMEM;
-		return DL_ST_BUSY;
-	}
-	return DL_ST_OK;
-}
-
-// The share of a 20 ms frame, in percent
-static unsigned pct(uint32_t us)
-{
-	return (unsigned)((us * 100u + M17_BENCH_FRAME_US / 2u) / M17_BENCH_FRAME_US);
+	static const char *const names[] = { "none", "can", "enc", "c2_1600", "data" };
+	return d < sizeof names / sizeof names[0] ? names[d] : "?";
 }
 #endif
 
-void debuglink_view_m17(dl_text_t *t)
+void debuglink_view_m17(const radio_view_t *v, dl_text_t *t)
 {
 #if CONFIG_M17
-	m17_bench_result_t r = bench_res;	// a run in progress may tear a counter: its frames say so
-	uint32_t ea = r.enc_frames ? r.enc_us / r.enc_frames : 0, da = r.dec_frames ? r.dec_us / r.dec_frames : 0;
+	const radio_m17_view_t *m = &v->m17;
+	radio_m17_settings_t s;
+	radio_m17_stats_t c;
 
-	dl_text(t, "m17.built=1\nm17.bench=%s\nm17.bench_runs=%u\nm17.bench_ok=%u\n", bench_names[bench_state], bench_runs,
-		bench_state == BENCH_DONE && m17_bench_ok(&r));
-	dl_text(t, "m17.enc_frames=%u\nm17.enc_us=%lu\nm17.enc_max_us=%lu\nm17.enc_pct=%u\nm17.enc_max_pct=%u\n",
-		r.enc_frames, (unsigned long)ea, (unsigned long)r.enc_max_us, pct(ea), pct(r.enc_max_us));
-	dl_text(t, "m17.dec_frames=%u\nm17.dec_us=%lu\nm17.dec_max_us=%lu\nm17.dec_pct=%u\nm17.dec_max_pct=%u\n",
-		r.dec_frames, (unsigned long)da, (unsigned long)r.dec_max_us, pct(da), pct(r.dec_max_us));
-	dl_text(t, "m17.enc_hash=%08lx\nm17.dec_hash=%08lx\n", (unsigned long)r.enc_hash, (unsigned long)r.dec_hash);
+	// The call heard now, or the last one (on=0: the engine is not running on this channel)
+	dl_text(t, "m17.built=1\nm17.on=%u\nm17.fit=%u\n", (m->flags & RADIO_M17_ON) != 0, m->fit);
+	dl_text(t, "m17.rx=%u\nm17.rx.played=%u\nm17.rx.late=%u\nm17.rx.src=%s\nm17.rx.dst=%s\nm17.rx.can=%u\n",
+		(m->flags & RADIO_M17_RX) != 0, (m->flags & RADIO_M17_PLAYED) != 0, (m->flags & RADIO_M17_LATE) != 0,
+		m->src, m->dst, m->can);
+	dl_text(t, "m17.rx.enc=%u\nm17.rx.dtype=%u\nm17.rx.deny=%s\nm17.rx.text=%s\n", m17_type_enc(m->type),
+		(unsigned)(m17_type_data(m->type) >> 1), deny_key(m->deny), m->text);
+	// Transmit (ADR 006 step 4): refused for now; no_call: no callsign to send as
+	dl_text(t, "m17.tx=%u\nm17.tx.deny=%u\nm17.no_call=%u\n", m->tx, v->tx_deny, (m->flags & RADIO_M17_NO_CALL) != 0);
+	// The settings in force (a stored channel's own while the engine runs, else the VFO's), then the VFO's
+	dl_text(t, "m17.run.can=%u\nm17.run.any=%u\nm17.run.dst=%s\n", m->run_can, (m->flags & RADIO_M17_ANY) != 0,
+		m->run_dst[0] != '\0' ? m->run_dst : "ALL");
+	radio_m17_settings(&s);
+	dl_text(t, "m17.set.can=%u\nm17.set.any=%u\nm17.set.dst=%s\n", s.can, s.hear_any,
+		s.dest[0] != '\0' ? s.dest : "ALL");
+	radio_m17_stats(&c);
+	dl_text(t, "m17.begins=%u\nm17.begin_fails=%u\nm17.rx_calls=%u\nm17.lsf_ok=%u\nm17.lsf_fail=%u\n",
+		(unsigned)c.begins, (unsigned)c.begin_fails, (unsigned)c.air.rx_calls, (unsigned)c.lsf_ok,
+		(unsigned)c.lsf_fail);
+	dl_text(t, "m17.lich_ok=%u\nm17.lich_fail=%u\nm17.frames=%u\nm17.fn_gaps=%u\nm17.fec_bits=%u\n",
+		(unsigned)c.lich_ok, (unsigned)c.lich_fail, (unsigned)c.frames, (unsigned)c.fn_gaps, (unsigned)c.fec_bits);
+	dl_text(t, "m17.auth_frames=%u\nm17.eot=%u\nm17.packets=%u\nm17.held=%u\nm17.rx_chunks=%u\n",
+		(unsigned)c.auth_frames, (unsigned)c.eot, (unsigned)c.packets, (unsigned)c.held,
+		(unsigned)c.air.rx_chunks);
+	dl_text(t, "m17.tx_underruns=%u\nm17.tx_syms=%u\n", (unsigned)c.air.tx_underruns, (unsigned)c.air.tx_syms);
+	// The voice path: Codec 2 frames played, blocks concealed (a repeat or silence), blocks with nothing queued,
+	// frames dropped with the queue full, mic blocks encoded
+	dl_text(t, "m17.c2_frames=%u\nm17.c2_concealed=%u\nm17.c2_underruns=%u\nm17.c2_overflows=%u\nm17.tx_encoded=%u\n",
+		(unsigned)c.c2_frames, (unsigned)c.c2_concealed, (unsigned)c.c2_underruns, (unsigned)c.c2_overflows,
+		(unsigned)c.tx_encoded);
+	debuglink_view_m17_bench(t);
 #else
+	(void)v;
 	dl_text(t, "m17.built=0\n");
+#endif
+}
+
+void debuglink_m17_reset(void)
+{
+#if CONFIG_M17
+	radio_m17_reset_stats();
 #endif
 }

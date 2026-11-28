@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The radio core's task: a request queue in front of the state machine (radio_sm.c), a status poll every
 // RADIO_POLL_MS, the DMR call stack every RADIO_TICK_MS, and a snapshot of the view that other tasks copy under a
 // mutex. It also implements the hotspot's radio operations (hotspot_radio_ops_t): they post requests and never wait,
@@ -76,6 +77,9 @@ static radio_p25_settings_t pending_p25;	// radio_req_p25_settings -> the radio 
 #endif
 #if CONFIG_NXDN
 static radio_nxdn_settings_t pending_nxdn;	// radio_req_nxdn_settings -> the radio task, under view_lock
+#endif
+#if CONFIG_M17
+static radio_m17_settings_t pending_m17;	// radio_req_m17_settings -> the radio task, under view_lock
 #endif
 #if CONFIG_YSF
 static radio_ysf_settings_t pending_ysf;	// radio_req_ysf_settings -> the radio task, under view_lock
@@ -307,6 +311,15 @@ static void radio_task(void *arg)
 					n = pending_nxdn;
 					xSemaphoreGive(view_lock);
 					radio_nxdn_set_settings(&n);
+					radio_sm_request(&sm, &req, hal_millis());
+#endif
+#if CONFIG_M17
+				} else if (req.type == RREQ_M17_SET) {
+					radio_m17_settings_t m;
+					xSemaphoreTake(view_lock, portMAX_DELAY);
+					m = pending_m17;
+					xSemaphoreGive(view_lock);
+					radio_m17_set_settings(&m);
 					radio_sm_request(&sm, &req, hal_millis());
 #endif
 #if CONFIG_YSF
@@ -834,6 +847,18 @@ void radio_req_nxdn_settings(const radio_nxdn_settings_t *s)
 	pending_nxdn = *s;
 	xSemaphoreGive(view_lock);
 	post(RREQ_NXDN_SET, 0, pdMS_TO_TICKS(50));
+}
+#endif
+#if CONFIG_M17
+void radio_req_m17_settings(const radio_m17_settings_t *s)
+{
+	if (view_lock == NULL) {
+		return;
+	}
+	xSemaphoreTake(view_lock, portMAX_DELAY);
+	pending_m17 = *s;
+	xSemaphoreGive(view_lock);
+	post(RREQ_M17_SET, 0, pdMS_TO_TICKS(50));
 }
 #endif
 #if CONFIG_YSF

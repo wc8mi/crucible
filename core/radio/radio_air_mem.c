@@ -40,6 +40,9 @@ void *radio_air_imbe_mem(size_t *len)
 #if CONFIG_YSF
 #include "ysf/ysf_engine.h"
 #endif
+#if CONFIG_M17
+#include "m17/m17_engine.h"
+#endif
 
 // One block for whichever of them runs, 8-aligned as their users check (a uint64_t member is 4-aligned on some
 // cores: C-SKY's ABI, where the engines then refused the block)
@@ -49,6 +52,9 @@ typedef union {
 #endif
 #if CONFIG_YSF
 	ysf_engine_t ysf;
+#endif
+#if CONFIG_M17
+	m17_engine_t m17;	// radio_m17_mem.c
 #endif
 	uint64_t u64;
 } engine_mem_t;

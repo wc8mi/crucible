@@ -114,7 +114,7 @@ static void testSpeech(void)
 		const int16_t *mic = &pcm[b * M17_VOICE_SAMPLES];
 		c2fxp_encode(&ref_enc, bits, mic);
 		h = fnv(h, bits, sizeof bits);
-		m17_voice_block(mic, spk);
+		CHECK(!m17_voice_block(mic, spk), "nothing plays while transmitting");
 		CHECK(silent(spk), "the speaker is quiet while transmitting");
 		if ((b & 1) && taken < nframes && m17_voice_tx_take(pl[taken]))
 			taken++;
@@ -150,15 +150,18 @@ static void testSpeech(void)
 			if (f == nframes)
 				m17_voice_rx_end();
 		}
-		m17_voice_block(NULL, spk);
+		bool on = m17_voice_block(NULL, spk);
 		if (played < blocks && !(played == 0 && silent(spk))) {
+			if (!on)
+				same = false;	// the speaker route follows the sound
 			c2fxp_decode(&ref_dec, want, &pl[played / 2][(played & 1) * M17_VOICE_BYTES]);
 			same &= !memcmp(spk, want, sizeof spk);
 			played++;
 		} else if (played == 0) {
 			quiet_lead++;
+			CHECK(!on, "not playing while priming (block %zu)", b);
 		} else {
-			CHECK(silent(spk), "silence after the call (block %zu)", b);
+			CHECK(silent(spk) && !on, "silence after the call, not playing (block %zu)", b);
 		}
 	}
 	CHECK(same && played == blocks, "every frame decoded as the codec decodes it: %zu of %zu", played, blocks);
@@ -168,7 +171,7 @@ static void testSpeech(void)
 	      st.rx_overflows == 0, "rx stats in %u played %u calls %u under %u over %u", st.rx_in, st.rx_frames,
 	      st.rx_calls, st.rx_underruns, st.rx_overflows);
 	m17_voice_end();
-	m17_voice_block(NULL, spk);
+	CHECK(!m17_voice_block(NULL, spk), "ended: not playing");
 	CHECK(silent(spk), "ended: silence");
 	m17_voice_rx(pl[0], true);
 	CHECK(!m17_voice_tx_take(rest), "ended: nothing taken");

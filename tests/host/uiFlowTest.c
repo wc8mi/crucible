@@ -296,6 +296,17 @@ static const flow_t flows[] = {
 #if CONFIG_YSF
 	// YSF: the power, the DG-ID heard and our radio ID in the chips, the DG-ID PTT sends on the talk line; a call names
 	// its caller by callsign
+#if CONFIG_M17
+	// M17 (m17.md 6): the power and the CAN heard in the chips, where PTT sends on the talk line; a call names its
+	// caller and destination by callsign, a call not played says why, META text takes the talk line while heard
+	{ "M17 channel shows its mode", "dlmode:m17", "", "mode=m17 screen=home shows=M17 shows=CAN_0 shows=@ALL hides=No_tone", 0, false },
+	{ "M17 home: a call", "dlmode:m17", "m17rx:N1ABC,@ALL,0", "screen=home shows=N1ABC", 0, false },
+	{ "M17 home: META text", "dlmode:m17", "m17rx:N1ABC,M17-M17_A,0,0,Hello_from_M17", "screen=home shows=N1ABC shows=Hello_from_M17", 0, false },
+	{ "M17 home: another CAN", "dlmode:m17", "m17rx:N1ABC,@ALL,7,1", "screen=home shows=Other_CAN:_not_played hides=N1ABC", 0, false },
+	{ "M17 home: encrypted", "dlmode:m17", "m17rx:N1ABC,@ALL,0,2", "screen=home shows=Encrypted:_not_played", 0, false },
+	{ "M17 home: voice and data", "dlmode:m17", "m17rx:N1ABC,@ALL,0,3", "screen=home shows=Voice+data:_not_played", 0, false },
+	{ "M17 home: after the call", "dlmode:m17 m17rx:N1ABC,@ALL,0", "m17end", "screen=home hides=N1ABC", 0, false },
+#endif
 	{ "YSF channel shows its mode", "dlmode:ysf", "", "mode=ysf screen=home shows=YSF shows=DG-ID_00 hides=K7Q2Z hides=No_tone hides=SQ5", 0, false },
 	{ "YSF home: a call", "dlmode:ysf", "ysfrx:N1ABC,12", "screen=home shows=N1ABC shows=DG-ID_12", 0, false },
 	{ "YSF home: another DG-ID", "dlmode:ysf", "ysfrx:N1ABC,12,o", "screen=home shows=Other_DG-ID:_not_played hides=N1ABC", 0, false },
@@ -1372,6 +1383,14 @@ static const flow_t flows[] = {
 	  false },
 	{ "S VFO mode: YSF shows on the strip", "ysf ok 4 up ok quick 4 back quick 4 back", "", "mode=ysf screen=home shows=YSF",
 	  0, false },
+#endif
+#if CONFIG_M17
+	// M17 last: after YSF, else after the last air mode the radio has (DMR where it has none); then FM
+	{ "S VFO mode: YSF to M17", "ysf m17 ok 4 up ok quick 4 back quick 4 back", "quick 4",
+	  "toast=VFO:_M17 mode=m17 temporary=0 vfo=1", 2, false },
+	{ "S VFO mode: DMR to M17", "m17 ok 4 up ok quick 4 back", "quick 4", "toast=VFO:_M17 mode=m17", 2, false },
+	{ "S VFO mode: M17 back to FM", "m17 ok 4 up ok quick 4 back quick 4 back", "quick 4", "toast=VFO:_FM mode=fm", 2,
+	  false },
 #endif
 	{ "S VFO mode: P25 shows on the strip", "p25 ok 4 up ok quick 4 back quick 4 back", "", "mode=p25 screen=home shows=P25",
 	  0, false },

@@ -154,7 +154,7 @@ const YSF = 103;
 // A file's other words for a mode (the fork and other tools write C4FM for YSF)
 const MODE_WORDS = { c4fm: YSF, fusion: YSF, analog: "fm", digital: "dmr" };
 
-// The Mode column: FM, DMR, or the channel's kind by its short name (P25, NXDN, YSF, T3, P25T, AES), so a file read back
+// The Mode column: FM, DMR, or the channel's kind by its short name (P25, NXDN, M17, YSF, T3, P25T, AES), so a file read back
 // keeps each channel's mode. A file can make a channel YSF, P25 or NXDN (kinds that need no system: optionalSystem or
 // none); a kind that needs a system (the trunked ones) only stays what it was
 const modeText = (r) => (r.kind ? kindRow(r.kind)?.short ?? MODES[r.mode] : MODES[r.mode]);

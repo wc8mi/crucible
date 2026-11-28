@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The registry of channel kinds and system types (docs/spec/channel-modes.md 4) in the Codeplug Editor: the same rows
 // as core/codeplug/codeplug_modes.h and the spec's tables (tools/check_modes.py checks all three). Each row names its
 // mode module, which knows the kind's or the type's bytes and fields; the generic layer (channelmodes.js) and the
@@ -12,6 +13,7 @@ import { p25Kind, p25TrunkKind, p25System } from "./mode_p25.js";
 import { aesKind, aesSystem } from "./mode_aes.js";
 import { nxdnKind, nxdnSystem } from "./mode_nxdn.js";
 import { ysfKind } from "./mode_ysf.js";
+import { m17Kind } from "./mode_m17.js";
 
 // id, the C token, the short name the radio shows, the feature that runs it, its module
 export const KINDS = [
@@ -20,6 +22,7 @@ export const KINDS = [
 	{ id: 3, token: "P25_TRUNK", short: "P25T", feature: "P25_TRUNK", module: p25TrunkKind },
 	{ id: 4, token: "NXDN", short: "NXDN", feature: "NXDN", module: nxdnKind },
 	{ id: 5, token: "DMR_AES", short: "AES", feature: "DMR_AES", module: aesKind },
+	{ id: 7, token: "M17", short: "M17", feature: "M17", module: m17Kind },
 	{ id: 103, token: "YSF", short: "YSF", feature: "YSF", module: ysfKind },
 ];
 
