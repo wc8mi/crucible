@@ -153,8 +153,10 @@ switch = "YSF_VW"
 spec = "docs/spec/ysf.md"
 source = ["core/ysf/ysf_vw.c", "core/ysf/ysf_vw.h", "core/ysf/ysf_call.c", "core/ysf/ysf_engine.c",
           "core/radio/radio_ysf.c", "core/radio/radio_air_mem.c", "core/p25/p25Voice.c", "core/fec/imbe88.c"]
-planned_tests = ["tests/hil/test_ysf.py::test_ysf_vw_rx", "tests/hil/test_ysf.py::test_ysf_vd1_rx"]
-manual = "Receive a Yaesu radio sending VW, then DN, on a YSF channel: both play, and Home shows VW then DN."
+planned_tests = ["tests/hil/test_ysf.py::test_ysf_vw_rx", "tests/hil/test_ysf.py::test_ysf_vd1_rx",
+                 "tests/hil/test_ysf.py::test_ysf_vw_tx", "tests/hil/test_ysf.py::test_ysf_vd1_tx"]
+manual = """Receive a Yaesu radio sending VW, then DN, on a YSF channel: both play, and Home shows VW then DN. \
+Set the channel's voice mode to VW, then V/D 1, and call the Yaesu radio: it plays both, at a level like DN's."""
 
 [feature.mbe2400]
 switch = "MBE2400"
