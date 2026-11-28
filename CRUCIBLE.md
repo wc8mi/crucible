@@ -178,10 +178,11 @@ The result is `build/crucible-site/`. Copy it to `/crucible/` on the tinker host
 - says Crucible wherever the flasher's English says RadioFoundry, and credits RadioFoundry in the footer
 - builds the shared Satellite TLE page at `tools/satellite/index.html` in the same shell. The front page links it, and
   the flasher offers it after an update, so a radio with the satellite feature gets new satellite data without new
-  firmware. Its AMSAT button reads the daily bulletin from `../../api/amsat-tle` (`data-amsat-api`), which is
-  `/crucible/api/amsat-tle` on the tinker host: a GET-only proxy in Caddy that sends no visitor headers. Its PE0SAT
-  button reads PE0SAT's amateur list the same way, from `../../api/pe0sat-tle` (`data-pe0sat-api`), proxied to
-  `http://tle.pe0sat.nl/kepler/amateur.txt`. PE0SAT serves HTTP only; the proxy gives the page HTTPS. The page
+  firmware. Its Load latest TLEs button reads the AMSAT daily bulletin from `../../api/amsat-tle` (`data-amsat-api`)
+  and PE0SAT's amateur list from `../../api/pe0sat-tle` (`data-pe0sat-api`), and keeps the newest TLE per satellite.
+  On the tinker host these are `/crucible/api/amsat-tle` and `/crucible/api/pe0sat-tle`: GET-only proxies in Caddy
+  that send no visitor headers. PE0SAT (`http://tle.pe0sat.nl/kepler/amateur.txt`) serves HTTP only; the proxy gives the
+  page HTTPS. The page
   allows requests to this site only. The satellite frequencies are the page's own table, not a download
 - fails the build if a page links to a local file that is not there
 

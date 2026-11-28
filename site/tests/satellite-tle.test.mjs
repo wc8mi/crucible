@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { AMSAT_API, amsatEndpoint, buildTleBundle, DEFAULT_SELECTED_IDS, filterFmSatellites, MAX_SELECTED_PROFILES,
-	parseTleCatalog, PE0SAT_API, PE0SAT_CATALOG, pe0satEndpoint, proxiedProvider, SATELLITES } from "../static/js/satellite-tle.js";
+	mergeNewest, parseTleCatalog, PE0SAT_API, PE0SAT_CATALOG, pe0satEndpoint, SATELLITES } from "../static/js/satellite-tle.js";
 
 const SAMPLE = `ISS (ZARYA)\n1 25544U 98067A   26317.20662175  .00008559  00000+0  16132-3 0  9990\n2 25544  51.6325 282.6584 0007349  20.2588 339.8690 15.49346920594859\nSO-50\n1 27607U 02058C   26316.49281663  .00001582  00000+0  20311-3 0  9999\n2 27607  64.5539  30.0380 0068124 235.0518 124.4178 14.83333417286454\nAO-91\n1 43017U 17073E   26317.60524444  .00008151  00000+0  33970-3 0  9990\n2 43017  97.4443 181.7665 0144887 171.0350 189.3523 15.14807395487992\n`;
 
@@ -72,9 +72,6 @@ test("the PE0SAT endpoint takes a same-origin path only", () => {
 	for (const other of [PE0SAT_CATALOG, "//evil.example/x", "http://tinker.example/crucible/api/pe0sat-tle"])
 		assert.equal(pe0satEndpoint(other, page), PE0SAT_API, other);
 	assert.equal(pe0satEndpoint("", page), PE0SAT_API);
-	assert.equal(proxiedProvider("../../api/pe0sat-tle", PE0SAT_CATALOG, page), "https://tinker.example/crucible/api/pe0sat-tle");
-	assert.equal(proxiedProvider(PE0SAT_API, PE0SAT_CATALOG, "http://localhost:8000/tools/satellite/"), PE0SAT_CATALOG);
-	assert.equal(proxiedProvider(PE0SAT_API, PE0SAT_CATALOG, undefined), PE0SAT_CATALOG);
 });
 
 test("PE0SAT proxy requests and serves uncached lists", async () => {
@@ -111,7 +108,7 @@ test("the page refreshes AMSAT before export and retains checked satellites thro
 		}
 		click() {}
 	}
-	const ids = ["satellite-tle-file", "tle-amsat", "tle-pe0sat", "satellite-tle-options", "satellite-tle-build",
+	const ids = ["satellite-tle-file", "tle-latest", "satellite-tle-options", "satellite-tle-build",
 		"satellite-tle-push", "satellite-tle-status", "tle-provider", "satellite-tle-search"];
 	const elements = Object.fromEntries(ids.map((id) => [id, new Element()]));
 	const strings = await readFile(new URL("../i18n/en.json", import.meta.url), "utf8");
@@ -119,6 +116,8 @@ test("the page refreshes AMSAT before export and retains checked satellites thro
 	const oldCreate = URL.createObjectURL, oldRevoke = URL.revokeObjectURL, oldTimeout = globalThis.setTimeout;
 	const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
 	const downloads = [], requests = [];
+	const storage = new Map();
+	const storageDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
 	let linkModule, savedLink;
 	let responseText;
 	const catalogAt = (daysAgo) => {
@@ -146,17 +145,21 @@ test("the page refreshes AMSAT before export and retains checked satellites thro
 		URL.createObjectURL = (blob) => { downloads.push(blob); return "blob:test"; };
 		URL.revokeObjectURL = () => {};
 		globalThis.setTimeout = (fn) => { fn(); return 0; };
+		Object.defineProperty(globalThis, "localStorage", { configurable: true, value: {
+			getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value),
+		} });
 		await import("../static/js/tletool.js");
 		responseText = catalogAt(8);
 		const fetchCatalog = globalThis.fetch;
-		let resolveFetch;
+		const pending = [];
 		globalThis.fetch = (...args) => new Promise((resolve) => {
-			resolveFetch = async () => resolve(await fetchCatalog(...args));
+			pending.push(async () => resolve(await fetchCatalog(...args)));
 		});
-		const loading = elements["tle-amsat"].fire("click");
+		const loading = elements["tle-latest"].fire("click");
 		assert.ok(elements["satellite-tle-build"].disabled && elements["satellite-tle-push"].disabled &&
 			elements["satellite-tle-file"].disabled);
-		await resolveFetch();
+		assert.equal(pending.length, 2, "both lists are fetched at once");
+		for (const resolve of pending) await resolve();
 		await loading;
 		globalThis.fetch = fetchCatalog;
 		elements["satellite-tle-search"].value = "ISS";
@@ -166,7 +169,8 @@ test("the page refreshes AMSAT before export and retains checked satellites thro
 		const bundle = JSON.parse(await downloads[0].text());
 		assert.deepEqual(bundle.profile_ids, [25544, 27607, 43017]);
 		assert.equal(bundle.records[0].line1, parseTleCatalog(responseText)[0].line1);
-		assert.equal(requests.length, 2);
+		assert.equal(requests.length, 4);
+		assert.deepEqual(requests.map(({ url }) => url), [AMSAT_API, PE0SAT_API, AMSAT_API, PE0SAT_API]);
 		assert.ok(requests.every(({ options }) => options.cache === "no-store"));
 
 		responseText = catalogAt(0).split("AO-91\n")[0];
@@ -233,7 +237,7 @@ test("the page refreshes AMSAT before export and retains checked satellites thro
 		assert.equal(opened, 1);
 		assert.match(elements["satellite-tle-status"].textContent, /profiles synced/);
 		assert.ok(new TextDecoder().decode(Uint8Array.from(transferred)).includes(parseTleCatalog(responseText)[0].line1));
-		assert.equal(requests.length, 4);
+		assert.equal(requests.length, 8);
 
 		globalThis.fetch = async () => new Response("", { status: 404 });
 		await elements["satellite-tle-build"].fire("click");
@@ -249,43 +253,61 @@ test("the page refreshes AMSAT before export and retains checked satellites thro
 		assert.equal(downloads.length, 2);
 		assert.equal(JSON.parse(await downloads[1].text()).records[0].line1, parseTleCatalog(fileText)[0].line1);
 
-		// PE0SAT: its own proxy, its URL as the source, and fetched again from there before the bundle is made
-		const pe0satRequests = [];
+		// Merged: per satellite the newest lines, AMSAT's name where it has one, the page as the bundle's provider
+		const amsatText = catalogAt(8).split("AO-91\n")[0];
 		// PE0SAT names some objects differently (IO-86 is LAPAN-A2 there): the box shows both names, search finds either
-		const pe0satText = catalogAt(0).replace("SO-50\n", "SAUDISAT 1C\n");
-		globalThis.fetch = async (url, options) => {
-			pe0satRequests.push({ url, options });
-			return new Response(pe0satText);
+		const pe0satText = catalogAt(0).replace("SO-50\n", "SAUDISAT 1C\n").replace("AO-91\n", "FOX-1B\n");
+		const listFetch = (amsat, pe0sat) => async (url) => {
+			const reply = url === AMSAT_API ? amsat : pe0sat;
+			return typeof reply === "number" ? new Response("", { status: reply }) : new Response(reply);
 		};
+		globalThis.fetch = listFetch(amsatText, pe0satText);
+		const page = "https://tinker.example/crucible/tools/satellite/index.html";
 		const locationDescriptor = Object.getOwnPropertyDescriptor(globalThis, "location");
-		Object.defineProperty(globalThis, "location", { configurable: true,
-			value: { href: "https://tinker.example/crucible/tools/satellite/index.html" } });
+		Object.defineProperty(globalThis, "location", { configurable: true, value: { href: `${page}?x=1#top` } });
 		try {
-			await elements["tle-pe0sat"].fire("click");
+			await elements["tle-latest"].fire("click");
 		} finally {
 			if (locationDescriptor) Object.defineProperty(globalThis, "location", locationDescriptor);
 			else delete globalThis.location;
 		}
-		const pe0satProvider = "https://tinker.example/api/pe0sat-tle";
-		assert.equal(elements["tle-provider"].value, pe0satProvider);
-		const labels = () => elements["satellite-tle-options"].children.filter((row) => row.dataset?.id)
-			.map((row) => row.children[1].textContent);
-		assert.deepEqual(labels(), ["ISS (ZARYA)", "SO-50 (SAUDISAT 1C)", "AO-91"]);
-		for (const query of ["so-50", "saudisat", "27607"]) {
+		assert.equal(elements["tle-provider"].value, page);
+		const rows = () => elements["satellite-tle-options"].children.filter((row) => row.dataset?.id);
+		const labels = () => rows().map((row) => row.children[1].textContent);
+		assert.deepEqual(labels(), ["ISS (ZARYA)", "SO-50", "AO-91 (FOX-1B)"]);
+		assert.ok(rows().every((row) => /TLE <1 d old \(PE0SAT\)$/.test(row.children[2].textContent)),
+			rows().map((row) => row.children[2].textContent).join("; "));
+		for (const query of ["ao-91", "fox", "43017"]) {
 			elements["satellite-tle-search"].value = query;
 			elements["satellite-tle-options"].replaceChildren();
 			await elements["satellite-tle-search"].fire("input");
-			assert.deepEqual(labels(), ["SO-50 (SAUDISAT 1C)"], query);
+			assert.deepEqual(labels(), ["AO-91 (FOX-1B)"], query);
 		}
 		elements["satellite-tle-search"].value = "";
 		await elements["satellite-tle-search"].fire("input");
+		for (const checkbox of elements["satellite-tle-options"].querySelectorAll("input")) {
+			if (checkbox.value === "43017" && !checkbox.checked) {
+				checkbox.checked = true;
+				await checkbox.fire("change");
+			}
+		}
+		assert.deepEqual(JSON.parse(storage.get("satellite-tle-picks")).sort(), [25544, 43017]);
 		await elements["satellite-tle-build"].fire("click");
 		assert.equal(downloads.length, 3, elements["satellite-tle-status"].textContent);
-		assert.deepEqual(pe0satRequests.map(({ url }) => url), [PE0SAT_API, PE0SAT_API]);
-		assert.equal(JSON.parse(await downloads[2].text()).provider, pe0satProvider);
-		globalThis.fetch = async () => new Response("", { status: 404 });
-		await elements["tle-pe0sat"].fire("click");
-		assert.match(elements["satellite-tle-status"].textContent, /PE0SAT API route was not found/);
+		const merged = JSON.parse(await downloads[2].text());
+		assert.equal(merged.provider, page);
+		assert.equal(merged.records[0].line1, parseTleCatalog(pe0satText)[0].line1, "the newer lines");
+		assert.equal(merged.records[0].name, "ISS (ZARYA)");
+
+		// one list down: the other is used, and the status says so
+		globalThis.fetch = listFetch(503, pe0satText);
+		await elements["tle-latest"].fire("click");
+		assert.match(elements["satellite-tle-status"].textContent, /Using PE0SAT only\. Could not fetch the AMSAT bulletin: 503/);
+		assert.ok(!elements["satellite-tle-build"].disabled);
+		globalThis.fetch = listFetch(404, 404);
+		await elements["tle-latest"].fire("click");
+		assert.match(elements["satellite-tle-status"].textContent, /AMSAT API route was not found.*PE0SAT API route was not found/);
+		assert.ok(elements["satellite-tle-build"].disabled);
 	} finally {
 		if (savedLink) {
 			linkModule.SerialStream.open = savedLink.open;
@@ -295,6 +317,8 @@ test("the page refreshes AMSAT before export and retains checked satellites thro
 		}
 		if (navigatorDescriptor) Object.defineProperty(globalThis, "navigator", navigatorDescriptor);
 		else delete globalThis.navigator;
+		if (storageDescriptor) Object.defineProperty(globalThis, "localStorage", storageDescriptor);
+		else delete globalThis.localStorage;
 		globalThis.document = oldDocument;
 		globalThis.fetch = oldFetch;
 		URL.createObjectURL = oldCreate;
@@ -344,6 +368,20 @@ test("a repeated catalog ID keeps the first of identical lines and leaves out di
 	assert.throws(() => parseTleCatalog(`ISS\n${iss1}\n${iss2}\nISS B\n${iss1}\n${other}\n`), /No TLE records/);
 	assert.equal(so50Name, "SO-50");
 	assert.ok(so501 && so502);
+});
+
+test("merging keeps each satellite's newest lines, the first list's name, and the source", () => {
+	const [name, line1, line2] = SAMPLE.split("\n");
+	const newer = parseTleCatalog(`ISS NEW NAME\n${line1.replace("26317.20662175", "26318.20662175").slice(0, 68)}0\n${line2}\n`);
+	newer[0].line1 = newer[0].line1.slice(0, 68) + [...newer[0].line1.slice(0, 68)].reduce((sum, c) =>
+		sum + (c >= "0" && c <= "9" ? Number(c) : c === "-" ? 1 : 0), 0) % 10;
+	const merged = mergeNewest([{ source: "AMSAT", records: parseTleCatalog(SAMPLE) }, { source: "PE0SAT", records: newer }]);
+	assert.deepEqual(merged.map(({ catalog_id, source }) => [catalog_id, source]),
+		[[25544, "PE0SAT"], [27607, "AMSAT"], [43017, "AMSAT"]]);
+	assert.equal(merged[0].name, name);
+	assert.equal(merged[0].line1, newer[0].line1);
+	const older = mergeNewest([{ source: "AMSAT", records: newer }, { source: "PE0SAT", records: parseTleCatalog(SAMPLE) }]);
+	assert.equal(older[0].source, "AMSAT", "an older copy does not replace a newer one");
 });
 
 test("an Alpha-5 catalog number is skipped, a malformed one rejected", () => {

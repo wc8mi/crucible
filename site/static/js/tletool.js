@@ -3,7 +3,7 @@
 
 import {
 	AMSAT_BULLETIN, amsatEndpoint, buildTleBundle, DEFAULT_SELECTED_IDS, MAX_SELECTED_PROFILES, filterFmSatellites,
-	parseTleCatalog, PE0SAT_CATALOG, pe0satEndpoint, proxiedProvider, SATELLITES,
+	mergeNewest, parseTleCatalog, pe0satEndpoint, SATELLITES, tleEpochMilliseconds,
 } from "./satellite-tle.js";
 import { pushSatelliteBundle } from "./satellite-radio.js";
 import {
@@ -13,8 +13,7 @@ import { page } from "./i18n.js";
 
 const { t } = page;
 const fileInput = document.getElementById("satellite-tle-file");
-const amsatButton = document.getElementById("tle-amsat");
-const pe0satButton = document.getElementById("tle-pe0sat");
+const latestButton = document.getElementById("tle-latest");
 const options = document.getElementById("satellite-tle-options");
 const buildButton = document.getElementById("satellite-tle-build");
 const pushButton = document.getElementById("satellite-tle-push");
@@ -22,21 +21,52 @@ const status = document.getElementById("satellite-tle-status");
 const providerInput = document.getElementById("tle-provider");
 const searchInput = document.getElementById("satellite-tle-search");
 const form = document.getElementById("satellite-tle");
-// The online catalogs, each read through this site's own proxy; a page without a button leaves that source out
+// The online catalogs, each read through this site's own proxy. AMSAT comes first: on a tie its lines are kept, and
+// its names are the ones shown.
 const SOURCES = [
-	{ button: amsatButton, api: amsatEndpoint(form?.dataset.amsatApi), provider: () => AMSAT_BULLETIN,
-		fetching: "tools.satellite.status.fetching", failed: "tools.satellite.status.fetch_failed",
+	{ name: "AMSAT", api: amsatEndpoint(form?.dataset.amsatApi), failed: "tools.satellite.status.fetch_failed",
 		notFound: "tools.satellite.status.api_not_found" },
-	{ button: pe0satButton, api: pe0satEndpoint(form?.dataset.pe0satApi),
-		provider() { return proxiedProvider(this.api, PE0SAT_CATALOG); },
-		fetching: "tools.satellite.status.pe0sat_fetching", failed: "tools.satellite.status.pe0sat_fetch_failed",
+	{ name: "PE0SAT", api: pe0satEndpoint(form?.dataset.pe0satApi), failed: "tools.satellite.status.pe0sat_fetch_failed",
 		notFound: "tools.satellite.status.pe0sat_api_not_found" },
-].filter((source) => source.button);
+];
 const profileById = new Map(SATELLITES.map((satellite) => [satellite.id, satellite]));
 const RADIO_PORT_FILTERS = [RFOUNDRY_USB, ...CABLES];
+const PICKS_KEY = "satellite-tle-picks";
 let catalog = null;
-let liveSource = null; // the online source loaded, fetched again before a bundle is made
-const selected = new Set(DEFAULT_SELECTED_IDS);
+let live = false; // the online lists are loaded, and fetched again before a bundle is made
+let sourceNotice = ""; // why only one list is in use
+const selected = new Set(storedPicks() ?? DEFAULT_SELECTED_IDS);
+
+// The boxes checked on the last visit; none stored (or no storage, as in a private window) gives the defaults
+function storedPicks() {
+	try {
+		const ids = JSON.parse(globalThis.localStorage?.getItem(PICKS_KEY) ?? "null");
+		return Array.isArray(ids) ? ids.filter((id) => profileById.has(id)).slice(0, MAX_SELECTED_PROFILES) : null;
+	} catch {
+		return null;
+	}
+}
+
+function storePicks() {
+	try {
+		globalThis.localStorage?.setItem(PICKS_KEY, JSON.stringify(selectedIds()));
+	} catch {
+		// private window or storage turned off: the picks last for this visit only
+	}
+}
+
+// A bundle names one HTTPS provider. Merged lists name this page, which put them together; a plain HTTP preview names
+// AMSAT so the bundle check still passes there.
+function pageProvider() {
+	try {
+		const url = new URL(globalThis.location.href);
+		url.search = "";
+		url.hash = "";
+		return url.protocol === "https:" ? url.href : AMSAT_BULLETIN;
+	} catch {
+		return AMSAT_BULLETIN;
+	}
+}
 
 function selectedIds() {
 	return [...selected];
@@ -77,9 +107,18 @@ function showReadyState() {
 		makeBundle();
 		buildButton.disabled = false;
 		pushButton.disabled = false;
-		status.textContent = t("tools.satellite.status.ready", { n: selected.length });
+		status.textContent = t("tools.satellite.status.ready", { n: selected.length }) +
+			(sourceNotice ? ` ${sourceNotice}` : "");
 	} catch (error) {
 		status.textContent = t("tools.satellite.status.invalid", { error: error.message });
+	}
+}
+
+function ageDays(record) {
+	try {
+		return (Date.now() - tleEpochMilliseconds(record.line1, record.catalog_id)) / 86400000;
+	} catch {
+		return null;
 	}
 }
 
@@ -116,6 +155,7 @@ function renderOptions() {
 			}
 			if (checkbox.checked) selected.add(record.catalog_id);
 			else selected.delete(record.catalog_id);
+			storePicks();
 			showReadyState();
 		});
 		const name = document.createElement("label");
@@ -126,6 +166,10 @@ function renderOptions() {
 		detail.className = "tle-profile-detail";
 		detail.textContent = t("tools.satellite.option", { id: record.catalog_id, rx: (satellite.rxHz / 1e6).toFixed(3),
 			tx: (satellite.txHz / 1e6).toFixed(3) });
+		const age = record.line1 ? ageDays(record) : null;
+		if (age !== null)
+			detail.textContent += ` · ${t("tools.satellite.option_age", { age: age < 1 ? "<1" : Math.round(age),
+				source: record.source || t("tools.satellite.file") })}`;
 		row.append(checkbox, name, detail);
 		options.append(row);
 	}
@@ -137,12 +181,13 @@ function renderOptions() {
 	}
 }
 
-function loadText(text, provider, source) {
-	catalog = parseTleCatalog(text);
-	liveSource = source;
+function loadCatalog(records, provider, online) {
+	catalog = records;
+	live = online;
 	providerInput.value = provider;
 	const available = new Set(filterFmSatellites(catalog).map((record) => record.catalog_id));
 	for (const id of selected) if (!available.has(id)) selected.delete(id);
+	storePicks();
 	options.replaceChildren();
 	renderOptions();
 	showReadyState();
@@ -163,10 +208,24 @@ async function fetchSourceText(source) {
 	return text;
 }
 
+// Both lists, merged newest-first per satellite. One that fails is left out and named in sourceNotice; both failing
+// is an error with both reasons.
+async function fetchLatest() {
+	const results = await Promise.allSettled(SOURCES.map(async (source) =>
+		({ source: source.name, records: parseTleCatalog(await fetchSourceText(source)) })));
+	const loaded = results.filter((result) => result.status === "fulfilled").map((result) => result.value);
+	const failures = results.map((result, i) => result.status === "rejected" ?
+		{ source: SOURCES[i].name, error: result.reason.message } : null).filter(Boolean);
+	if (!loaded.length) throw new Error(failures.map((failure) => failure.error).join(" "));
+	sourceNotice = failures.length ? t("tools.satellite.status.latest_one",
+		{ source: loaded.map((list) => list.source).join(", "), error: failures.map((f) => f.error).join(" ") }) : "";
+	return mergeNewest(loaded);
+}
+
 async function refreshSource() {
-	if (!liveSource) return;
-	status.textContent = t(liveSource.fetching);
-	const refreshed = parseTleCatalog(await fetchSourceText(liveSource));
+	if (!live) return;
+	status.textContent = t("tools.satellite.status.latest_fetching");
+	const refreshed = await fetchLatest();
 	makeBundle(refreshed);
 	catalog = refreshed;
 }
@@ -176,16 +235,16 @@ function setPushProgress(step) {
 }
 
 function setBusy(busy) {
-	for (const control of [...SOURCES.map((source) => source.button), fileInput, providerInput, searchInput, buildButton, pushButton,
+	for (const control of [latestButton, fileInput, providerInput, searchInput, buildButton, pushButton,
 		...options.querySelectorAll("input")])
 		control.disabled = busy;
 }
 
-for (const source of SOURCES) source.button.addEventListener("click", async () => {
+latestButton.addEventListener("click", async () => {
 	setBusy(true);
-	status.textContent = t(source.fetching);
+	status.textContent = t("tools.satellite.status.latest_fetching");
 	try {
-		loadText(await fetchSourceText(source), source.provider(), source);
+		loadCatalog(await fetchLatest(), pageProvider(), true);
 	} catch (error) {
 		catalog = null;
 		buildButton.disabled = true;
@@ -210,7 +269,8 @@ fileInput.addEventListener("change", async () => {
 		return;
 	}
 	try {
-		loadText(await file.text(), providerInput.value.trim() || AMSAT_BULLETIN, null);
+		sourceNotice = "";
+		loadCatalog(parseTleCatalog(await file.text()), providerInput.value.trim() || AMSAT_BULLETIN, false);
 	} catch (error) {
 		catalog = null;
 		buildButton.disabled = true;

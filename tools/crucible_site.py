@@ -388,7 +388,7 @@ def satellite_page(tle, project, assets, built):
     name = html.escape(project['name'])
     page = shell(page, project, assets, built, '../../', f'{name} · Satellites',
                  '<body class="page-tools" data-root="../../" data-home="../../" data-gl-more="More">',
-                 "The AMSAT and PE0SAT buttons get their TLE lists through this site. ")
+                 "The Load latest TLEs button gets the AMSAT and PE0SAT lists through this site. ")
     m = one(r'(<section class="wrap section page-head">)\s*<p class="eyebrow">.*?</p>(\s*<h1>)(.*?)(</h1>\s*<p class="lead">)(.*?)(</p>)',
             page, 'satellite page head')
     page = (page[:m.start()] + m.group(1) + m.group(2) + 'Satellites' + m.group(4) + SAT_LEAD.format(name=name)
@@ -722,11 +722,11 @@ def self_test():
         else:
             raise AssertionError('a RadioFoundry service left in the output')
     assert 'location.replace("./#terms")' in page, 'the update page asks for the terms first'
-    # the satellite page: the shared template in Crucible's shell; the AMSAT and PE0SAT buttons use this site's proxies only
+    # the satellite page: the shared template in Crucible's shell; the TLE lists come through this site's proxies only
     tle = ('<html><head><title>x</title></head><body class="page-tools" data-root="../../" data-home="../../">'
            '<header class="site-header">nav</header><main><section class="wrap section page-head">\n'
            '<p class="eyebrow"><a href="../../tools/index.html">Tools</a></p>\n<h1>Satellite TLE Update</h1>\n<p class="lead">l</p>'
-           '</section><section class="wrap section satellite-tle" id="satellite-tle"><button id="tle-amsat">a</button></section>'
+           '</section><section class="wrap section satellite-tle" id="satellite-tle"><button id="tle-latest">a</button></section>'
            '</main><footer class="site-footer">f</footer><script type="application/json" id="i18n">{"b": "RadioFoundry"}</script>'
            '<script type="module" src="../../static/js/tletool.js?v=1"></script></body></html>')
     sat = satellite_page(tle, proj, '1', 'v')
