@@ -830,7 +830,7 @@ def self_test():
     posts = read_news(ROOT / 'site' / 'crucible' / 'news', {b: b for b in crucible.board_ids(ROOT)})
     assert posts and [(x['date'], x['seq']) for x in posts] == sorted(((x['date'], x['seq']) for x in posts), reverse=True)
     assert len({x['id'] for x in posts}) == len(posts)
-    head = '<!-- SPDX-License-Identifier: MIT -->\n<!-- c -->\n'
+    head = '<!-- SPDX-' 'License-Identifier: MIT -->\n<!-- c -->\n'  # split so REUSE doesn't read it as this file's
     good = parse_post('2026-01-02-a-b.md', head + '---\ndate: 2026-01-02\ntitle: Hello\nrelease: crucible-x-1\n---\nText.\n')
     assert good['id'] == 'news-2026-01-02-a-b' and good['release'] == 'crucible-x-1' and good['body'] == 'Text.'
     for name, text in (('2026-01-02-A.md', '---\ndate: 2026-01-02\ntitle: T\n---\nx'),
