@@ -509,6 +509,11 @@ msgctxt "QUICK_WHY_FM_ONLY_YSF_CHANNEL"
 msgid "FM only: this is YSF"
 msgstr "仅 FM：这是 YSF"
 
+#: core/ui/ui_app.c
+msgctxt "QUICK_WHY_FM_ONLY_M17_CHANNEL"
+msgid "FM only: this is M17"
+msgstr "仅 FM：这是 M17"
+
 #: core/ui/ui_app.c core/ui/ui_menus.c
 msgctxt "WHY_NOT_IN_BUILD"
 msgid "Not in this build"
@@ -2294,7 +2299,7 @@ msgctxt "CHAN_LABEL_RATE"
 msgid "Rate"
 msgstr "速率"
 
-#: core/ui/ui_menus.c core/ui/ui_screens.c
+#: core/ui/ui_menus.c core/ui/ui_satellite.c core/ui/ui_screens.c
 msgctxt "WORD_RX_ONLY"
 msgid "RX only"
 msgstr "仅接收"
@@ -5868,6 +5873,21 @@ msgstr "其他通话组：不播放"
 msgctxt "CALL_HINT_MON_DMON"
 msgid "MON: digital monitor"
 msgstr "MON：数字监听"
+
+#: core/ui/ui_screens.c
+msgctxt "CALL_WHY_M17_1600"
+msgid "Voice+data: not played"
+msgstr "语音+数据：不播放"
+
+#: core/ui/ui_screens.c
+msgctxt "CALL_WHY_NO_VOICE"
+msgid "No voice: not played"
+msgstr "无语音：不播放"
+
+#: core/ui/ui_screens.c
+msgctxt "CALL_WHY_OTHER_CAN"
+msgid "Other CAN: not played"
+msgstr "其他 CAN：不播放"
 
 #: core/ui/ui_screens.c
 msgctxt "CALL_WHY_NOT_DN"

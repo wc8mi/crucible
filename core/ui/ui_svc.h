@@ -61,6 +61,7 @@ extern radio_view_t ui_svc_view;
 #define UI_FEAT_P25		(1u << 22)	// P25 on this board (CONFIG_P25, radio_p25_fits): the VFO's mode tile offers it
 #define UI_FEAT_NXDN		(1u << 23)	// NXDN on this board (CONFIG_NXDN, radio_nxdn_fits): the same
 #define UI_FEAT_YSF		(1u << 24)	// YSF on this board (CONFIG_YSF, radio_ysf_fits): the same
+#define UI_FEAT_M17		(1u << 25)	// M17 on this board (CONFIG_M17, radio_m17_fits): the same
 uint32_t ui_svc_features(void);
 // The parts of it each package reports (ui_svc_features ORs them): dmr-voice / radio core, dmr-data, storage-cps,
 // radio-features
@@ -120,7 +121,7 @@ bool ui_svc_mode(uint8_t mode);			// radio_mode_t: the VFO's mode (a channel's g
 static inline const char *ui_mode_name(uint8_t mode)
 {
 	return mode == RADIO_MODE_DMR ? "DMR" : mode == RADIO_MODE_P25 ? "P25" : mode == RADIO_MODE_NXDN ? "NXDN" :
-	       mode == RADIO_MODE_YSF ? "YSF" : "FM";
+	       mode == RADIO_MODE_YSF ? "YSF" : mode == RADIO_MODE_M17 ? "M17" : "FM";
 }
 // Copy to VFO: the channel on view into the VFO, which opens (CONFIG_VFO). Returns a radio_vfo_copy_t: VFO_COPY_OK
 // when the request went to the radio core, else why nothing changed

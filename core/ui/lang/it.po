@@ -507,6 +507,11 @@ msgctxt "QUICK_WHY_FM_ONLY_YSF_CHANNEL"
 msgid "FM only: this is YSF"
 msgstr "Solo FM: questo è YSF"
 
+#: core/ui/ui_app.c
+msgctxt "QUICK_WHY_FM_ONLY_M17_CHANNEL"
+msgid "FM only: this is M17"
+msgstr "Solo FM: questo è M17"
+
 #: core/ui/ui_app.c core/ui/ui_menus.c
 msgctxt "WHY_NOT_IN_BUILD"
 msgid "Not in this build"
@@ -2292,7 +2297,7 @@ msgctxt "CHAN_LABEL_RATE"
 msgid "Rate"
 msgstr "Velocità"
 
-#: core/ui/ui_menus.c core/ui/ui_screens.c
+#: core/ui/ui_menus.c core/ui/ui_satellite.c core/ui/ui_screens.c
 msgctxt "WORD_RX_ONLY"
 msgid "RX only"
 msgstr "Solo RX"
@@ -5866,6 +5871,21 @@ msgstr "Altro TG: non riprodotto"
 msgctxt "CALL_HINT_MON_DMON"
 msgid "MON: digital monitor"
 msgstr "MON: monitor digitale"
+
+#: core/ui/ui_screens.c
+msgctxt "CALL_WHY_M17_1600"
+msgid "Voice+data: not played"
+msgstr "Voce+dati: non riprodotto"
+
+#: core/ui/ui_screens.c
+msgctxt "CALL_WHY_NO_VOICE"
+msgid "No voice: not played"
+msgstr "Senza voce: non riprodotto"
+
+#: core/ui/ui_screens.c
+msgctxt "CALL_WHY_OTHER_CAN"
+msgid "Other CAN: not played"
+msgstr "Altro CAN: non riprodotto"
 
 #: core/ui/ui_screens.c
 msgctxt "CALL_WHY_NOT_DN"

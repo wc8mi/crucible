@@ -1926,6 +1926,10 @@ static bool bcast_rx;
 static bool p25_radio;
 static bool nxdn_radio;
 static bool ysf_radio;
+static bool m17_radio;
+#if CONFIG_M17
+bool radio_m17_fits(void) { return m17_radio; }
+#endif
 // Hardware options (Settings > Advanced > Hardware, hal_hwopt.h) only with the "hwopt" token: a revision that starts
 // unset and a plain option
 static int8_t hwopt_val[2];
@@ -1950,7 +1954,7 @@ uint32_t ui_svc_features(void)
 	return 0xFFFFFFFFu & ~(soft_volume ? 0 : UI_FEAT_VOLUME) & ~(bcast_rx ? 0 : UI_FEAT_BCAST) &
 	       ~(ref_trim ? 0 : UI_FEAT_REF_TRIM) &
 	       ~(knob_radio ? 0 : UI_FEAT_VOLUME_KNOB) & ~(p25_radio ? 0 : UI_FEAT_P25) &
-	       ~(nxdn_radio ? 0 : UI_FEAT_NXDN) & ~(ysf_radio ? 0 : UI_FEAT_YSF);
+	       ~(nxdn_radio ? 0 : UI_FEAT_NXDN) & ~(ysf_radio ? 0 : UI_FEAT_YSF) & ~(m17_radio ? 0 : UI_FEAT_M17);
 }
 // My radio's names (ui_svc_name_*): placeholders, as the user's own would be; a save writes at once
 static char sim_names[UI_NAME_COUNT][17];
@@ -2986,6 +2990,10 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	p25_radio = false;
 	nxdn_radio = false;
 	ysf_radio = false;
+	m17_radio = false;
+#if CONFIG_M17
+	memset(&view.m17, 0, sizeof view.m17);
+#endif
 #if CONFIG_YSF
 	memset(&sim_wx, 0, sizeof sim_wx);
 	sim_wx.asked_cmd = YSF_WX_NONE;
@@ -3228,7 +3236,8 @@ static bool check(const char *kv, char *err, size_t len)
 	else if (strcmp(key, "mode") == 0) snprintf(got, sizeof got, "%s", view.ch.mode == RADIO_MODE_DMR ? "dmr" :
 								     view.ch.mode == RADIO_MODE_P25 ? "p25" :
 								     view.ch.mode == RADIO_MODE_NXDN ? "nxdn" :
-								     view.ch.mode == RADIO_MODE_YSF ? "ysf" : "fm");
+								     view.ch.mode == RADIO_MODE_YSF ? "ysf" :
+								     view.ch.mode == RADIO_MODE_M17 ? "m17" : "fm");
 	else if (strcmp(key, "tx") == 0) snprintf(got, sizeof got, "%u", (unsigned)sim_rec.tx_count);
 #if CONFIG_UI_SETTINGS && CONFIG_DMR_AES
 	else if (strcmp(key, "aes_recover") == 0) snprintf(got, sizeof got, "%u", sim_aes_recover_choice);
@@ -3806,7 +3815,7 @@ static bool run_token(char *t, char *err, size_t len)
 #endif
 	if (strcmp(t, "dlmode") == 0 && arg != NULL) {	// the debug link sets the mode (DMR_FIELDS): fm, dmr, p25 or nxdn
 		ui_svc_mode(strcmp(arg, "p25") == 0 ? RADIO_MODE_P25 : strcmp(arg, "nxdn") == 0 ? RADIO_MODE_NXDN :
-			    strcmp(arg, "ysf") == 0 ? RADIO_MODE_YSF :
+			    strcmp(arg, "ysf") == 0 ? RADIO_MODE_YSF : strcmp(arg, "m17") == 0 ? RADIO_MODE_M17 :
 			    strcmp(arg, "dmr") == 0 ? RADIO_MODE_DMR : RADIO_MODE_FM);
 		advance(100);
 		return true;
@@ -3942,6 +3951,37 @@ static bool run_token(char *t, char *err, size_t len)
 			(kind == 'd' ? RADIO_YSF_DATA : 0) | (kind == 'o' || kind == 'v' || kind == 'd' ? 0 : RADIO_YSF_PLAYED));
 		strcpy(view.ysf.src, call);
 		view.ysf.dgid = (uint8_t)dgid;
+		view.state = RS_RX;
+		view.rssi_dbm = -84;
+		changed();
+		advance(300);
+		return true;
+	}
+#endif
+#if CONFIG_M17
+	if (strcmp(t, "m17end") == 0) {		// the M17 call heard ends
+		view.m17.flags = RADIO_M17_ON;
+		view.state = RS_IDLE;
+		view.last_rx_ms = now_ms;
+		changed();
+		advance(300);
+		return true;
+	}
+	if (strcmp(t, "m17rx") == 0) {		// an M17 call: src,dst,can[,deny[,text]] (deny 0 played, else M17_DENY_*)
+		char src[RADIO_M17_CALL_TEXT] = "", dst[RADIO_M17_CALL_TEXT] = "", text[sizeof view.m17.text] = "";
+		unsigned can = 0, deny = 0;
+		if (arg == NULL || sscanf(arg, "%9[^,],%9[^,],%u,%u,%52[^\n]", src, dst, &can, &deny, text) < 3) {
+			snprintf(err, len, "bad %s", t);
+			return false;
+		}
+		for (char *p = text; *p; p++)
+			*p = *p == '_' ? ' ' : *p;	// (a token has no spaces)
+		view.m17.flags = (uint8_t)(RADIO_M17_ON | RADIO_M17_RX | (deny == 0 ? RADIO_M17_PLAYED : 0));
+		strcpy(view.m17.src, src);
+		strcpy(view.m17.dst, dst);
+		strcpy(view.m17.text, text);
+		view.m17.can = (uint8_t)can;
+		view.m17.deny = (uint8_t)deny;
 		view.state = RS_RX;
 		view.rssi_dbm = -84;
 		changed();
@@ -4314,6 +4354,10 @@ static bool run_token(char *t, char *err, size_t len)
 	}
 	if (strcmp(t, "ysf") == 0) {		// this radio runs YSF
 		ysf_radio = true;
+		return true;
+	}
+	if (strcmp(t, "m17") == 0) {		// this radio runs M17
+		m17_radio = true;
 		return true;
 	}
 

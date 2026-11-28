@@ -19,6 +19,9 @@
 #if CONFIG_DMR_TRUNK
 #include "dmr/trunk/t3_ms.h"	// the engine's states, for the trunked status words
 #endif
+#if CONFIG_M17
+#include "m17/m17_engine.h"	// why a call is not played (M17_DENY_*)
+#endif
 
 ui_layout_t ui_layout;
 static const font_t *font_largest;	// the large text setting's font (large_font)
@@ -1308,6 +1311,17 @@ static void draw_talk(const radio_view_t *v, bool label_first)
 		sb_str(&b, "DG-ID ");
 		sb_u32(&b, v->ysf.tx_dgid, 2);
 #endif
+#if CONFIG_M17
+	} else if (v->ch.mode == RADIO_MODE_M17 && (v->m17.flags & RADIO_M17_RX) != 0 && v->m17.text[0] != '\0') {
+		sb_str(&b, v->m17.text);	// the call's META text (m17.md 6.1) while it is heard
+		c = ui_col.rx;
+	} else if (v->ch.mode == RADIO_MODE_M17 && (v->m17.flags & RADIO_M17_NO_CALL) != 0) {
+		sb_str(&b, TR(HOME_STATE_NO_CALLSIGN, "No callsign"));
+		c = ui_col.warn;
+	} else if (v->ch.mode == RADIO_MODE_M17) {
+		// Where PTT sends: the destination, or BROADCAST as M17 names it
+		sb_str(&b, v->m17.run_dst[0] != '\0' ? v->m17.run_dst : "@ALL");
+#endif
 	} else {
 		// A channel shows the frequency it listens on, as dual watch does, and a repeater's offset after it: no
 		// other row has either (#1031). Where PTT goes, with the arrow, only while PTT is held (transmitting, or
@@ -1405,6 +1419,23 @@ static void draw_chips(const radio_view_t *v, const ui_state_t *s)
 #endif
 		return;
 	}
+#if CONFIG_M17
+	if (v->ch.mode == RADIO_MODE_M17) {
+		// The same for M17: the power and the CAN heard (*: every CAN)
+		if (pw_temp)
+			x = gfx_text(f, x, y, GLYPH_DOT, ui_col.warn);
+		x = gfx_text(f, x, y, ui_power_name(v->power, v->ch.tx_hz), pw_temp ? ui_col.warn : ui_col.fg) + f->w;
+		sb_init(&b, buf, sizeof buf);
+		sb_str(&b, "CAN ");
+		if ((v->m17.flags & RADIO_M17_ANY) != 0)
+			sb_chr(&b, '*');
+		else
+			sb_u32(&b, v->m17.run_can, 1);
+		if (x + gfx_text_width(f, buf) <= w)
+			gfx_text(f, x, y, buf, ui_col.fg);
+		return;
+	}
+#endif
 	if (v->ch.mode == RADIO_MODE_NXDN) {
 		// The same for NXDN: the power, the RAN sent and the rate
 		if (pw_temp)
@@ -2468,12 +2499,16 @@ static void draw_dmr_call(const radio_view_t *v, const ui_state_t *s)
 #endif
 
 #if CONFIG_AIR
-// A P25, NXDN or YSF call coming in (air_call): whether one is heard now, and its fields. YSF names its caller by
-// callsign (call, "" until heard) and its target by DG-ID: dgid >= 0
+// A P25, NXDN, YSF or M17 call coming in (air_call): whether one is heard now, and its fields. YSF names its caller
+// by callsign (call, "" until heard) and its target by DG-ID: dgid >= 0. M17 names both by callsign (m17_src)
 typedef struct {
 	bool played, enc, unit;
 	uint32_t src, dst;
 	const char *name;
+#if CONFIG_M17
+	const char *m17_src, *m17_dst;
+	uint8_t m17_can, m17_deny;	// M17_DENY_*
+#endif
 #if CONFIG_YSF
 	bool not_dn, data;
 	const char *call;
@@ -2485,6 +2520,20 @@ typedef struct {
 static bool air_call(const radio_view_t *v, air_call_t *c)
 {
 	memset(c, 0, sizeof *c);
+#if CONFIG_M17
+	if (v->ch.mode == RADIO_MODE_M17 && (v->m17.flags & RADIO_M17_RX) != 0) {
+		c->played = (v->m17.flags & RADIO_M17_PLAYED) != 0;
+		c->m17_deny = v->m17.deny;
+		c->enc = c->m17_deny == M17_DENY_ENC;
+		c->m17_src = v->m17.src;
+		c->m17_dst = v->m17.dst;
+		c->m17_can = v->m17.can;
+#if CONFIG_YSF
+		c->dgid = -1;
+#endif
+		return true;
+	}
+#endif
 #if CONFIG_YSF
 	c->dgid = -1;
 	if (v->ch.mode == RADIO_MODE_YSF && (v->ysf.flags & RADIO_YSF_RX) != 0) {
@@ -2533,6 +2582,37 @@ static void air_call_line(const air_call_t *c, const font_t *f, int y)
 	char buf[64], fit[48];
 	sbuf_t b;
 
+#if CONFIG_M17
+	if (c->m17_src != NULL) {
+		if (!c->played) {
+			// The reason (m17.md 6): encrypted, voice and data (Codec 2 1600), a stream without voice, another CAN
+			gfx_text_fit(f, c->m17_deny == M17_DENY_ENC ? TR(CALL_WHY_ENCRYPTED, "Encrypted: not played") :
+				c->m17_deny == M17_DENY_1600 ? TR(CALL_WHY_M17_1600, "Voice+data: not played") :
+				c->m17_deny == M17_DENY_DATA ? TR(CALL_WHY_NO_VOICE, "No voice: not played") :
+				TR(CALL_WHY_OTHER_CAN, "Other CAN: not played"), gfx_width(), fit, sizeof fit);
+			gfx_text(f, 0, y, fit, ui_col.warn);
+			return;
+		}
+		// "N0CALL > @ALL CAN 5", shorter as it must: the CAN goes first, the callsign is kept longest
+		for (int keep = 2; keep >= 0; keep--) {
+			sb_init(&b, buf, sizeof buf);
+			sb_str(&b, c->m17_src[0] ? c->m17_src : "?");
+			if (keep) {
+				sb_str(&b, " " GLYPH_ARROW " ");
+				sb_str(&b, c->m17_dst);
+			}
+			if (keep == 2) {
+				sb_str(&b, " CAN ");
+				sb_u32(&b, c->m17_can, 1);
+			}
+			if (gfx_text_width(f, buf) <= gfx_width())
+				break;
+		}
+		gfx_text_fit(f, buf, gfx_width(), fit, sizeof fit);
+		gfx_text(f, 0, y, fit, ui_col.rx);
+		return;
+	}
+#endif
 #if CONFIG_YSF
 	if (!c->played && !c->data) {
 		gfx_text_fit(f, c->enc ? TR(CALL_WHY_ENCRYPTED, "Encrypted: not played") :
