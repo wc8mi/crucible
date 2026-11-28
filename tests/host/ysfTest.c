@@ -291,6 +291,7 @@ typedef struct {
 	bool deaf;			// nothing reaches its receiver (late entry: switched on mid-call)
 } prov_t;
 static prov_t prov[2];
+static uint16_t opened_dev_hz[2];	// the outer deviation each provider was last opened at
 
 static void ev(prov_t *p, uint8_t kind, const air_chunk_t *c)
 {
@@ -355,11 +356,13 @@ static void step(uint8_t i)
 
 static uint32_t p_fit(const air_profile_t *pr)
 {
-	return pr->sym_rate == 4800 && pr->dev_outer_hz == 2700 ? AIR_FIT_RX | AIR_FIT_TX | AIR_FIT_SOFT : 0;
+	// Wide and Narrow (ADR 005 5); a deviation the engine never asks for is refused
+	return pr->sym_rate == 4800 && (pr->dev_outer_hz == 2700 || pr->dev_outer_hz == 1350) ?
+	       AIR_FIT_RX | AIR_FIT_TX | AIR_FIT_SOFT : 0;
 }
 static bool p_open(uint8_t i, const air_profile_t *pr, air_event_cb_t cb, void *ctx)
 {
-	(void)pr;
+	opened_dev_hz[i] = pr->dev_outer_hz;
 	memset(&prov[i], 0, sizeof prov[i]);
 	prov[i].cb = cb;
 	prov[i].ctx = ctx;
@@ -508,7 +511,21 @@ static void testEngines(void)
 	uint16_t n, first;
 
 	voice_frame(silence);
-	CHECK(ysf_engine_fit(&air0, false) == (AIR_FIT_RX | AIR_FIT_TX | AIR_FIT_SOFT) && ysf_engine_fit(&air0, true) == (AIR_FIT_RX | AIR_FIT_TX | AIR_FIT_SOFT) && ysf_engine_fit(NULL, false) == 0, "fit");
+	CHECK(ysf_engine_fit(&air0, false) == (AIR_FIT_RX | AIR_FIT_TX | AIR_FIT_SOFT) &&
+	      ysf_engine_fit(&air0, true) == (AIR_FIT_RX | AIR_FIT_TX | AIR_FIT_SOFT) && ysf_engine_fit(NULL, false) == 0,
+	      "fit");
+	CHECK(ysf_air_mode.profile.dev_outer_hz == 2700 && ysf_air_mode_narrow.profile.dev_outer_hz == 1350 &&
+	      ysf_air_mode_narrow.profile.sym_rate == ysf_air_mode.profile.sym_rate &&
+	      ysf_air_mode_narrow.frame_syms == ysf_air_mode.frame_syms, "Narrow is Wide at half deviation");
+	// The session opens at the channel's deviation
+	ysf_engine_cfg_t cn = cfg_for(0, 0, 0);
+	cn.narrow = true;
+	begin(0, &cn);
+	CHECK(opened_dev_hz[0] == 1350, "Narrow opens at 1350 Hz");
+	ysf_engine_end(&r[0].e);
+	begin(0, &c0);
+	CHECK(opened_dev_hz[0] == 2700, "Wide opens at 2700 Hz");
+	ysf_engine_end(&r[0].e);
 
 	// A call: callsigns, voice in order, no underrun, the over ends soon after the key comes up
 	begin(0, &c0);
