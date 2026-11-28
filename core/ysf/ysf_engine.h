@@ -25,9 +25,10 @@ typedef struct {
 	void (*rx_update)(const ysf_call_t *c, void *ctx);
 	void (*rx_voice)(const uint8_t v[YSF_VOICE_BYTES], void *ctx);
 	void (*rx_end)(void *ctx);
-	// Transmit, from the provider's task: the next voice frame, false when none is ready. NULL: every frame is
-	// `silence`
-	bool (*tx_voice)(uint8_t v[YSF_VOICE_BYTES], void *ctx);
+	// Transmit, from the provider's task: the next voice frame of the transmission's path (YSF_VOICE_BYTES on the
+	// AMBE path, YSF_VW_BYTES on the IMBE path; v holds AIR_VOICE_FRAME_MAX), false when none is ready. NULL: every
+	// frame is silence
+	bool (*tx_voice)(uint8_t *v, void *ctx);
 	// A room reply heard, from the provider's task (ysf.md 9.3)
 	void (*rx_wx)(const ysf_wx_t *w, void *ctx);
 	// The call's voice on a path opens before its first frame there (open), and closes at the call's end if the path
@@ -44,6 +45,7 @@ typedef struct {
 	uint8_t voice;		// ysf_cp_voice_t (ysf_codeplug.h): what PTT sends; only a mode this build can send
 	bool narrow;		// half deviation (ADR 005 5): the session's profile, and FICH DEV on transmit
 	const uint8_t *silence;	// a voice frame of silence (YSF_VOICE_BYTES), from the vocoder
+	const uint8_t *silence_vw;	// an IMBE frame of silence (YSF_VW_BYTES), for VW; NULL: no VW transmit
 } ysf_engine_cfg_t;
 
 typedef struct {
@@ -65,7 +67,7 @@ typedef struct {
 	void *ctx;
 	ysf_call_t heard;		// the call heard as published with av's view
 	// The voice path (ysf_engine_path_*): path the radio core's task writes, the frames' one now; want the provider's,
-	// what the call heard needs (AMBE between calls); gate odd while the provider is inside a voice hook, so the radio
+	// what the call heard needs (between calls the home path, the one the channel transmits on); gate odd while the provider is inside a voice hook, so the radio
 	// core knows when the old path is no longer in use; opened the path whose voice the call opened
 	volatile uint8_t path, want, gate;
 	uint8_t opened;
@@ -105,6 +107,10 @@ void ysf_engine_view(const ysf_engine_t *e, ysf_engine_view_t *out);
 // from then on, the token to give quiet), quiet until true (no voice hook still runs on the old path), then the radio
 // core stops the old path, starts the new one and opens it
 uint8_t ysf_engine_path_want(const ysf_engine_t *e);
+// The path the channel transmits on (IMBE for VW, else AMBE): the engine wants it between calls, and PTT needs it
+uint8_t ysf_engine_path_home(const ysf_engine_t *e);
+// The data type PTT sends: YSF_DT_VD2 (DN), YSF_DT_VD1 or YSF_DT_VW, from cfg.voice
+uint8_t ysf_engine_tx_dt(const ysf_engine_t *e);
 uint8_t ysf_engine_path_close(ysf_engine_t *e);
 bool ysf_engine_path_quiet(const ysf_engine_t *e, uint8_t token);
 void ysf_engine_path_open(ysf_engine_t *e, uint8_t path);

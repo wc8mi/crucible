@@ -10520,6 +10520,69 @@ static void test_ysf_vw_path(void)
 	req(RREQ_RELOAD, 0);
 	run(50);
 }
+
+// A VW channel: the IMBE path is home from the start, PTT sends VW from P25's encoder, a DN call heard takes the AMBE
+// path for its length and PTT waits for IMBE to come back
+static void test_ysf_vw_tx(void)
+{
+	radio_ysf_stats_t s0, s1;
+	size_t len = 0;
+	ysf_engine_t *e;
+	int keyed0;
+
+	setup_codeplug();
+	add(3, "YSF VW", 446100000, RADIO_MODE_DMR, false, 2);
+	chans[3].kind = CODEPLUG_KIND_YSF;
+	chans[3].system = 0xFF;
+	stored_ysf[3] = (ysf_chan_t){ .voice = YSF_CP_VOICE_VW };
+	air_nofit = false;
+	memset(fair, 0, sizeof(fair));
+	start();
+	req(RREQ_ZONE_POS, 2);
+	run(200);
+	e = radio_air_ysf_mem(&len);
+	CHECK(radio_ysf_running() && e != NULL && sm.view.ysf.path == YSF_PATH_IMBE && ysf_engine_path_home(e) == YSF_PATH_IMBE);
+	yfar_begin(0);
+	keyed0 = hw.tx_calls;
+	req(RREQ_PTT, 1);
+	run(400);
+	CHECK(hw.tx_calls == keyed0 + 1);
+	req(RREQ_PTT, 0);
+	for (int i = 0; i < 200 && sm.view.state == RS_TX; i++)
+		run(10);
+	CHECK(yfar.rx.call.dt == YSF_DT_VW && yfar.rx.stats.vw_frames > 0 && yfar.rx.stats.vw_fec_bits == 0);
+	// A DN call heard: AMBE for its length, PTT refused until IMBE is back
+	radio_ysf_stats(&s0);
+	e->want = YSF_PATH_AMBE;
+	run(50);
+	CHECK(sm.view.ysf.path == YSF_PATH_AMBE);
+	keyed0 = hw.tx_calls;
+	req(RREQ_PTT, 1);
+	run(100);
+	CHECK(hw.tx_calls == keyed0 && !hw.keyed);
+	req(RREQ_PTT, 0);
+	run(50);
+	e->want = YSF_PATH_IMBE;	// the call ended: home again
+	run(50);
+	radio_ysf_stats(&s1);
+	CHECK(sm.view.ysf.path == YSF_PATH_IMBE && s1.path_switches == s0.path_switches + 2 && s1.path_fails == s0.path_fails);
+	// The channel turned DN: the engine wants AMBE, the radio switches, PTT sends DN
+	stored_ysf[3].voice = YSF_CP_VOICE_DN;
+	req(RREQ_RELOAD, 0);
+	run(200);
+	CHECK(sm.view.ysf.path == YSF_PATH_AMBE);
+	req(RREQ_PTT, 1);
+	run(400);
+	CHECK(hw.tx_calls == keyed0 + 1);
+	req(RREQ_PTT, 0);
+	for (int i = 0; i < 200 && sm.view.state == RS_TX; i++)
+		run(10);
+	CHECK(yfar.rx.call.dt == YSF_DT_VD2);
+	yfar_stop();
+	setup_codeplug();
+	req(RREQ_RELOAD, 0);
+	run(50);
+}
 #endif
 
 #if CONFIG_SCAN && CONFIG_DUAL_WATCH
@@ -13223,6 +13286,7 @@ int main(void)
 	test_ysf_wx();
 #if CONFIG_YSF_VW
 	test_ysf_vw_path();
+	test_ysf_vw_tx();
 #endif
 #if CONFIG_SCAN && CONFIG_DUAL_WATCH
 	test_ysf_dual();

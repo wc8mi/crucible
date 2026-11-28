@@ -137,7 +137,7 @@ static int cmd_gen(const char *out, const char *call, int dgid, int frames)
 	if (!f)
 		die("can't write", out);
 	snprintf(id.callsign, sizeof id.callsign, "%s", call);
-	ysf_call_tx_begin(&tx, &id);
+	ysf_call_tx_begin(&tx, &id, YSF_DT_VD2, false);
 	while (!ysf_call_tx_done(&tx) && total < 4000000u) {
 		uint16_t n = ysf_call_tx_ready(&tx, &first);
 

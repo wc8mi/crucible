@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "ysf/ysf_engine.h"
+#include "ysf/ysf_codeplug.h"
 #include "ysf/ysf_id.h"
 #include "ysf/ysf_vw.h"
 #include "dmr/ambe/ambeFec.h"
@@ -227,7 +228,7 @@ static void testCallThroughFramer(void)
 	voice_frame(silence);
 	ysf_call_rx_init(&rx, &call_sink, &s);
 	air_framer_init(&fr, &ysf_air_mode, &rx.rx, fbuf, NULL, YSF_FRAME_SYMS);
-	ysf_call_tx_begin(&tx, &id);
+	ysf_call_tx_begin(&tx, &id, YSF_DT_VD2, false);
 	while (!ysf_call_tx_done(&tx) && total < 20000) {
 		uint16_t n = ysf_call_tx_ready(&tx, &first);
 		air_chunk_t c = { .sync_at = -1 };
@@ -399,7 +400,7 @@ PROVIDER(1)
 typedef struct {
 	ysf_engine_t e;
 	sink_t s;
-	uint8_t enc[VMAX][YSF_VOICE_BYTES];
+	uint8_t enc[VMAX][AIR_VOICE_FRAME_MAX];
 	uint16_t enc_made, enc_taken;
 } radio_t;
 static radio_t r[2];
@@ -409,13 +410,13 @@ static void h_start(const ysf_call_t *c, void *ctx) { s_start(c, &((radio_t *)ct
 static void h_update(const ysf_call_t *c, void *ctx) { s_update(c, &((radio_t *)ctx)->s); }
 static void h_end(void *ctx) { s_end(&((radio_t *)ctx)->s); }
 static void h_voice(const uint8_t v[YSF_VOICE_BYTES], void *ctx) { s_voice(v, &((radio_t *)ctx)->s); }
-static bool h_tx_voice(uint8_t v[YSF_VOICE_BYTES], void *ctx)
+static bool h_tx_voice(uint8_t *v, void *ctx)
 {
 	radio_t *x = ctx;
 
 	if (x->enc_taken == x->enc_made)
 		return false;
-	memcpy(v, x->enc[x->enc_taken++], YSF_VOICE_BYTES);
+	memcpy(v, x->enc[x->enc_taken++], x->e.tx.dt == YSF_DT_VW ? YSF_VW_BYTES : YSF_VOICE_BYTES);
 	return true;
 }
 static const ysf_engine_hooks_t hooks = { h_start, h_update, h_voice, h_end, h_tx_voice, NULL, NULL, NULL };
@@ -470,8 +471,16 @@ static uint16_t over(uint16_t n_key, uint16_t stall_from, uint16_t stall_to)
 		if (n == n_key)
 			ysf_engine_tx_stop(&r[0].e);
 		if (n < n_key && !(n >= stall_from && n < stall_to)) {
-			for (uint8_t k = (uint8_t)(1 + (n & 1)); k && r[0].enc_made < VMAX; k--)
-				voice_frame(r[0].enc[r[0].enc_made++]);
+			for (uint8_t k = (uint8_t)(1 + (n & 1)); k && r[0].enc_made < VMAX; k--) {
+				uint8_t *f = r[0].enc[r[0].enc_made++];
+
+				if (r[0].e.cfg.voice == YSF_CP_VOICE_VW) {
+					for (uint8_t b = 0; b < YSF_VW_BYTES; b++)
+						f[b] = (uint8_t)rng();
+				} else {
+					voice_frame(f);
+				}
+			}
 		}
 		steps(1);
 		if (ysf_engine_tx_state(&r[0].e) == AIR_TX_DONE) {
@@ -1149,6 +1158,163 @@ static void testVwVd1Calls(void)
 	      (unsigned)rx.stats.vw_frames, (unsigned)rx.stats.vw_fec_bits);
 }
 
+// Our transmit in each data type through the framer into our receiver: the voice comes back as sent, with the FICH
+// each data type's cycle gives (ysf.md 4.4)
+static void tx_round(uint8_t dt, bool narrow)
+{
+	static ysf_call_rx_t rx;
+	static ysf_call_tx_t tx;
+	static sink_t s;
+	static air_framer_t fr;
+	static ysf_fec_work_t w;
+	static uint8_t fbuf[YSF_FRAME_BYTES], made[40][YSF_VW_BYTES], quiet[YSF_VW_BYTES];
+	ysf_tx_id_t id = { .callsign = "n0call", .radio_id = "K7Q2Z", .dgid = 7 };
+	uint16_t nmade = 0, total = 0, first, frames = 0;
+	uint8_t chunk[36], bytes = dt == YSF_DT_VW ? YSF_VW_BYTES : YSF_VOICE_BYTES;
+	bool fich_ok = true, same = true;
+	const char *name = dt == YSF_DT_VW ? "vw tx" : "vd1 tx";
+
+	memset(&s, 0, sizeof s);
+	memset(quiet, 0, sizeof quiet);
+	if (dt != YSF_DT_VW)
+		voice_frame(quiet);
+	ysf_call_rx_init(&rx, &call_sink, &s);
+	air_framer_init(&fr, &ysf_air_mode, &rx.rx, fbuf, NULL, YSF_FRAME_SYMS);
+	ysf_call_tx_begin(&tx, &id, dt, narrow);
+	while (!ysf_call_tx_done(&tx) && total < 20000) {
+		uint16_t n = ysf_call_tx_ready(&tx, &first);
+		air_chunk_t c = { .sync_at = -1 };
+
+		if (!n) {
+			if (nmade < 40) {
+				if (dt == YSF_DT_VW) {
+					for (uint8_t i = 0; i < YSF_VW_BYTES; i++)
+						made[nmade][i] = (uint8_t)rng();
+				} else {
+					voice_frame(made[nmade]);
+				}
+				CHECK(ysf_call_tx_voice(&tx, made[nmade]), "%s: voice taken", name);
+				nmade++;
+			} else {
+				ysf_call_tx_end(&tx, quiet);
+			}
+			continue;
+		}
+		// Each frame's FICH as it goes out: the header, the communications frames, the terminator
+		if (first == 0 && tx.state != 0) {
+			ysf_fich_t f;
+			bool sub = tx.state == 2 && frames == 0;
+			uint8_t ft = dt == YSF_DT_VW ? (sub ? 1 : 0) : YSF_FT_VD1;
+
+			if (ysf_fich_get(ysf_call_tx_syms(&tx), NULL, &w, &f) < 0 || f.dt != dt || f.dev != narrow ||
+			    f.dgid != 7 || f.ft != ft || (dt == YSF_DT_VW ? f.fn != 0 : (tx.state == 2 && f.fn != frames % 3))) {
+				fich_ok = false;
+				printf("  %s: frame %u state %u: dt %u dev %u ft %u fn %u\n", name, frames, tx.state, f.dt,
+				       f.dev, f.ft, f.fn);
+			}
+			if (tx.state == 2)
+				frames++;
+		}
+		if (n > 144)
+			n = 144;
+		memset(chunk, 0, sizeof chunk);
+		air_syms_copy(chunk, 0, ysf_call_tx_syms(&tx), first, n);
+		c.nsyms = n;
+		c.hard = chunk;
+		air_framer_rx(&fr, &c);
+		ysf_call_tx_sent(&tx, n);
+		total = (uint16_t)(total + n);
+	}
+	CHECK(ysf_call_tx_done(&tx), "%s: the builder finished", name);
+	CHECK(fich_ok, "%s: FICH data type, deviation, DG-ID, FT and FN per frame", name);
+	CHECK(s.starts == 1 && s.ends == 1 && s.call.dt == dt && !strcmp(s.call.src, "N0CALL"),
+	      "%s: one call from '%s', dt %u", name, s.call.src, s.call.dt);
+	if (dt == YSF_DT_VW) {
+		// The sub-header holds 2, each later frame 5: 40 frames fill 8 frames and 2 more of quiet
+		CHECK(frames == 9 && s.nvw == 42 && s.nvoice == 0, "%s: frames %u imbe %u", name, frames, s.nvw);
+		for (uint16_t i = 0; i < nmade; i++)
+			same &= !memcmp(s.vw[i], made[i], bytes);
+		same &= !memcmp(s.vw[40], quiet, bytes) && !memcmp(s.vw[41], quiet, bytes);
+	} else {
+		CHECK(frames == 8 && s.nvoice == 40 && s.nvw == 0, "%s: frames %u voice %u", name, frames, s.nvoice);
+		for (uint16_t i = 0; i < nmade; i++)
+			same &= !memcmp(s.voice[i], made[i], bytes);
+	}
+	CHECK(same, "%s: voice as sent", name);
+	CHECK(rx.stats.fich_fail == 0 && rx.stats.dch_fail == 0 && rx.stats.csd_fail == 0, "%s: no channel failed", name);
+}
+
+static void testTxVd1Vw(void)
+{
+	tx_round(YSF_DT_VD1, false);
+	tx_round(YSF_DT_VW, true);
+
+	// An end before a frame's first voice: no communications frame goes out, the terminator follows the header
+	static ysf_call_tx_t tx;
+	ysf_tx_id_t id = { .callsign = "n0call" };
+	uint16_t first, n, total = 0;
+	uint8_t quiet[YSF_VW_BYTES] = { 0 };
+
+	ysf_call_tx_begin(&tx, &id, YSF_DT_VW, false);
+	while (!ysf_call_tx_done(&tx) && total < 5000) {
+		n = ysf_call_tx_ready(&tx, &first);
+		if (!n) {
+			ysf_call_tx_end(&tx, quiet);
+			continue;
+		}
+		ysf_call_tx_sent(&tx, n);
+		total = (uint16_t)(total + n);
+	}
+	CHECK(total == 3 * YSF_FRAME_SYMS, "vw tx: an end before voice sends preamble, header, terminator: %u", total);
+}
+
+// A VW channel's over between two engines: radio 0 sends VW from its IMBE encoder, radio 1 (also a VW channel, so its
+// home path is IMBE) plays every frame in order; between calls both want the IMBE path, a DN channel the AMBE path
+static void testEngineVwTx(void)
+{
+	static const uint8_t vw_quiet[YSF_VW_BYTES] = { 0 };
+	ysf_engine_cfg_t c0 = cfg_for(0, 0, 0), c1 = cfg_for(1, 0, 0);
+	uint16_t i = 0, k = 0, bad = 0;
+
+	c0.voice = c1.voice = YSF_CP_VOICE_VW;
+	c0.silence_vw = c1.silence_vw = vw_quiet;
+	memset(prov, 0, sizeof prov);
+	memset(r, 0, sizeof r);
+	CHECK(ysf_engine_begin(&r[0].e, &air0, &c0, &hooks_vw, &r[0]) && ysf_engine_begin(&r[1].e, &air1, &c1, &hooks_vw,
+	      &r[1]), "vw engines begin");
+	CHECK(ysf_engine_tx_dt(&r[0].e) == YSF_DT_VW && ysf_engine_path_home(&r[0].e) == YSF_PATH_IMBE &&
+	      ysf_engine_path_want(&r[1].e) == YSF_PATH_IMBE, "a VW channel sends VW from the IMBE path");
+	over(60, 0, 0);
+	CHECK(r[1].s.starts == 1 && r[1].s.ends == 1 && r[1].s.call.dt == YSF_DT_VW && !strcmp(r[1].s.call.src, "N0CALL"),
+	      "vw over: one call from '%s', dt %u", r[1].s.call.src, r[1].s.call.dt);
+	CHECK(r[1].s.path_open == 1 && r[1].s.path_last == YSF_PATH_IMBE && r[1].s.nvoice == 0,
+	      "vw over: played on IMBE, opened %u, AMBE frames %u", r[1].s.path_open, r[1].s.nvoice);
+	// In order from the first; silence frames (filler, the last frame's end) skipped
+	while (i < r[1].s.nvw && !memcmp(r[1].s.vw[i], vw_quiet, YSF_VW_BYTES))
+		i++;
+	for (; i < r[1].s.nvw; i++) {
+		if (!memcmp(r[1].s.vw[i], vw_quiet, YSF_VW_BYTES))
+			continue;
+		if (k >= r[0].enc_made || memcmp(r[1].s.vw[i], r[0].enc[k++], YSF_VW_BYTES))
+			bad++;
+	}
+	CHECK(bad == 0 && k + 2 >= r[0].enc_taken && k >= 60, "vw over: %u frames in order of %u sent, %u wrong", k,
+	      r[0].enc_taken, bad);
+	CHECK(ysf_engine_path_want(&r[1].e) == YSF_PATH_IMBE, "after the call: the home path, IMBE");
+
+	// The channel changes to DN: the engine wants the AMBE path at once (no call playing)
+	c1.voice = YSF_CP_VOICE_DN;
+	ysf_engine_set(&r[1].e, &c1);
+	CHECK(ysf_engine_path_want(&r[1].e) == YSF_PATH_AMBE && ysf_engine_tx_dt(&r[1].e) == YSF_DT_VD2,
+	      "a DN channel wants the AMBE path");
+	// Without an IMBE silence frame VW can't transmit
+	c0.silence_vw = NULL;
+	ysf_engine_set(&r[0].e, &c0);
+	CHECK(!ysf_engine_tx_prepare(&r[0].e), "no IMBE silence: PTT refused");
+	ysf_engine_end(&r[0].e);
+	ysf_engine_end(&r[1].e);
+}
+
 // The engine: a VW call asks for the IMBE path and drops its voice until the radio core switches; after the switch
 // the path opens before its first frame and closes at the call's end; between calls the AMBE path is wanted again
 static void testEnginePaths(void)
@@ -1227,6 +1393,8 @@ int main(void)
 	testEngines();
 	testRooms();
 	testVwVd1Calls();
+	testTxVd1Vw();
+	testEngineVwTx();
 	testEnginePaths();
 	printf("# ysfTest %s (%d checks, %d failures)\n", failures ? "FAILED" : "PASSED", checks, failures);
 	return failures != 0;

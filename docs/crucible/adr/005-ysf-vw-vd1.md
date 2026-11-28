@@ -84,7 +84,7 @@ path is restored, not merely at the call's end. Room data (DT 1) keeps today's h
 | Voice frames | `AIR_VOICE_FRAME_MAX` grows from 9 to 11 (`P25_IMBE_BYTES`), so VW transmit goes through `air_voice` as DN does. It sizes one stack buffer (`air_voice.c`) and two asserts: 2 bytes of stack, no NXDN memory. Receive gets a VW hook of its own (`rx_vw`: 11 bytes and the FEC errors) beside the AMBE hook |
 | Codec | P25's software IMBE path (`p25Voice`, `core/mbe`). One codec for P25 and YSF |
 | Shared P25 change | `p25VoiceBegin` gets a frames-per-burst argument and a receive AGC mode. P25 primes on one LDU (9 frames, 180 ms) and passes `RX_AGC_P25`, unchanged; YSF primes on one frame's 5 VCH (100 ms; 2 in the sub-header) and passes `RX_AGC_YSF`. The fork made the burst change |
-| Levels | While VW runs, the voice path uses YSF's settings: `tx_level_ysf` through `p25VoiceSetTxTarget`, `rx_agc_ysf` through the AGC mode above, both set when the IMBE path starts. P25 sets its own each time P25 starts, so nothing is left over |
+| Levels | Receive uses YSF's setting: `rx_agc_ysf` through the AGC mode above, set when the IMBE path starts. Transmit uses P25's level (`tx_level_p25`, the target `p25VoiceSetTxTarget` already holds): VW and P25 share the IMBE encoder, so they start from one value. A VW-only adjustment comes only if listening on a Yaesu radio shows VW needs one (revision 1) |
 | Encoder level | The fork found its IMBE encoder input about 14 dB low and adds +12 dB, saturating. We do not take that blind: in step 4 we measure P25 and VW transmit level against [ADR 003](003-digital-agc.md)'s on-air target and fix the shared encoder once if it is low |
 | Switch | `CONFIG_YSF_VW`, added in step 2. A normal switch, in `FEATURES` and Crucible's CI matrix: `CONFIG_YSF_VW ?= $(if $(filter y,$(CONFIG_YSF)),$(CONFIG_P25),n)`, and an `$(error)` when it is on without `CONFIG_YSF` and `CONFIG_P25`. A radio short of flash or heap sets it `n` in its `config.mk`. Off: VW calls show as today, "Not DN voice" |
 
@@ -226,6 +226,7 @@ lands.
 
 | Round | Verdict | Changes |
 |---|---|---|
+| 4 | Revision 1 (KF8S, 2026-11-27) | VW transmit uses P25's TX level, not `tx_level_ysf`: one encoder, one starting value, adjusted after listening on a Yaesu radio. The YSF engine's block placed in CCM as planned once no DMA was found to touch it |
 | 3 | Accept | Wording: the STM32F4 memory row names the VW-on condition |
 | 2 | Revise | `CONFIG_YSF_VW` a normal switch, off per radio; CCM block only with VW on and no lend; receive AGC mode in `p25VoiceBegin`; heap floor and margin; units |
 | 1 | Revise | STM32F4 memory re-planned from measured sizes (engine to CCM); `AIR_VOICE_FRAME_MAX` widened instead of separate transmit hooks; one transmit cycle per data type, FT marked unverified; `p25VoiceBegin` priming change and YSF level settings named; Narrow profile and per-provider fit; spec updates per step; codeplug fallback on rename; interleave credit; `CONFIG_YSF_VW` derived; PTT tied to the restored path; title |

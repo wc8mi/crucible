@@ -8,8 +8,9 @@
 #include <string.h>
 
 #include "config.h"
+#include "ysf_codeplug.h"
 
-_Static_assert(YSF_VOICE_BYTES <= AIR_VOICE_FRAME_MAX, "a voice frame fits air_voice's");
+_Static_assert(YSF_VOICE_BYTES <= AIR_VOICE_FRAME_MAX && YSF_VW_BYTES <= AIR_VOICE_FRAME_MAX, "a voice frame fits air_voice's");
 
 uint32_t ysf_engine_fit(const hal_air_t *air, bool narrow)
 {
@@ -116,7 +117,7 @@ static void on_end(void *ctx)
 {
 	ysf_engine_t *e = ctx;
 
-	e->want = YSF_PATH_AMBE;	// between calls: the path a transmission sends on
+	e->want = ysf_engine_path_home(e);	// between calls: the path a transmission sends on
 	notify(e, NULL, air_voice_rx_end(&e->av));
 }
 
@@ -147,7 +148,13 @@ static int8_t t_next(void *eng, uint8_t v[AIR_VOICE_FRAME_MAX])
 		return -1;
 	return e->hooks.tx_voice(v, e->ctx) ? 1 : 0;
 }
-static const uint8_t *t_silence(void *eng) { return ((ysf_engine_t *)eng)->cfg.silence; }
+// Asked before the transmission begins as well as during it: by the data type PTT sends
+static const uint8_t *t_silence(void *eng)
+{
+	ysf_engine_t *e = eng;
+
+	return ysf_engine_tx_dt(e) == YSF_DT_VW ? e->cfg.silence_vw : e->cfg.silence;
+}
 
 _Static_assert(offsetof(ysf_engine_t, av) == 0, "air_voice_t first: tx_fill reaches the engine from it");
 static const air_voice_tx_ops_t tx_ops = {
@@ -161,7 +168,7 @@ bool ysf_engine_begin(ysf_engine_t *e, const hal_air_t *air, const ysf_engine_cf
 	e->cfg = *cfg;
 	e->hooks = *hooks;
 	e->ctx = ctx;
-	e->path = e->want = YSF_PATH_AMBE;	// the radio core starts the DMR side's voice path with the engine
+	e->path = e->want = ysf_engine_path_home(e);	// the radio core starts this path with the engine
 	ysf_call_rx_init(&e->rx, &sink, e);
 #if CONFIG_AIR_RX_ADAPT
 	air_softmodem_lend(&e->adapt);	// before the open: a provider with a soft modem sets it up there
@@ -190,6 +197,8 @@ void ysf_engine_retuned(ysf_engine_t *e)
 void ysf_engine_set(ysf_engine_t *e, const ysf_engine_cfg_t *cfg)
 {
 	e->cfg = *cfg;
+	if (e->opened == YSF_PATH_NONE)
+		e->want = ysf_engine_path_home(e);	// no call playing: the new home path, which the radio core switches to
 	air_voice_recheck(&e->av);
 }
 
@@ -198,7 +207,7 @@ bool ysf_engine_tx_prepare(ysf_engine_t *e)
 	if (e->cfg.tx_inhibit || !air_voice_tx_can(&e->av, true))
 		return false;
 	if (air_voice_tx_begin(&e->av))
-		ysf_call_tx_begin(&e->tx, &e->cfg.tx);
+		ysf_call_tx_begin(&e->tx, &e->cfg.tx, ysf_engine_tx_dt(e), e->cfg.narrow);
 	return air_voice_tx_prime(&e->av);
 }
 
@@ -253,6 +262,23 @@ void ysf_engine_view(const ysf_engine_t *e, ysf_engine_view_t *out)
 uint8_t ysf_engine_path_want(const ysf_engine_t *e)
 {
 	return e->want;
+}
+
+uint8_t ysf_engine_tx_dt(const ysf_engine_t *e)
+{
+	switch (e->cfg.voice) {
+	case YSF_CP_VOICE_VD1:
+		return YSF_DT_VD1;
+	case YSF_CP_VOICE_VW:
+		return CONFIG_YSF_VW ? YSF_DT_VW : YSF_DT_VD2;
+	default:
+		return YSF_DT_VD2;
+	}
+}
+
+uint8_t ysf_engine_path_home(const ysf_engine_t *e)
+{
+	return ysf_engine_tx_dt(e) == YSF_DT_VW ? YSF_PATH_IMBE : YSF_PATH_AMBE;
 }
 
 uint8_t ysf_engine_path_close(ysf_engine_t *e)
