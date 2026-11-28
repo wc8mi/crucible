@@ -25,6 +25,9 @@ bool stm32_clock_init(const stm32_clock_t *c);
 
 // System services for board.system (sysboot.c): chip info, memory reads, reboot incl. the ROM DFU entry
 extern const hal_system_t stm32_system;
+// The RTC on the LSE, in UTC (rtc.c, built with CONFIG_CLOCK; hal_system_t.rtc_get/rtc_set)
+bool stm32_rtc_get(int64_t *utc_s);
+bool stm32_rtc_set(int64_t utc_s);
 // First thing in main(): enters the ROM bootloader when a REBOOT ROM-DFU request armed it (does not return then)
 void stm32_sysboot_check(void);
 // The main stack, the interrupt handlers' once the scheduler runs (irq_stack.c): fill its free part (first thing in

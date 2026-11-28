@@ -157,6 +157,10 @@ const hal_system_t stm32_system = {
 #if CONFIG_SUPPORT_INFO
 	.image = image,
 #endif
+#if CONFIG_CLOCK
+	.rtc_get = stm32_rtc_get,	// rtc.c
+	.rtc_set = stm32_rtc_set,
+#endif
 #if CONFIG_STUB_ENTRY
 	.stub_region = stm32_stub_region,	// stub_entry.c
 	.enter_stub = stm32_enter_stub,
