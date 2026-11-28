@@ -38,6 +38,7 @@ typedef struct {
 } satellite_observation_t;
 
 bool satellite_orbit_init(satellite_orbit_t *orbit, const satellite_record_t *record);
+bool satellite_tle_catalog_id(const char *field, uint32_t *catalog_id);
 bool satellite_tle_epoch(const char line1[SATELLITE_TLE_LINE_LENGTH + 1u], int64_t *epoch_s,
 			 uint16_t *fraction_q16);
 bool satellite_orbit_is_fresh(const satellite_orbit_t *orbit, int64_t utc_s);
