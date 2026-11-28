@@ -269,6 +269,38 @@ static void test_invalid_decimal_field(void)
 	CHECK(!satellite_orbit_init(&orbit, &record));
 }
 
+static void test_alpha5_catalog_numbers(void)
+{
+	static const struct { const char *field; uint32_t id; } good[] = {
+		{ "00005", 5u }, { "99999", 99999u }, { "A0000", 100000u }, { "A1101", 101101u },
+		{ "H9999", 179999u }, { "J0000", 180000u }, { "N0001", 220001u }, { "P0000", 230000u },
+		{ "Z9999", 339999u },
+	};
+	for (size_t i = 0; i < sizeof(good) / sizeof(good[0]); i++) {
+		uint32_t id = 0u;
+		CHECK(satellite_tle_catalog_id(good[i].field, &id) && id == good[i].id);
+	}
+	static const char *const bad[] = { "I0000", "O0000", "a1101", "A11 1", " 1101", "AA101" };
+	for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+		uint32_t id = 0u;
+		CHECK(!satellite_tle_catalog_id(bad[i], &id));
+	}
+
+	satellite_orbit_t orbit;
+	satellite_record_t record = record_for(
+		"1 A1101U 58002B   00179.78495062  .00000023  00000-0  28098-4 0  4753",
+		"2 A1101  34.2682 348.7242 1859667 331.7664  19.3264 10.82419157413667",
+		101101u, 962131819u);
+	CHECK(satellite_orbit_init(&orbit, &record) && orbit.catalog_id == 101101u);
+	record.catalog_id = 1101u;	// the lines say A1101: the record's number must agree
+	CHECK(!satellite_orbit_init(&orbit, &record));
+	record = record_for(
+		"1 A1101U 58002B   00179.78495062  .00000023  00000-0  28098-4 0  4753",
+		"2 B1101  34.2682 348.7242 1859667 331.7664  19.3264 10.82419157413667",
+		101101u, 962131819u);
+	CHECK(!satellite_orbit_init(&orbit, &record));
+}
+
 static void test_orbit_parser_fuzz_loop(void)
 {
 	satellite_record_t base = test_record();
@@ -505,6 +537,7 @@ int main(void)
 	test_keplerian_propagation();
 	test_circular_kepler_orbit();
 	test_invalid_decimal_field();
+	test_alpha5_catalog_numbers();
 	test_orbit_parser_fuzz_loop();
 	test_pass_summary_order();
 	test_pass_cache_age();
