@@ -18,13 +18,14 @@ State:
 |---|---|
 | Frame codec: sync, FICH, header and terminator channels, DCH, VCH (2, 3) | written, host tested |
 | Receive, the call layer, the engine (4, 5) | written, host tested: header and late entry, the DG-ID squelch |
-| Voice | through the DMR side's voice path to the vocoder the board hosts (`hal_vocoder_t`), as NXDN's (5.2) |
+| Voice | DN and V/D mode 1 through the DMR side's voice path to the vocoder the board hosts (`hal_vocoder_t`), as NXDN's; VW through P25's full-rate IMBE path (5.5) |
 | The radio core: mode, PTT, scan, dual watch, debug link, Home (5) | written, host tested |
 | The radio ID (6) | written, host tested |
 | Codeplug channels, the site's Codeplug Editor ([ysf-codeplug.md](ysf-codeplug.md)) | written, host tested |
 | On air | not checked with this code; see the radio's bring-up record |
 | Rooms: status, connect, disconnect, room list, search (9) | written, host tested |
-| VW (full rate voice), Group Monitor, positions, news, V/D mode 1 | not supported in this first version (8). A VW call shows on Home, not played |
+| V/D mode 1 and VW receive (3.5, 5.5) | written, host tested; VW needs `CONFIG_YSF_VW`. Transmit is DN only |
+| Group Monitor, positions, news | not supported in this first version (8) |
 
 ## 1. On air
 
@@ -136,8 +137,8 @@ its 72-bit frame (`ambeFecEncode`), which carries them without loss either way.
 
 ### 3.5 V/D mode 1 and VW channels
 
-Channel codecs only so far: calls in these data types are not yet played or sent (8). Their layout per payload block
-(72 symbols, 144 bits; block n starts at payload bit 144 n):
+Calls in these data types are received and played (4.3, 5.5), not sent (8). Their layout per payload block (72 symbols,
+144 bits; block n starts at payload bit 144 n):
 
 | Data type | Block layout |
 |---|---|
@@ -146,13 +147,14 @@ Channel codecs only so far: calls in these data types are not yet played or sent
 | VW sub-header (DT 3, FN 0, FT 1) | DCH in payload symbols 0-179 without gaps, symbols 180-215 zero, VCH in blocks 3 and 4 |
 
 **V/D mode 1 DCH.** 20 bytes, coded as a header's CSD1 (3.2: whitened, CRC, K = 5, 9 columns) and in the same place.
-FN 0 carries destination and source, FN 1 downlink and uplink, FN 2 remarks.
+FN 0 carries destination and source, FN 1 downlink and uplink, FN 2 remarks. Received, FN 0 gives the call's
+callsigns; the others aren't shown.
 
 **V/D mode 1 VCH.** The DMR side's 72-bit AMBE+2 frame as it is: the same code words and interleave, no whitening.
 `ambeFecDecode` reads it.
 
 **VW sub-header DCH.** 20 bytes (CSD3), coded as CSD1 but its 180 coded dibits run through the payload in order, not
-36 to a block.
+36 to a block. Received, its content isn't used; the call's callsigns come from the header.
 
 **VW VCH.** One 20 ms IMBE frame, 88 bits, in the P25 voice code words (`core/fec/imbe88.h`): u0-u3 Golay(23,12),
 u4-u6 Hamming(15,11), u7 raw, c1-c6 scrambled by masks from u0. The 144 code word bits go on air through VW's own
@@ -217,7 +219,7 @@ remarks 3-4, whichever arrives first; five characters that aren't all 0-9 or A-Z
 |---|---|
 | Header | A new call (one already running ends: its terminator was lost); the callsigns from CSD1 |
 | Communications frame, no call | A late entry: the call starts, its fields come from the DCH as the FNs pass |
-| Communications frame | The DG-ID, DT and MR from the FICH; the DCH by FN; five voice frames if DT is 2, else none (shown as not DN voice) |
+| Communications frame | The DG-ID, DT and MR from the FICH; the DCH by FN (DT 0, 2); the voice frames by DT: five AMBE+2 (DT 0, 2), five IMBE (DT 3; two in the sub-header) with `CONFIG_YSF_VW`, else none (shown as not played) |
 | A frame whose FICH fails | Taken as the communications frame due, for up to three in a row: its DCH as the next FN, its voice played |
 | Terminator, or 400 ms without a sync | The call ends |
 
@@ -227,16 +229,16 @@ remarks 3-4, whichever arrives first; five characters that aren't all 0-9 or A-Z
 |---|---|
 | Mode | `RADIO_MODE_YSF`, a channel's mode only: the board stays in its digital mode, its DMR stack stopped, as for P25 and NXDN. Offered where the board's air interface fits the profile (`radio_ysf_fits`) |
 | Channels | A stored channel of kind 103 runs in YSF with its own DG-IDs ([ysf-codeplug.md](ysf-codeplug.md)); the VFO and a channel in YSF for now take the RAM settings (DG-ID 0 both ways until the debug link sets others) |
-| Memory | The engine runs in P25's memory where P25's isn't lent to the vocoder, else in one block it shares with NXDN (`radio_air_mem.c`): one air mode runs at a time |
-| PTT | Refused without a callsign (`TXDENY_NO_ID`), without the vocoder (`TXDENY_NO_CODEC`), and where the provider can't transmit the profile |
+| Memory | The engine runs in P25's memory where P25's isn't lent to the vocoder, else in one block it shares with NXDN (`radio_air_mem.c`): one air mode runs at a time. With `CONFIG_YSF_VW` and P25's own memory, a VW call's voice takes that memory, so the engine has a block of its own (5.5) |
+| PTT | Refused without a callsign (`TXDENY_NO_ID`), without the vocoder (`TXDENY_NO_CODEC`), where the provider can't transmit the profile, and while a VW call has the IMBE path (5.5) |
 | Scan, dual watch | As NXDN: a stop holds on a call it would play. Dual watch pairs a YSF channel with any other mode's (FM, DMR, P25, NXDN, YSF): one receiver alternates, each look starts that channel's engine or the DMR stack and stops the other first, never two at once (`radioCoreTestAir`); a radio with a second receiver gives it the FM or DMR channel and alternates the main one only between two air channels |
 
 ### 5.1 The DG-ID squelch
 
 | Receive DG-ID | Played |
 |---|---|
-| 0 | every DN call, whatever its DG-ID |
-| 1-99 | DN calls with that DG-ID only; the rest show as "Other DG-ID: not played" |
+| 0 | every voice call, whatever its DG-ID |
+| 1-99 | voice calls with that DG-ID only; the rest show as "Other DG-ID: not played" |
 
 PTT sends the transmit DG-ID. A channel stores both; the channel editor sets one value for both.
 
@@ -258,7 +260,9 @@ entry, letters, digits, `-` and `/`, folded to upper case); saved empty, it remo
 ### 5.3 Debug link
 
 The `ysf` view section (DL_VIEW_YSF, [debuglink.md](debuglink.md)): the call heard (`ysf.src`, `ysf.src_rid`,
-`ysf.dgid`, `ysf.played`, `ysf.late`, `ysf.not_dn`), who we are (`ysf.callsign`, `ysf.rid`, `ysf.rid_weak`), the
+`ysf.dgid`, `ysf.played`, `ysf.late`, `ysf.not_dn`, `ysf.dt` its data type), the voice path (5.5: `ysf.path`,
+`ysf.vw` built, `ysf.path_switches`, `ysf.path_fails`, `ysf.path_drops`, `ysf.vd1_frames`, `ysf.vw_frames`,
+`ysf.vw_fec_bits`), who we are (`ysf.callsign`, `ysf.rid`, `ysf.rid_weak`), the
 DG-IDs set and in force, the provider's fit and the counters (`ysf.frames`, `ysf.fich_fail`, `ysf.dch_fail`,
 `ysf.csd_fail`, `ysf.voice`, `ysf.fec_bits`, `ysf.vch_fixed`, ...) and the receive options (5.4: `ysf.rx_eq`,
 `ysf.rx_tone_on`, `ysf.rx_tone` the tone notched, `ysf.rx_eq_center`). RADIO op 44 sets the RAM DG-IDs: u8 transmit,
@@ -284,6 +288,31 @@ and their automatic mode select then finds the C4FM and switches to it. Whatever
 the 4FSK from the discriminator sees the tone as a slow error on every symbol's level: the notch takes it out. With
 the equalizer and the notch the voice bit errors through that repeater fell from 5.6 % to about 1.7 % in the
 recordings (measured with the proof of concept's receiver, the same two methods).
+
+### 5.5 Voice paths
+
+DN and V/D mode 1 carry the DMR side's half-rate AMBE+2 frames: they go to the vocoder the board hosts, as DMR's. VW
+carries full-rate IMBE frames, which those vocoders don't run: with `CONFIG_YSF_VW` (needs `CONFIG_P25`) they go to
+P25's voice path, the software decoder in `core/mbe`. Only one path runs at a time, because on some radios they share
+memory: P25's voice runs in the DMR codec's working memory (`hal_vocoder_t.lend`), or in P25's own idle memory.
+
+| Step | Who | What |
+|---|---|---|
+| 1 | provider's task | A played call's voice frame needs a path (AMBE for DT 0 and 2, IMBE for DT 3). The engine records it as wanted; if it isn't the path running, the frame is dropped (`ysf.path_drops`) |
+| 2 | radio task, next poll | Wanted differs from running and nothing is being sent: the engine's path is closed (frames drop from now on) |
+| 3 | radio task | Once no voice hook is still running on the old path (a counter the hooks move on entry and exit), the old path stops and the new one starts: `ambeVoiceStop` then `p25VoiceBegin`, or `p25VoiceEnd` then `ambeVoiceStart` |
+| 4 | radio task | The engine's path opens on the new one. Its next frame opens the call there (the stream's call start) |
+| 5 | provider's task | The call ends: its voice closes on the path it opened, and AMBE is wanted again (transmit's path) |
+
+Switching takes a poll or two: the first frames of a VW call are lost, under 100 ms. P25's path runs with a VW frame's
+5 voice frames as a burst (P25 waits for 9, one LDU) and with YSF's receive AGC settings and caller memory
+(`p25VoiceBegin`, `p25VoiceRxIdentity`). When the IMBE path finds no memory (`ysf.path_fails`) the DMR side's path
+starts again and the call isn't played; no new switch is tried until that call ends. PTT is refused while the IMBE path
+runs or a switch is due; leaving the channel stops whichever path runs.
+
+Memory without a lending vocoder: the engine's own block (about 4.2 KB, in the board's CPU RAM where it has one, taken from the RTOS heap) instead of P25's memory, which holds P25's
+voice (4.7 KB) during a VW call. With a lending vocoder nothing is added: the engine stays in the block it shares with
+NXDN.
 
 ## 6. The radio ID (RID)
 
@@ -356,7 +385,8 @@ caller's radio ID shows as `ysf.src_rid` on the debug link.
 
 | Choice | Why |
 |---|---|
-| The engine shares NXDN's memory | One air mode runs at a time; a block of its own cost 1.9 KB of RAM |
+| The engine shares NXDN's memory | One air mode runs at a time; a block of its own cost 1.9 KB of RAM. With `CONFIG_YSF_VW` and no lending vocoder it has one anyway: P25's memory, where it would run, holds a VW call's voice (5.5) |
+| VW through P25's voice path, switched per call | The vocoders run AMBE+2 only; P25's software decoder runs IMBE. Switching costs the first frames of a VW call; running both would need both memories at once |
 | No transmit level, preamble or field-layout settings | The values here are the measured ones; a setting would only let a radio drift from them |
 | One DG-ID value for both ways in the channel editor | What a group on a repeater uses; the codeplug keeps both (the Codeplug Editor sets them apart) |
 
@@ -367,18 +397,19 @@ repeaters with callsign, radio ID and DG-ID, and the room basics (9). Not suppor
 
 | Function | Why |
 |---|---|
-| VW (voice at full rate) | Its full-rate voice is not what the radios' vocoder chips run: they carry DMR's half-rate AMBE+2 only. Shown on Home as "Not DN voice", not played. (The software full-rate decoder P25 uses, `core/mbe`, is a possible way later, not checked against VW) |
+| VW transmit | Received only (5.5); PTT sends DN |
+| VW without `CONFIG_YSF_VW` | Shown on Home as "Not DN voice", not played |
 | Group Monitor (GM) | Not written |
 | Positions (GPS) in the frames | Our transmissions carry none |
 | News, voice messages and pictures from a repeater or node | Not written |
-| V/D mode 1, data at full rate other than the room commands | Not written |
+| V/D mode 1 transmit, data at full rate other than the room commands | Not written |
 
 Planned next, once this is in the main line:
 
 1. Positions from the GPS in the frames sent to a repeater.
 2. Group Monitor.
 3. A repeater's or node's news: voice messages and pictures.
-4. VW, if its voice can be carried (above).
+4. VW transmit.
 
 ## 9. Rooms (node commands)
 

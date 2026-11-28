@@ -17,6 +17,7 @@
 
 #include "../air/air_framer.h"
 #include "../dmr/ambe/ambeFec.h"
+#include "ysf_vw.h"
 #include "ysf_wx.h"
 
 // ── The frame ──
@@ -151,12 +152,18 @@ typedef struct {
 	void (*end)(void *ctx);
 	// A room reply heard (a data transmission, ysf.md 9): valid during the call. NULL: data is ignored
 	void (*wx)(const ysf_wx_t *w, void *ctx);
+	// A VW voice frame (CONFIG_YSF_VW: data type 3), for the IMBE codec; errs: what its codes corrected, packed as
+	// fec_imbe88_decode. NULL: VW voice is held, as without the switch
+	void (*vw)(const uint8_t imbe[YSF_VW_BYTES], uint8_t errs, void *ctx);
 } ysf_call_sink_t;
 
 typedef struct {
 	uint32_t calls, frames, fich_fail, csd_fail, dch_fail;
-	uint32_t voice;		// VCH handed on
-	uint32_t voice_held;	// VCH of another data type
+	uint32_t voice;		// VCH handed on, every data type
+	uint32_t voice_held;	// VCH of a data type not played (VW without CONFIG_YSF_VW)
+	uint32_t vd1_frames;	// of voice: V/D mode 1 VCH
+	uint32_t vw_frames;	// of voice: VW VCH
+	uint32_t vw_fec_bits;	// bits the VW VCH's codes corrected
 	uint32_t fec_bits;	// bits the FICH, CSD and DCH decoders corrected
 	uint32_t vch_fixed;	// VCH bits the vote corrected
 	uint32_t data_frames, wx_replies;	// frames of data transmissions; room replies parsed from them

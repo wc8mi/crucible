@@ -375,6 +375,10 @@
 #ifndef CONFIG_YSF
 #define CONFIG_YSF			0
 #endif
+// YSF VW: its calls through P25's IMBE voice path (docs/spec/ysf.md). Needs YSF and P25
+#ifndef CONFIG_YSF_VW
+#define CONFIG_YSF_VW			0
+#endif
 #ifndef CONFIG_AIR
 #define CONFIG_AIR			(CONFIG_P25 || CONFIG_NXDN || CONFIG_YSF)
 #endif

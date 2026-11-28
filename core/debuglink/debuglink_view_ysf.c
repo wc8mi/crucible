@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The ysf section: YSF DN on the channel (docs/spec/ysf.md 5, core/radio/radio_ysf.h): the call heard, who
 // we are on air (the callsign and the radio ID, with where the ID came from), the DG-IDs, what the board's provider
-// gives YSF, the engine's counters. The voice path's are the DMR side's (dmr_stats, ambe.*). "ysf.built=0" without
-// CONFIG_YSF
+// gives YSF, the engine's counters. The voice path's are the DMR side's (dmr_stats, ambe.*), or P25's for VW (p25.*).
+// "ysf.built=0" without CONFIG_YSF
 #include "config.h"
 #include "debuglink/debuglink.h"
 #if CONFIG_YSF
@@ -49,6 +50,14 @@ void debuglink_view_ysf(const radio_view_t *v, dl_text_t *t)
 	dl_text(t, "ysf.voice_held=%u\nysf.fec_bits=%u\nysf.vch_fixed=%u\nysf.rx_chunks=%u\n", (unsigned)c.voice_held,
 		(unsigned)c.fec_bits, (unsigned)c.vch_fixed, (unsigned)c.air.rx_chunks);
 	dl_text(t, "ysf.tx_underruns=%u\nysf.tx_syms=%u\n", (unsigned)c.air.tx_underruns, (unsigned)c.air.tx_syms);
+	// The call's data type (ysf.dt: 0 V/D mode 1, 1 data, 2 DN, 3 VW) and the voice path running (ysf.path: 1 the DMR
+	// side's, 2 P25's IMBE for VW, 0 mid-switch), ysf.md 5.5. vd1_frames, vw_frames: voice frames of each mode handed
+	// on; vw_fec_bits: bits the VW codes corrected; path_switches, path_fails (no memory for IMBE), path_drops (VCH
+	// dropped while a switch was due); vw=1 where CONFIG_YSF_VW is built
+	dl_text(t, "ysf.dt=%u\nysf.path=%u\nysf.vw=%u\nysf.vd1_frames=%u\nysf.vw_frames=%u\nysf.vw_fec_bits=%u\n", y->dt,
+		y->path, CONFIG_YSF_VW, (unsigned)c.vd1_frames, (unsigned)c.vw_frames, (unsigned)c.vw_fec_bits);
+	dl_text(t, "ysf.path_switches=%u\nysf.path_fails=%u\nysf.path_drops=%u\n", (unsigned)c.path_switches,
+		(unsigned)c.path_fails, (unsigned)c.path_drops);
 	// Rooms (ysf.md 9): what was asked (wx_asked counts commands sent), the node's last reply (wx_serial counts
 	// them), the page of rooms held
 	radio_ysf_wx_t w;
