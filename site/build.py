@@ -56,20 +56,26 @@ def main(argv=None):
 	if warnings and args.strict:
 		return 1
 	if args.serve:
+		# the satellite page's catalog proxies (functions/api/*-tle.js), for a local preview
+		tle_sources = {"/api/amsat-tle": ("https://www.amsat.org/tle/daily-bulletin.txt", "AMSAT bulletin"),
+		               "/api/pe0sat-tle": ("http://tle.pe0sat.nl/kepler/amateur.txt", "PE0SAT list")}
+
 		class SiteHandler(http.server.SimpleHTTPRequestHandler):
 			def do_GET(self):
-				if self.path.partition("?")[0] != "/api/amsat-tle":
+				source = tle_sources.get(self.path.partition("?")[0])
+				if not source:
 					return super().do_GET()
+				url, label = source
 				try:
-					request = urllib.request.Request("https://www.amsat.org/tle/daily-bulletin.txt",
+					request = urllib.request.Request(url,
 										 headers={"Accept": "text/plain", "User-Agent": "RadioFoundry site TLE updater"})
 					with urllib.request.urlopen(request, timeout=20) as response:
 						body = response.read(1000001)
 						if len(body) > 1000000:
-							self.send_error(502, "AMSAT bulletin exceeds the size limit")
+							self.send_error(502, "%s exceeds the size limit" % label)
 							return
 				except Exception:
-					self.send_error(502, "AMSAT bulletin is temporarily unavailable")
+					self.send_error(502, "%s is temporarily unavailable" % label)
 					return
 				self.send_response(200)
 				self.send_header("Content-Type", "text/plain; charset=utf-8")

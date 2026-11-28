@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { AMSAT_API, amsatEndpoint, buildTleBundle, DEFAULT_SELECTED_IDS, filterFmSatellites, MAX_SELECTED_PROFILES,
-	parseTleCatalog, SATELLITES } from "../static/js/satellite-tle.js";
+	parseTleCatalog, PE0SAT_API, PE0SAT_CATALOG, pe0satEndpoint, proxiedProvider, SATELLITES } from "../static/js/satellite-tle.js";
 
 const SAMPLE = `ISS (ZARYA)\n1 25544U 98067A   26317.20662175  .00008559  00000+0  16132-3 0  9990\n2 25544  51.6325 282.6584 0007349  20.2588 339.8690 15.49346920594859\nSO-50\n1 27607U 02058C   26316.49281663  .00001582  00000+0  20311-3 0  9999\n2 27607  64.5539  30.0380 0068124 235.0518 124.4178 14.83333417286454\nAO-91\n1 43017U 17073E   26317.60524444  .00008151  00000+0  33970-3 0  9990\n2 43017  97.4443 181.7665 0144887 171.0350 189.3523 15.14807395487992\n`;
 
@@ -33,8 +33,9 @@ test("the AMSAT button uses the page's same-origin proxy path, or the default", 
 		assert.equal(amsatEndpoint(ws + "//evil.example/x", page), AMSAT_API, "a leading space that trim() strips");
 	assert.equal(amsatEndpoint("../../api/amsat-tle", undefined), AMSAT_API, "no page to compare with: the default");
 	const tool = await readFile(new URL("../static/js/tletool.js", import.meta.url), "utf8");
-	assert.match(tool, /amsatEndpoint\(document\.getElementById\("satellite-tle"\)\?\.dataset\.amsatApi\)/);
-	assert.match(tool, /fetch\(amsatApi, /);
+	assert.match(tool, /amsatEndpoint\(form\?\.dataset\.amsatApi\)/);
+	assert.match(tool, /pe0satEndpoint\(form\?\.dataset\.pe0satApi\)/);
+	assert.match(tool, /fetch\(source\.api, /);
 	assert.doesNotMatch(tool, /fetch\("/, "every fetch goes through the endpoint");
 });
 
@@ -64,6 +65,38 @@ test("AMSAT proxy requests and serves uncached bulletins", async () => {
 	}
 });
 
+test("the PE0SAT endpoint takes a same-origin path only", () => {
+	const page = "https://tinker.example/crucible/tools/satellite/index.html";
+	assert.equal(PE0SAT_API, "/api/pe0sat-tle");
+	assert.equal(pe0satEndpoint("../../api/pe0sat-tle", page), "../../api/pe0sat-tle");
+	for (const other of [PE0SAT_CATALOG, "//evil.example/x", "http://tinker.example/crucible/api/pe0sat-tle"])
+		assert.equal(pe0satEndpoint(other, page), PE0SAT_API, other);
+	assert.equal(pe0satEndpoint("", page), PE0SAT_API);
+	assert.equal(proxiedProvider("../../api/pe0sat-tle", PE0SAT_CATALOG, page), "https://tinker.example/crucible/api/pe0sat-tle");
+	assert.equal(proxiedProvider(PE0SAT_API, PE0SAT_CATALOG, "http://localhost:8000/tools/satellite/"), PE0SAT_CATALOG);
+	assert.equal(proxiedProvider(PE0SAT_API, PE0SAT_CATALOG, undefined), PE0SAT_CATALOG);
+});
+
+test("PE0SAT proxy requests and serves uncached lists", async () => {
+	const source = await readFile(new URL("../../functions/api/pe0sat-tle.js", import.meta.url), "utf8");
+	const { onRequestGet } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+	const oldFetch = globalThis.fetch;
+	try {
+		globalThis.fetch = async (url, options) => {
+			assert.equal(url, PE0SAT_CATALOG);
+			assert.equal(options.cache, "no-store");
+			return new Response(SAMPLE);
+		};
+		const response = await onRequestGet();
+		assert.equal(response.headers.get("cache-control"), "no-store");
+		assert.equal(await response.text(), SAMPLE);
+		globalThis.fetch = async () => new Response("", { status: 503 });
+		assert.equal((await onRequestGet()).status, 502);
+	} finally {
+		globalThis.fetch = oldFetch;
+	}
+});
+
 test("the page refreshes AMSAT before export and retains checked satellites through search", async () => {
 	class Element {
 		constructor() { this.children = []; this.listeners = {}; this.value = ""; this.dataset = {}; }
@@ -78,7 +111,7 @@ test("the page refreshes AMSAT before export and retains checked satellites thro
 		}
 		click() {}
 	}
-	const ids = ["satellite-tle-file", "tle-amsat", "satellite-tle-options", "satellite-tle-build",
+	const ids = ["satellite-tle-file", "tle-amsat", "tle-pe0sat", "satellite-tle-options", "satellite-tle-build",
 		"satellite-tle-push", "satellite-tle-status", "tle-provider", "satellite-tle-search"];
 	const elements = Object.fromEntries(ids.map((id) => [id, new Element()]));
 	const strings = await readFile(new URL("../i18n/en.json", import.meta.url), "utf8");
@@ -215,6 +248,32 @@ test("the page refreshes AMSAT before export and retains checked satellites thro
 		await elements["satellite-tle-build"].fire("click");
 		assert.equal(downloads.length, 2);
 		assert.equal(JSON.parse(await downloads[1].text()).records[0].line1, parseTleCatalog(fileText)[0].line1);
+
+		// PE0SAT: its own proxy, its URL as the source, and fetched again from there before the bundle is made
+		const pe0satRequests = [];
+		const pe0satText = catalogAt(0);
+		globalThis.fetch = async (url, options) => {
+			pe0satRequests.push({ url, options });
+			return new Response(pe0satText);
+		};
+		const locationDescriptor = Object.getOwnPropertyDescriptor(globalThis, "location");
+		Object.defineProperty(globalThis, "location", { configurable: true,
+			value: { href: "https://tinker.example/crucible/tools/satellite/index.html" } });
+		try {
+			await elements["tle-pe0sat"].fire("click");
+		} finally {
+			if (locationDescriptor) Object.defineProperty(globalThis, "location", locationDescriptor);
+			else delete globalThis.location;
+		}
+		const pe0satProvider = "https://tinker.example/api/pe0sat-tle";
+		assert.equal(elements["tle-provider"].value, pe0satProvider);
+		await elements["satellite-tle-build"].fire("click");
+		assert.equal(downloads.length, 3, elements["satellite-tle-status"].textContent);
+		assert.deepEqual(pe0satRequests.map(({ url }) => url), [PE0SAT_API, PE0SAT_API]);
+		assert.equal(JSON.parse(await downloads[2].text()).provider, pe0satProvider);
+		globalThis.fetch = async () => new Response("", { status: 404 });
+		await elements["tle-pe0sat"].fire("click");
+		assert.match(elements["satellite-tle-status"].textContent, /PE0SAT API route was not found/);
 	} finally {
 		if (savedLink) {
 			linkModule.SerialStream.open = savedLink.open;

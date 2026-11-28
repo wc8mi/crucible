@@ -3,7 +3,7 @@
 
 import {
 	AMSAT_BULLETIN, amsatEndpoint, buildTleBundle, DEFAULT_SELECTED_IDS, MAX_SELECTED_PROFILES, filterFmSatellites,
-	parseTleCatalog, SATELLITES,
+	parseTleCatalog, PE0SAT_CATALOG, pe0satEndpoint, proxiedProvider, SATELLITES,
 } from "./satellite-tle.js";
 import { pushSatelliteBundle } from "./satellite-radio.js";
 import {
@@ -14,17 +14,28 @@ import { page } from "./i18n.js";
 const { t } = page;
 const fileInput = document.getElementById("satellite-tle-file");
 const amsatButton = document.getElementById("tle-amsat");
+const pe0satButton = document.getElementById("tle-pe0sat");
 const options = document.getElementById("satellite-tle-options");
 const buildButton = document.getElementById("satellite-tle-build");
 const pushButton = document.getElementById("satellite-tle-push");
 const status = document.getElementById("satellite-tle-status");
 const providerInput = document.getElementById("tle-provider");
 const searchInput = document.getElementById("satellite-tle-search");
-const amsatApi = amsatEndpoint(document.getElementById("satellite-tle")?.dataset.amsatApi);
+const form = document.getElementById("satellite-tle");
+// The online catalogs, each read through this site's own proxy; a page without a button leaves that source out
+const SOURCES = [
+	{ button: amsatButton, api: amsatEndpoint(form?.dataset.amsatApi), provider: () => AMSAT_BULLETIN,
+		fetching: "tools.satellite.status.fetching", failed: "tools.satellite.status.fetch_failed",
+		notFound: "tools.satellite.status.api_not_found" },
+	{ button: pe0satButton, api: pe0satEndpoint(form?.dataset.pe0satApi),
+		provider() { return proxiedProvider(this.api, PE0SAT_CATALOG); },
+		fetching: "tools.satellite.status.pe0sat_fetching", failed: "tools.satellite.status.pe0sat_fetch_failed",
+		notFound: "tools.satellite.status.pe0sat_api_not_found" },
+].filter((source) => source.button);
 const profileById = new Map(SATELLITES.map((satellite) => [satellite.id, satellite]));
 const RADIO_PORT_FILTERS = [RFOUNDRY_USB, ...CABLES];
 let catalog = null;
-let usingAmsat = false;
+let liveSource = null; // the online source loaded, fetched again before a bundle is made
 const selected = new Set(DEFAULT_SELECTED_IDS);
 
 function selectedIds() {
@@ -117,9 +128,9 @@ function renderOptions() {
 	}
 }
 
-function loadText(text, provider, fromAmsat) {
+function loadText(text, provider, source) {
 	catalog = parseTleCatalog(text);
-	usingAmsat = fromAmsat;
+	liveSource = source;
 	providerInput.value = provider;
 	const available = new Set(filterFmSatellites(catalog).map((record) => record.catalog_id));
 	for (const id of selected) if (!available.has(id)) selected.delete(id);
@@ -128,28 +139,25 @@ function loadText(text, provider, fromAmsat) {
 	showReadyState();
 }
 
-async function fetchAmsatText() {
+async function fetchSourceText(source) {
 	let response;
 	try {
-		response = await fetch(amsatApi, { cache: "no-store", headers: { Accept: "text/plain" } });
+		response = await fetch(source.api, { cache: "no-store", headers: { Accept: "text/plain" } });
 	} catch (error) {
-		throw new Error(t("tools.satellite.status.fetch_failed", { status: error.message }));
+		throw new Error(t(source.failed, { status: error.message }));
 	}
-	if (!response.ok) {
-		throw new Error(response.status === 404
-			? t("tools.satellite.status.api_not_found")
-			: t("tools.satellite.status.fetch_failed", { status: response.status }));
-	}
+	if (!response.ok)
+		throw new Error(response.status === 404 ? t(source.notFound) : t(source.failed, { status: response.status }));
 	const text = await response.text();
 	if (new TextEncoder().encode(text).length > 1000000)
 		throw new Error(t("tools.satellite.status.too_large"));
 	return text;
 }
 
-async function refreshAmsat() {
-	if (!usingAmsat) return;
-	status.textContent = t("tools.satellite.status.fetching");
-	const refreshed = parseTleCatalog(await fetchAmsatText());
+async function refreshSource() {
+	if (!liveSource) return;
+	status.textContent = t(liveSource.fetching);
+	const refreshed = parseTleCatalog(await fetchSourceText(liveSource));
 	makeBundle(refreshed);
 	catalog = refreshed;
 }
@@ -159,16 +167,16 @@ function setPushProgress(step) {
 }
 
 function setBusy(busy) {
-	for (const control of [amsatButton, fileInput, providerInput, searchInput, buildButton, pushButton,
+	for (const control of [...SOURCES.map((source) => source.button), fileInput, providerInput, searchInput, buildButton, pushButton,
 		...options.querySelectorAll("input")])
 		control.disabled = busy;
 }
 
-amsatButton.addEventListener("click", async () => {
+for (const source of SOURCES) source.button.addEventListener("click", async () => {
 	setBusy(true);
-	status.textContent = t("tools.satellite.status.fetching");
+	status.textContent = t(source.fetching);
 	try {
-		loadText(await fetchAmsatText(), AMSAT_BULLETIN, true);
+		loadText(await fetchSourceText(source), source.provider(), source);
 	} catch (error) {
 		catalog = null;
 		buildButton.disabled = true;
@@ -193,7 +201,7 @@ fileInput.addEventListener("change", async () => {
 		return;
 	}
 	try {
-		loadText(await file.text(), providerInput.value.trim() || AMSAT_BULLETIN, false);
+		loadText(await file.text(), providerInput.value.trim() || AMSAT_BULLETIN, null);
 	} catch (error) {
 		catalog = null;
 		buildButton.disabled = true;
@@ -207,7 +215,7 @@ providerInput.addEventListener("input", showReadyState);
 buildButton.addEventListener("click", async () => {
 	setBusy(true);
 	try {
-		await refreshAmsat();
+		await refreshSource();
 		const bundle = makeBundle();
 		const filename = `satellites-${new Date().toISOString().slice(0, 10)}.json`;
 		const url = URL.createObjectURL(new Blob([`${JSON.stringify(bundle, null, 2)}\n`], { type: "application/json" }));
@@ -235,7 +243,7 @@ pushButton.addEventListener("click", async () => {
 		setPushProgress("connecting");
 		if (!serialSupported()) throw new Error(t("flash.err.no_serial"));
 		const port = await serialApi().requestPort({ filters: RADIO_PORT_FILTERS });
-		await refreshAmsat();
+		await refreshSource();
 		const bundle = makeBundle();
 		stream = await SerialStream.open(port);
 		const link = new Link(stream);

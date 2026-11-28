@@ -23,20 +23,43 @@ export const SATELLITES = Object.freeze([
 
 export const DEFAULT_SELECTED_IDS = Object.freeze([25544, 27607, 43017]);
 export const AMSAT_BULLETIN = "https://www.amsat.org/tle/daily-bulletin.txt";
+// PE0SAT's amateur list serves plain HTTP only; the page reads it through PE0SAT_API, which adds HTTPS
+export const PE0SAT_CATALOG = "http://tle.pe0sat.nl/kepler/amateur.txt";
 export const MAX_SELECTED_PROFILES = 10;
-// The same-origin proxy for AMSAT_BULLETIN (functions/api/amsat-tle.js). A page served from another path names its
-// own in data-amsat-api; only a same-origin path is taken, so a page cannot point the button at another site.
+// The same-origin proxies for AMSAT_BULLETIN and PE0SAT_CATALOG (functions/api/*-tle.js). A page served from another
+// path names its own in data-amsat-api and data-pe0sat-api; only a same-origin path is taken, so a page cannot point a
+// button at another site.
 export const AMSAT_API = "/api/amsat-tle";
+export const PE0SAT_API = "/api/pe0sat-tle";
 
-export function amsatEndpoint(value, base = globalThis.location?.href) {
+export function sameOriginEndpoint(value, fallback, base = globalThis.location?.href) {
 	const v = typeof value === "string" ? value.trim() : "";
-	if (!v || !base) return AMSAT_API;
+	if (!v || !base) return fallback;
 	try {
 		// the browser's own parse of the very string returned, so a tab, newline, backslash or a space that trim()
 		// strips cannot turn the path into another host
-		return new URL(v, base).origin === new URL(base).origin ? v : AMSAT_API;
+		return new URL(v, base).origin === new URL(base).origin ? v : fallback;
 	} catch {
-		return AMSAT_API;
+		return fallback;
+	}
+}
+
+export function amsatEndpoint(value, base = globalThis.location?.href) {
+	return sameOriginEndpoint(value, AMSAT_API, base);
+}
+
+export function pe0satEndpoint(value, base = globalThis.location?.href) {
+	return sameOriginEndpoint(value, PE0SAT_API, base);
+}
+
+// A bundle names an HTTPS provider. PE0SAT's own URL is HTTP, so a list read through the proxy names the proxy, where
+// the data came from over HTTPS; on a plain HTTP preview it stays PE0SAT_CATALOG and the bundle check says why.
+export function proxiedProvider(endpoint, fallback, base = globalThis.location?.href) {
+	try {
+		const url = new URL(endpoint, base);
+		return url.protocol === "https:" ? url.href : fallback;
+	} catch {
+		return fallback;
 	}
 }
 

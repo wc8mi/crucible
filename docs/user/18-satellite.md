@@ -15,9 +15,9 @@ python tools/satellite_tle.py catalog --source amsat
 ```
 
 For a browser workflow, open **Tools > Satellite TLE Update** on the RadioFoundry site. Load the AMSAT daily bulletin
-or browse for a TLE file, then choose up to 10 FM satellites by name. Non-FM objects are not shown. ISS, SO-50 and
-AO-91 start selected when present. Search does not clear checked selections. The page refreshes the AMSAT bulletin
-before each push or bundle download; a selected file is used as supplied. A push replaces checked satellites' existing
+or PE0SAT's amateur TLE list, or browse for a TLE file, then choose up to 10 FM satellites by name. Non-FM objects are
+not shown. ISS, SO-50 and AO-91 start selected when present. Search does not clear checked selections. The page
+refreshes the AMSAT or PE0SAT list before each push or bundle download; a selected file is used as supplied. A push replaces checked satellites' existing
 TLEs and verifies their epochs. The page can push directly over USB/serial or create a JSON bundle for the PC utility.
 Direct push requires a supported browser and a secure context (HTTPS or localhost).
 After an install or update, the web flasher offers this page when the installed build reports satellite support.

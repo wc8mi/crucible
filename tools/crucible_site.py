@@ -364,10 +364,12 @@ def crucible_page(flash, project, assets, built):
     return page
 
 
-# The satellite page: the AMSAT bulletin comes through this site's proxy (/crucible/api/amsat-tle on the tinker host),
-# named relative to the page so the folder can move; the frequencies are the page's own table (satellite-tle.js)
+# The satellite page: the AMSAT bulletin and PE0SAT's amateur list come through this site's proxies
+# (/crucible/api/amsat-tle and /crucible/api/pe0sat-tle on the tinker host), named relative to the page so the folder
+# can move; the frequencies are the page's own table (satellite-tle.js)
 SAT_PAGE = 'tools/satellite/index.html'
 SAT_API = '../../api/amsat-tle'
+SAT_PE0SAT_API = '../../api/pe0sat-tle'
 SAT_LEAD = ('Load new satellite data on a radio with RadioFoundry or {name}. A firmware update is not necessary. '
             'The radio must have the satellite feature. Select up to 10 FM satellites. Send them to the radio over USB, '
             'or save a bundle file.')
@@ -379,13 +381,13 @@ def satellite_page(tle, project, assets, built):
     name = html.escape(project['name'])
     page = shell(page, project, assets, built, '../../', f'{name} · Satellites',
                  '<body class="page-tools" data-root="../../" data-home="../../" data-gl-more="More">',
-                 "The AMSAT button gets AMSAT's daily bulletin through this site. ")
+                 "The AMSAT and PE0SAT buttons get their TLE lists through this site. ")
     m = one(r'(<section class="wrap section page-head">)\s*<p class="eyebrow">.*?</p>(\s*<h1>)(.*?)(</h1>\s*<p class="lead">)(.*?)(</p>)',
             page, 'satellite page head')
     page = (page[:m.start()] + m.group(1) + m.group(2) + 'Satellites' + m.group(4) + SAT_LEAD.format(name=name)
             + m.group(6) + page[m.end():])
     m = one(r'<section class="wrap section satellite-tle" id="satellite-tle"', page, 'satellite form')
-    page = page[:m.end()] + f' data-amsat-api="{SAT_API}"' + page[m.end():]
+    page = page[:m.end()] + f' data-amsat-api="{SAT_API}" data-pe0sat-api="{SAT_PE0SAT_API}"' + page[m.end():]
     return page
 
 
@@ -710,7 +712,7 @@ def self_test():
         else:
             raise AssertionError('a RadioFoundry service left in the output')
     assert 'location.replace("./#terms")' in page, 'the update page asks for the terms first'
-    # the satellite page: the shared template in Crucible's shell; the AMSAT button uses this site's proxy only
+    # the satellite page: the shared template in Crucible's shell; the AMSAT and PE0SAT buttons use this site's proxies only
     tle = ('<html><head><title>x</title></head><body class="page-tools" data-root="../../" data-home="../../">'
            '<header class="site-header">nav</header><main><section class="wrap section page-head">\n'
            '<p class="eyebrow"><a href="../../tools/index.html">Tools</a></p>\n<h1>Satellite TLE Update</h1>\n<p class="lead">l</p>'
@@ -719,8 +721,9 @@ def self_test():
            '<script type="module" src="../../static/js/tletool.js?v=1"></script></body></html>')
     sat = satellite_page(tle, proj, '1', 'v')
     assert '<h1>Satellites</h1>' in sat and 'eyebrow' not in sat and 'tools/index.html' not in sat and 'site-header' not in sat
-    assert f'id="satellite-tle" data-amsat-api="{SAT_API}"' in sat and not SAT_API.startswith(('/', 'http'))
-    assert CSP in sat and 'amsat.org' not in CSP and 'location.replace("../../#terms")' in sat and '"Crucible"' in sat
+    assert f'id="satellite-tle" data-amsat-api="{SAT_API}" data-pe0sat-api="{SAT_PE0SAT_API}"' in sat
+    assert not any(a.startswith(('/', 'http')) for a in (SAT_API, SAT_PE0SAT_API))
+    assert CSP in sat and 'amsat.org' not in CSP and 'pe0sat' not in CSP and 'location.replace("../../#terms")' in sat and '"Crucible"' in sat
     assert 'href="../../crucible/crucible.css?v=1"' in sat and 'class="cx-brand" href="../../"' in sat
     assert all(len(x.split()) <= 25 for x in re.split(r'(?<=\.) ', SAT_LEAD))
     with tempfile.TemporaryDirectory() as d:
