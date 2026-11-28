@@ -83,12 +83,21 @@ function showReadyState() {
 	}
 }
 
+// The list's name when it holds the page's own ("ISS (ZARYA)"), else both: PE0SAT, for one, calls IO-86 LAPAN-A2,
+// and a box or search under that name alone would hide it
+function profileLabel(record) {
+	const own = profileById.get(record.catalog_id)?.name || record.name;
+	if (!record.name || record.name.toLocaleLowerCase().includes(own.toLocaleLowerCase())) return record.name || own;
+	return `${own} (${record.name})`;
+}
+
 function renderOptions() {
 	const records = filterFmSatellites(catalog || SATELLITES.map((satellite) => ({
 		catalog_id: satellite.id, name: satellite.name,
 	})));
 	const query = searchInput.value.trim().toLocaleLowerCase();
-	const matching = records.filter((record) => `${record.name} ${record.catalog_id}`.toLocaleLowerCase().includes(query));
+	const matching = records.filter((record) => `${profileLabel(record)} ${record.catalog_id}`.toLocaleLowerCase()
+		.includes(query));
 	for (const record of matching) {
 		const satellite = profileById.get(record.catalog_id);
 		const row = document.createElement("div");
@@ -112,7 +121,7 @@ function renderOptions() {
 		const name = document.createElement("label");
 		name.className = "tle-profile-name";
 		name.htmlFor = checkbox.id;
-		name.textContent = record.name;
+		name.textContent = profileLabel(record);
 		const detail = document.createElement("small");
 		detail.className = "tle-profile-detail";
 		detail.textContent = t("tools.satellite.option", { id: record.catalog_id, rx: (satellite.rxHz / 1e6).toFixed(3),

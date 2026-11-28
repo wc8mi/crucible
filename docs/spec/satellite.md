@@ -173,7 +173,8 @@ PE0SAT's amateur list, `http://tle.pe0sat.nl/kepler/amateur.txt`, the same way (
 HTTP only, so the bundle's provider is the endpoint's absolute HTTPS URL. In a loaded list, a catalog ID repeated
 with identical lines keeps the first record. An ID repeated with different lines is left out, and a selected one is
 then reported missing. An Alpha-5 record (catalog number 100000 and up) is skipped, since a bundle's IDs stop at
-99999. Browse remains available for another local
+99999. A box shows the page's name for the satellite and adds the list's name when it is another one
+(PE0SAT uses launch names such as LAPAN-A2 for IO-86); search matches either name or the catalog ID. Browse remains available for another local
 source. When AMSAT or PE0SAT is selected, the page fetches that list again without caching before each radio push or
 bundle download. A failed refresh stops the operation; a local file is used as supplied. Checked selections persist across
 searches. The daily TLE bulletin itself contains no frequency data. The page validates selected IDs, checksums, orbital

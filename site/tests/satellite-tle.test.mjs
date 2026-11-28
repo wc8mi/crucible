@@ -251,7 +251,8 @@ test("the page refreshes AMSAT before export and retains checked satellites thro
 
 		// PE0SAT: its own proxy, its URL as the source, and fetched again from there before the bundle is made
 		const pe0satRequests = [];
-		const pe0satText = catalogAt(0);
+		// PE0SAT names some objects differently (IO-86 is LAPAN-A2 there): the box shows both names, search finds either
+		const pe0satText = catalogAt(0).replace("SO-50\n", "SAUDISAT 1C\n");
 		globalThis.fetch = async (url, options) => {
 			pe0satRequests.push({ url, options });
 			return new Response(pe0satText);
@@ -267,6 +268,17 @@ test("the page refreshes AMSAT before export and retains checked satellites thro
 		}
 		const pe0satProvider = "https://tinker.example/api/pe0sat-tle";
 		assert.equal(elements["tle-provider"].value, pe0satProvider);
+		const labels = () => elements["satellite-tle-options"].children.filter((row) => row.dataset?.id)
+			.map((row) => row.children[1].textContent);
+		assert.deepEqual(labels(), ["ISS (ZARYA)", "SO-50 (SAUDISAT 1C)", "AO-91"]);
+		for (const query of ["so-50", "saudisat", "27607"]) {
+			elements["satellite-tle-search"].value = query;
+			elements["satellite-tle-options"].replaceChildren();
+			await elements["satellite-tle-search"].fire("input");
+			assert.deepEqual(labels(), ["SO-50 (SAUDISAT 1C)"], query);
+		}
+		elements["satellite-tle-search"].value = "";
+		await elements["satellite-tle-search"].fire("input");
 		await elements["satellite-tle-build"].fire("click");
 		assert.equal(downloads.length, 3, elements["satellite-tle-status"].textContent);
 		assert.deepEqual(pe0satRequests.map(({ url }) => url), [PE0SAT_API, PE0SAT_API]);
