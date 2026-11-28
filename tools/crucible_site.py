@@ -369,7 +369,7 @@ def crucible_page(flash, project, assets, built):
 SAT_PAGE = 'tools/satellite/index.html'
 SAT_API = '../../api/amsat-tle'
 SAT_LEAD = ('Load new satellite data on a radio with RadioFoundry or {name}. A firmware update is not necessary. '
-            'The radio must have the satellite feature. Select up to 10 FM satellites. Send them to the radio over USB, '
+            'The radio must have the satellite feature. Select up to 18 FM satellites. Send them to the radio over USB, '
             'or save a bundle file.')
 
 

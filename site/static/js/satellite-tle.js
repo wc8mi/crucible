@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 
 export const SATELLITES = Object.freeze([
 	{ id: 25544, name: "ISS", rxHz: 437800000, txHz: 145990000, toneHz: 670 },
@@ -23,7 +24,8 @@ export const SATELLITES = Object.freeze([
 
 export const DEFAULT_SELECTED_IDS = Object.freeze([25544, 27607, 43017]);
 export const AMSAT_BULLETIN = "https://www.amsat.org/tle/daily-bulletin.txt";
-export const MAX_SELECTED_PROFILES = 10;
+// The most a protocol-v8 radio keeps; the push checks the connected radio's own limit from INFO
+export const MAX_SELECTED_PROFILES = 18;
 // The same-origin proxy for AMSAT_BULLETIN (functions/api/amsat-tle.js). A page served from another path names its
 // own in data-amsat-api; only a same-origin path is taken, so a page cannot point the button at another site.
 export const AMSAT_API = "/api/amsat-tle";

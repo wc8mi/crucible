@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -250,8 +251,9 @@ test("rejects malformed, stale, and unselected catalog data", () => {
 	const catalog = parseTleCatalog(SAMPLE);
 	assert.throws(() => buildTleBundle(catalog, []), /Select at least one satellite/);
 	assert.throws(() => buildTleBundle(catalog, [40908]), /missing selected IDs/);
-	assert.throws(() => buildTleBundle(catalog, [...SATELLITES.slice(0, MAX_SELECTED_PROFILES + 1).map(({ id }) => id)],
-		{ now: new Date("2026-11-14T00:00:00Z") }), /no more than 10/);
+	assert.equal(MAX_SELECTED_PROFILES, 18);
+	assert.throws(() => buildTleBundle(catalog, [...SATELLITES.map(({ id }) => id), 99001, 99002],
+		{ now: new Date("2026-11-14T00:00:00Z") }), /no more than 18/);
 	const badChecksum = catalog.map((record) => ({ ...record }));
 	badChecksum[0].line1 = badChecksum[0].line1.slice(0, 68) + (badChecksum[0].line1[68] === "0" ? "1" : "0");
 	assert.throws(() => buildTleBundle(badChecksum, [25544], { now: new Date("2026-11-14T00:00:00Z") }), /checksum/);

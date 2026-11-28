@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -15,8 +16,10 @@ const record = {
 const profile = { catalog_id: 99001, rx_hz: 145900000, tx_hz: 435100000, tx_tone_tenths: 885 };
 
 class FakeLink {
-	constructor(version = 5, records = [record], profiles = [profile]) {
+	constructor(version = 5, records = [record], profiles = [profile], capacity = 10, profileMax = 18) {
 		this.version = version;
+		this.capacity = capacity;
+		this.profileMax = profileMax;
 		this.records = records;
 		this.expectedProfiles = profiles;
 		this.calls = [];
@@ -41,9 +44,10 @@ class FakeLink {
 		this.calls.push([...payload]);
 		switch (payload[0]) {
 		case 0: {
-			const reply = new Uint8Array(5);
+			const reply = new Uint8Array(this.version >= 8 ? 6 : 5);
 			reply[0] = this.version;
-			new DataView(reply.buffer).setUint16(1, 10, true);
+			new DataView(reply.buffer).setUint16(1, this.capacity, true);
+			if (this.version >= 8) reply[5] = this.profileMax;
 			return reply;
 		}
 		case 1: {
@@ -168,6 +172,35 @@ test("rejects ten profiles on protocol-v5 before starting a transaction", async 
 	await assert.rejects(() => pushSatelliteBundle(link, { schema_version: 3, records, profiles }),
 		{ translationKey: "tools.satellite.status.profile_version" });
 	assert.deepEqual(link.calls.map((call) => call[0]), [0]);
+});
+
+function satellites(count) {
+	const records = Array.from({ length: count }, (_, index) => ({ ...record, catalog_id: 99001 + index,
+		name: `Satellite ${index}` }));
+	const profiles = records.map(({ catalog_id }) => ({ catalog_id, rx_hz: 145900000, tx_hz: 435100000,
+		tx_tone_tenths: 885 }));
+	return { records, profiles };
+}
+
+test("stages 18 profiles on a protocol-v8 radio", async () => {
+	const { records, profiles } = satellites(18);
+	const link = new FakeLink(8, records, profiles, 18, 18);
+	await pushSatelliteBundle(link, { schema_version: 3, records, profiles });
+	assert.equal(link.calls.filter((call) => call[0] === 12).length, 5);
+	assert.deepEqual(link.profiles, profiles);
+	assert.ok(link.calls.every((call) => call.length <= 64));
+});
+
+test("checks the radio's own limit before starting a transaction", async () => {
+	const { records, profiles } = satellites(11);
+	for (const link of [new FakeLink(7, records, profiles, 10), new FakeLink(8, records, profiles, 18, 10)]) {
+		await assert.rejects(() => pushSatelliteBundle(link, { schema_version: 3, records, profiles }),
+			{ translationKey: "tools.satellite.status.radio_limit", translationParams: { n: 10 } });
+		assert.deepEqual(link.calls.map((call) => call[0]), [0]);
+	}
+	await assert.rejects(() => pushSatelliteBundle(new FakeLink(8, records, profiles, 18),
+		{ schema_version: 3, records: satellites(19).records, profiles: satellites(19).profiles }),
+		/Invalid satellite bundle/);
 });
 
 test("rejects older firmware before starting a transaction", async () => {
