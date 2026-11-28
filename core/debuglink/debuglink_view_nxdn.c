@@ -8,6 +8,7 @@
 #include "debuglink/debuglink.h"
 #if CONFIG_NXDN
 #include "radio/radio_nxdn.h"
+#include "nxdn/nxdn_codeplug.h"
 #include "settings/settings.h"
 #endif
 
@@ -32,6 +33,9 @@ void debuglink_view_nxdn(const radio_view_t *v, dl_text_t *t)
 	dl_text(t, "nxdn.rate=%u\nnxdn.rx_ran=%u\nnxdn.tx_ran=%u\nnxdn.rx_gid=%u\nnxdn.unit_id=%u\n",
 		s.rate9600 ? 9600u : 4800u, s.rx_ran, s.tx_ran, s.rx_gid, s.unit_id);
 	dl_text(t, "nxdn.unit_call=%u\nnxdn.tx_dst=%u\nnxdn.tx_emergency=%u\n", s.unit_call, s.tx_dst, s.emergency);
+	// The radio's own unit ID from the codeplug (the radio-wide NXDN record, else the DMR ID, else 1): what unit_id 0
+	// sends, and a stored channel without an ID of its own (ADR 007, 1a)
+	dl_text(t, "nxdn.radio_unit_id=%u\n", nxdn_radio_unit_id());
 	// The stored radio default the settings start from (docs/crucible/adr/004-nxdn-radio-default.md): what a restart
 	// brings back; the settings above differ by what was set for now (Talk to, the debug link)
 	dl_text(t, "nxdn.default.rate=%u\nnxdn.default.rx_ran=%u\nnxdn.default.tx_ran=%u\nnxdn.default.tg=%u\n",

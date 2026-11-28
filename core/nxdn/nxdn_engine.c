@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // NXDN conventional voice on a channel (nxdn_engine.h), on the shared voice engine (air_voice.h)
 #include "nxdn_engine.h"
 #include "config.h"
@@ -184,6 +185,7 @@ bool nxdn_engine_tx_prepare(nxdn_engine_t *e)
 		// A subscriber unit sends inbound, direct or through a repeater (table 5.2-2)
 		nxdn_call_tx_begin(&e->tx, &v, cfg->tx_ran, NXDN_DIR_INBOUND, cfg->rate9600);
 		e->tx.scramble_key = key;
+		air_session_tx_lead_in(&e->av.session, nxdn_preamble[0], cfg->lead_in_ms);
 	}
 	return air_voice_tx_prime(&e->av);
 }
@@ -206,6 +208,11 @@ void nxdn_engine_tx_abort(nxdn_engine_t *e)
 air_tx_state_t nxdn_engine_tx_state(const nxdn_engine_t *e)
 {
 	return air_voice_tx_state(&e->av);
+}
+
+bool nxdn_engine_tx_leading(const nxdn_engine_t *e)
+{
+	return air_session_tx_leading(&e->av.session);
 }
 
 void nxdn_engine_tx_clear(nxdn_engine_t *e)

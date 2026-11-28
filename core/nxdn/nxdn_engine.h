@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // NXDN conventional voice on a channel (docs/spec/nxdn.md 7): the call layer (nxdn.h) on an air interface session
 // (core/air/air_session.h). The radio core begins it on an NXDN channel and ends it on leaving; in between it
 // receives calls, hands their voice frames to a sink, and transmits when the radio core says so. No RTOS call: the
@@ -46,6 +47,9 @@ typedef struct {
 	uint8_t system;		// traffic-key system for this channel
 #endif
 	const uint8_t *silence;	// a voice frame of silence (NXDN_EHR_BYTES), from the vocoder
+	// A transmission opens with this long of the reference pattern before the preamble, so a repeater's receiver
+	// settles before the header (0 none). The owner starts the encoder once it is queued (nxdn_engine_tx_leading)
+	uint16_t lead_in_ms;
 } nxdn_engine_cfg_t;
 
 typedef struct {
@@ -91,6 +95,9 @@ bool nxdn_engine_tx_go(nxdn_engine_t *e);
 void nxdn_engine_tx_stop(nxdn_engine_t *e);
 void nxdn_engine_tx_abort(nxdn_engine_t *e);
 air_tx_state_t nxdn_engine_tx_state(const nxdn_engine_t *e);
+// The lead-in (cfg.lead_in_ms) is still being queued: start the encoder after it, so its frames are not held in its
+// queue (and dropped there) for the length of the lead-in
+bool nxdn_engine_tx_leading(const nxdn_engine_t *e);
 void nxdn_engine_tx_clear(nxdn_engine_t *e);
 
 // A copy of the state for the radio core's task

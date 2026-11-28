@@ -1,5 +1,6 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 The RadioFoundry Authors -->
+<!-- Copyright (c) 2026 David Behnke -->
 
 # Air interface
 
@@ -242,6 +243,12 @@ A mode that has nothing ready in `tx_fill` adds nothing and is asked again one c
 before the queue falls under the provider's lead, or the provider sends idle symbols and reports an underrun.
 
 Transmit states: idle, priming, on, ending (the last symbol is queued), done.
+
+A lead-in: before the prime, `air_session_tx_lead_in(s, byte, ms)` opens the next transmission with `ms` of a
+four-dibit pattern (rounded down to whole patterns), ahead of anything `tx_fill` queues, so a repeater's receiver
+settles before the mode's own preamble. The session queues it as room allows and then hands over to `tx_fill`;
+`air_session_tx_leading` is true until all of it is queued (read from any task). It ends with the transmission. NXDN
+uses it ([nxdn.md](nxdn.md) 1); P25 and YSF send none.
 
 In the radio core each mode on the air interface fills one table of these steps (`radio_air_ops_t`,
 `core/radio/radio_air.h`: running, no TX, prepare, go, stop, abort, state, clear), so PTT, the time-out and the

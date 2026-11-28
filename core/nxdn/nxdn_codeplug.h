@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // NXDN conventional channels in the codeplug (docs/spec/nxdn-codeplug.md): the codec from the stored bytes to a plain
 // struct the radio core sets the NXDN engine up from. Bytes in, values out: no engine here. Built with CONFIG_NXDN
 #ifndef RFOUNDRY_NXDN_CODEPLUG_H
@@ -35,6 +36,9 @@ void nxdn_conv_encode(const nxdn_conv_t *c, uint8_t out[NXDN_CP_CONV_LEN]);
 // The radio-wide unit ID from the kind's record (len bytes, -1 = none): when unset or out of range the DMR ID where it
 // fits, else 1
 uint16_t nxdn_unit_id_decode(const uint8_t *b, int len, uint32_t dmr_id);
+// The radio's own unit ID from the codeplug: the radio-wide NXDN record, else the DMR ID, else 1. A channel without an
+// ID of its own and the VFO send this one
+uint16_t nxdn_radio_unit_id(void);
 
 // What a conventional call is set up from: the channel's block, our unit ID and the talk target
 typedef struct {

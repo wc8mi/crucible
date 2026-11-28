@@ -492,7 +492,7 @@ uint8_t debuglink_radio_feature_op(uint8_t op, const uint8_t *a, uint16_t len)
 		// The NXDN settings (radio_nxdn_settings_t, RAM only: a restart seeds them again from the stored radio
 		// default, nxdn.default.*; docs/spec/debuglink.md 3.8): u8 flags (bit 0: 9600
 		// bit/s, else 4800; bit 1: PTT calls a unit; bit 2: emergency), u8 rx_ran (0 any), u8 tx_ran, u16 rx_gid (0: the
-		// RAN squelch), u16 unit_id (1..65519), u16 tx_dst, little-endian. The engine takes them when not transmitting;
+		// RAN squelch), u16 unit_id (1..65519, 0 the radio's own), u16 tx_dst, little-endian. The engine takes them when not transmitting;
 		// a new rate starts it over
 		if (len < 9 || (a[0] & 0xF8u) != 0 || a[1] > 63 || a[2] > 63) {
 			return DL_ST_BAD_ARG;
@@ -507,7 +507,7 @@ uint8_t debuglink_radio_feature_op(uint8_t op, const uint8_t *a, uint16_t len)
 		n.rx_gid = (uint16_t)(a[3] | a[4] << 8);
 		n.unit_id = (uint16_t)(a[5] | a[6] << 8);
 		n.tx_dst = (uint16_t)(a[7] | a[8] << 8);
-		if (n.unit_id == 0 || n.unit_id > RADIO_NXDN_UNIT_MAX) {
+		if (n.unit_id > RADIO_NXDN_UNIT_MAX) {
 			return DL_ST_BAD_ARG;
 		}
 		radio_req_nxdn_settings(&n);

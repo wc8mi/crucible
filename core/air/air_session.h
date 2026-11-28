@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // A session on the air interface (docs/spec/air-interface.md 7): one mode on one provider (hal_air.h) with the
 // framer between them (air_framer.h). It opens and closes the provider, feeds received chunks to the framer, and
 // runs a transmission from the first queued symbol to AIR_EV_TX_DONE. It knows no mode and makes no RTOS call.
@@ -50,6 +51,9 @@ typedef struct {
 	volatile uint8_t tx;		// air_tx_state_t
 	volatile bool finish;		// air_session_tx_finish was called ...
 	volatile bool finished;		// ... and the last chunk is in the provider's queue (it may have had to wait for room)
+	uint16_t lead_syms;		// air_session_tx_lead_in: its length ...
+	volatile uint16_t lead_left;	// ... and what is still to queue, in symbols
+	uint8_t lead_byte;
 	air_session_stats_t stats;
 } air_session_t;
 
@@ -68,6 +72,12 @@ void air_session_retuned(air_session_t *s);
 // Transmit, owner's task: prime (calls tx_fill; true once a chunk is queued), switch the transmitter on
 // (hal_radio_t.tx), go. False from go: the provider refused; the owner switches off again
 bool air_session_tx_prime(air_session_t *s);
+// Before the prime (owner's task, AIR_TX_IDLE): open the next transmission with `ms` of a pattern, four dibits in
+// `byte` repeated, ahead of anything tx_fill queues. A receiver (a repeater) has that long to settle before the mode's
+// own preamble. Rounded down to whole patterns; 0 none. It ends with the transmission (air_session_tx_clear)
+void air_session_tx_lead_in(air_session_t *s, uint8_t byte, uint16_t ms);
+// Part of the lead-in is still to queue (any task: one read)
+static inline bool air_session_tx_leading(const air_session_t *s) { return s->lead_left != 0; }
 bool air_session_tx_go(air_session_t *s);
 // Stop at once, whatever is queued (owner's task). AIR_TX_DONE follows
 void air_session_tx_abort(air_session_t *s);

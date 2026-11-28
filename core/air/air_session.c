@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // A session on the air interface (air_session.h).
 #include "air_session.h"
 
@@ -20,12 +21,36 @@ static void try_finish(air_session_t *s)
 	}
 }
 
+// The lead-in, as much as the queue takes now. True when all of it is queued
+static bool lead_in(air_session_t *s)
+{
+	uint8_t pat[16];
+
+	memset(pat, s->lead_byte, sizeof pat);
+	while (s->lead_left) {
+		// Each piece starts where the last left off in the pattern, so the four dibits keep their order across chunks
+		uint16_t first = (uint16_t)((s->lead_syms - s->lead_left) & 3u);
+		uint16_t n = air_session_tx_space(s);
+
+		if (n > sizeof pat * 4u - first)
+			n = (uint16_t)(sizeof pat * 4u - first);
+		if (n > s->lead_left)
+			n = s->lead_left;
+		if (!n || !air_session_tx(s, pat, first, n))
+			return false;
+		s->lead_left -= n;
+	}
+	return true;
+}
+
 static void fill(air_session_t *s)
 {
 	if (s->finish) {
 		try_finish(s);
 		return;
 	}
+	if (!lead_in(s))
+		return;
 	if (s->ops.tx_fill)
 		s->ops.tx_fill(s->ctx);
 }
@@ -127,6 +152,14 @@ bool air_session_tx_prime(air_session_t *s)
 	return s->air->tx_space() < s->air->tx_queue_depth;
 }
 
+void air_session_tx_lead_in(air_session_t *s, uint8_t byte, uint16_t ms)
+{
+	if (!s->air || s->tx != AIR_TX_IDLE)
+		return;
+	s->lead_syms = s->lead_left = (uint16_t)(((uint32_t)s->fr.mode->profile.sym_rate * ms / 1000u) & ~3u);
+	s->lead_byte = byte;
+}
+
 bool air_session_tx_go(air_session_t *s)
 {
 	if (!s->air || s->tx != AIR_TX_PRIMING)
@@ -158,8 +191,10 @@ air_tx_state_t air_session_tx_state(const air_session_t *s)
 
 void air_session_tx_clear(air_session_t *s)
 {
-	if (s->tx == AIR_TX_DONE)
+	if (s->tx == AIR_TX_DONE) {
+		s->lead_left = 0;	// one that ended early takes its rest with it
 		s->tx = AIR_TX_IDLE;
+	}
 }
 
 uint16_t air_session_tx_space(const air_session_t *s)
