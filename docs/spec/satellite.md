@@ -167,15 +167,20 @@ redirects. Catalog browsing is separate from installation: the user selects cata
 never installed wholesale. For ID-based provider requests, the returned ID set must exactly match the selection.
 
 The site Tools page links to a standalone Satellite TLE page. It lists IDs in the curated FM frequency catalog and
-allows up to 10 profiles. Non-FM TLE objects are omitted. The AMSAT
-button loads the fixed daily bulletin through a same-origin site endpoint (`/api/amsat-tle`). The PE0SAT button loads
-PE0SAT's amateur list, `http://tle.pe0sat.nl/kepler/amateur.txt`, the same way (`/api/pe0sat-tle`). PE0SAT serves plain
-HTTP only, so the bundle's provider is the endpoint's absolute HTTPS URL. In a loaded list, a catalog ID repeated
+allows up to 10 profiles. Non-FM TLE objects are omitted. The Load
+latest TLEs button fetches two lists at once through same-origin site endpoints: the AMSAT daily bulletin
+(`/api/amsat-tle`) and PE0SAT's amateur list, `http://tle.pe0sat.nl/kepler/amateur.txt` (`/api/pe0sat-tle`; PE0SAT serves
+plain HTTP only). It merges them per catalog ID: the lines with the newest epoch win, AMSAT's on a tie, and the name
+comes from AMSAT when AMSAT has the ID. Each box shows the TLE's age and the list it came from. If one list fails, the
+other is used and the status says so; if both fail, the status gives both reasons. The bundle's provider is the page's
+own HTTPS URL, since the page assembled the data; a plain HTTP preview names the AMSAT bulletin. Checked boxes are
+kept in the browser's local storage for the next visit. In a loaded list, a catalog ID repeated
 with identical lines keeps the first record. An ID repeated with different lines is left out, and a selected one is
 then reported missing. An Alpha-5 record (catalog number 100000 and up) is skipped, since a bundle's IDs stop at
-99999. Browse remains available for another local
-source. When AMSAT or PE0SAT is selected, the page fetches that list again without caching before each radio push or
-bundle download. A failed refresh stops the operation; a local file is used as supplied. Checked selections persist across
+99999. A box shows the page's name for the satellite and adds the list's name when it is another one
+(PE0SAT uses launch names such as LAPAN-A2 for IO-86); search matches either name or the catalog ID. Browse remains available for another local
+source. After an online load, the page fetches both lists again without caching before each radio push or bundle
+download. A failed refresh stops the operation; a local file is used as supplied. Checked selections persist across
 searches. The daily TLE bulletin itself contains no frequency data. The page validates selected IDs, checksums, orbital
 fields and age, then creates a schema-v3 bundle or
 pushes TLE and frequency data over Web Serial/WebUSB. It verifies the installed IDs and epochs against the selected

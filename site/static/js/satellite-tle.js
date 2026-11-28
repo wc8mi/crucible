@@ -23,7 +23,7 @@ export const SATELLITES = Object.freeze([
 
 export const DEFAULT_SELECTED_IDS = Object.freeze([25544, 27607, 43017]);
 export const AMSAT_BULLETIN = "https://www.amsat.org/tle/daily-bulletin.txt";
-// PE0SAT's amateur list serves plain HTTP only; the page reads it through PE0SAT_API, which adds HTTPS
+// PE0SAT's amateur list serves plain HTTP only; the page reads it through PE0SAT_API, over this site's HTTPS
 export const PE0SAT_CATALOG = "http://tle.pe0sat.nl/kepler/amateur.txt";
 export const MAX_SELECTED_PROFILES = 10;
 // The same-origin proxies for AMSAT_BULLETIN and PE0SAT_CATALOG (functions/api/*-tle.js). A page served from another
@@ -52,15 +52,26 @@ export function pe0satEndpoint(value, base = globalThis.location?.href) {
 	return sameOriginEndpoint(value, PE0SAT_API, base);
 }
 
-// A bundle names an HTTPS provider. PE0SAT's own URL is HTTP, so a list read through the proxy names the proxy, where
-// the data came from over HTTPS; on a plain HTTP preview it stays PE0SAT_CATALOG and the bundle check says why.
-export function proxiedProvider(endpoint, fallback, base = globalThis.location?.href) {
-	try {
-		const url = new URL(endpoint, base);
-		return url.protocol === "https:" ? url.href : fallback;
-	} catch {
-		return fallback;
+// One catalog from several: for each catalog ID, the lines with the newest epoch. The name stays the one from the first
+// catalog that has the ID (AMSAT's names are the familiar ones), and each record notes the source its lines came from.
+export function mergeNewest(catalogs) {
+	const byId = new Map();
+	const epoch = (record) => {
+		try {
+			return tleEpochMilliseconds(record.line1, record.catalog_id);
+		} catch {
+			return -Infinity;
+		}
+	};
+	for (const { source, records } of catalogs) {
+		for (const record of records) {
+			const earlier = byId.get(record.catalog_id);
+			if (!earlier) byId.set(record.catalog_id, { ...record, source });
+			else if (epoch(record) > epoch(earlier))
+				byId.set(record.catalog_id, { ...earlier, line1: record.line1, line2: record.line2, source });
+		}
 	}
+	return [...byId.values()];
 }
 
 export function filterFmSatellites(records) {
