@@ -86,7 +86,8 @@ sets the clock, or you type it in Settings > Location > **Date & time** ([Settin
 radio indoors without a fix can still predict passes from a fixed position and a typed time. A fixed position typed
 without altitude counts as sea level, which is close enough for pass times. When something is missing, the list says
 **No position: set it** or **No time: set it**; **OK** on that row opens Fixed position or Date & time, and the list
-fills in once you come back. Computer fixes do not survive a restart. The clock does on radios with a real-time
+fills in once you come back. Installing TLEs from the computer also sets the clock from the computer's time
+(firmware with satellite protocol 9). Computer fixes do not survive a restart. The clock does on radios with a real-time
 clock. The list is ordered by time to AOS and shows each pass's maximum elevation. When prediction finishes, the
 first pass is highlighted. Up and Down select a pass; **OK** opens its details and starts tracking. The selected
 satellite is remembered across power cycles.

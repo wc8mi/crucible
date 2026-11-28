@@ -42,7 +42,7 @@ OP_INFO, OP_LIST, OP_BEGIN, OP_DATA, OP_COMMIT, OP_ABORT, OP_SYNC_CHANNELS = ran
 OP_PROFILE_GET, OP_PROFILE_SET = 7, 8
 OP_REPLACE_BEGIN = 9
 OP_PROFILE_STAGE, OP_PROFILE_VALUES_GET, OP_PROFILE_STAGE_CHUNK = 10, 11, 12
-OP_SYNC_CHANNELS_STATUS, OP_PROFILE_SET_CHUNK = 13, 14
+OP_SYNC_CHANNELS_STATUS, OP_PROFILE_SET_CHUNK, OP_CLOCK_SET = 13, 14, 15
 DEFAULT_PROFILE_IDS = (25544, 27607, 43017)
 # (RX, TX) in Hz; TX 0 is a listen-only profile, which radios before protocol 8 refuse
 PROFILE_FREQUENCIES = {
@@ -656,6 +656,21 @@ def _request(link, operation, payload=b""):
     return reply
 
 
+def set_radio_clock(link, utc_s=None):
+    """Protocol v9: give the radio this computer's UTC, so it can predict passes without a GPS fix. Best effort:
+    False when the radio has no clock (UNAVAILABLE) or refuses the time (REFUSED); it keeps its own."""
+    if utc_s is None:
+        utc_s = int(dt.datetime.now(dt.timezone.utc).timestamp())
+    try:
+        if _request(link, OP_CLOCK_SET, struct.pack("<I", utc_s)):
+            raise SatelliteTleError("radio returned unexpected data after the clock update")
+    except DebugLinkError as exc:
+        if exc.status in (6, 7):
+            return False
+        raise
+    return True
+
+
 def radio_profile_ids(link, protocol_version=None):
     if protocol_version is None:
         protocol_version = parse_info(_request(link, OP_INFO))[0]
@@ -817,6 +832,8 @@ def install_records(link, records, profile_ids=None, profiles=None):
     expected_count = len(record_ids)
     if expected_count > capacity:
         raise SatelliteTleError(f"radio capacity {capacity} cannot hold {expected_count} selected records")
+    if version >= PROFILE_SET_CHUNK_PROTOCOL_VERSION:
+        set_radio_clock(link)
     stream = _serialize_records(validated)
     checksum = zlib.crc32(stream) & 0xFFFFFFFF
     begin = _request(link, OP_REPLACE_BEGIN, struct.pack("<HHI", len(validated), len(stream), checksum))

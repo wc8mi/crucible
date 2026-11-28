@@ -21,7 +21,7 @@ and TLE epochs give it.
 | Source | Sets the clock | Notes |
 |---|---|---|
 | GPS | An RMC sentence with status `A` and a valid date and time, from the board GPS | Before a fix a receiver may send its own unsynced time or GPS time without leap seconds |
-| HOST | The same, from a computer's NMEA | |
+| HOST | The same, from a computer's NMEA, or `CLOCK_SET` ([satellite.md](satellite.md) 6) | Sent before each TLE push |
 | MANUAL | A time typed in Settings | Overrides a GPS or computer time until the next fix |
 | RTC | The board's real-time clock, once at start-up | Ignored once any other source has set the clock |
 

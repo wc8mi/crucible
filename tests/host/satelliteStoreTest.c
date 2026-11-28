@@ -6,6 +6,8 @@
 #include <string.h>
 #include "debuglink/debuglink.h"
 #include "debuglink/debuglink_proto.h"
+#include "clock/clock.h"
+#include "hal_time.h"
 #include "satellite/channels.h"
 #include "satellite/frequency.h"
 #include "satellite/store.h"
@@ -952,6 +954,29 @@ static void test_v4_bank_reads(void)
 	CHECK(satellite_store_count() == 2u);
 }
 
+static uint32_t fake_ms = 1000u;
+uint32_t hal_millis(void)
+{
+	return fake_ms;
+}
+
+// CLOCK_SET: the site's computer time, taken as HOST; a time before 2020 is refused and the clock keeps its own
+static void test_clock_set(void)
+{
+	clock_init(fake_ms);
+	uint8_t req[5] = { DL_SAT_OP_CLOCK_SET };
+	put32(req + 1u, 1795824000u);		// 2026-11-28 00:00:00 UTC
+	CHECK(command(req, 5u) == 1u && output[0] == DL_ST_OK);
+	int64_t utc = 0;
+	uint8_t src = CLOCK_SRC_NONE;
+	fake_ms += 2500u;
+	CHECK(clock_now(&utc, &src, fake_ms) && utc == 1795824002 && src == CLOCK_SRC_HOST);
+	put32(req + 1u, 1500000000u);		// 2017
+	CHECK(command(req, 5u) == 1u && output[0] == DL_ST_REFUSED);
+	CHECK(clock_now(&utc, NULL, fake_ms) && utc == 1795824002);
+	CHECK(command(req, 4u) == 1u && output[0] == DL_ST_BAD_ARG);
+}
+
 int main(void)
 {
 	sim_flash_create(FLASH_SIZE, &map);
@@ -970,6 +995,7 @@ int main(void)
 	test_profile_set_chunk();
 	test_v4_bank_reads();
 	test_alpha5_and_listen_only_profiles();
+	test_clock_set();
 	CHECK(sim_flash_violations() == 0);
 	sim_flash_free();
 	if (failures != 0) {

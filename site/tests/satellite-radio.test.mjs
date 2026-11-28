@@ -29,6 +29,8 @@ class FakeLink {
 		this.profiles = [];
 		this.reportedEpoch = 1794545852 - 8 * 86400;
 		this.keepOldEpoch = false;
+		this.clockStatus = 0;
+		this.clockSeconds = undefined;
 	}
 
 	async request(command, payload) {
@@ -73,6 +75,13 @@ class FakeLink {
 			if (!this.keepOldEpoch) this.reportedEpoch = 1794545852;
 			return new Uint8Array(0);
 		case 6:
+			return new Uint8Array(0);
+		case 15:
+			assert.equal(payload.length, 5);
+			if (this.clockStatus !== 0)
+				throw Object.assign(new Error(`status ${this.clockStatus}`),
+					{ status: this.clockStatus, operation: 15 });
+			this.clockSeconds = new DataView(Uint8Array.from(payload).buffer).getUint32(1, true);
 			return new Uint8Array(0);
 		case 9:
 			this.recordBytes = new Uint8Array(0);
@@ -232,4 +241,28 @@ test("reports a single-band radio before writing TLE data", async () => {
 	});
 	assert.deepEqual(link.calls.map((call) => call[0]), [0]);
 	assert.equal(link.viewCalls, 1);
+});
+
+test("protocol v9 sets the radio clock from the computer before the push", async () => {
+	const link = new FakeLink(9);
+	await pushSatelliteBundle(link, bundle, () => {}, () => 1795824000999);
+	assert.equal(link.calls[1][0], 15);
+	assert.equal(link.clockSeconds, 1795824000);
+	assert.ok(link.calls.some((call) => call[0] === 4));
+});
+
+test("a radio that refuses the clock or has none still takes the push", async () => {
+	for (const status of [7, 6]) {
+		const link = new FakeLink(9);
+		link.clockStatus = status;
+		await pushSatelliteBundle(link, bundle, () => {}, () => 1795824000000);
+		assert.equal(link.clockSeconds, undefined);
+		assert.ok(link.calls.some((call) => call[0] === 4));
+	}
+});
+
+test("protocol v8 and older are not sent the clock", async () => {
+	const link = new FakeLink(8);
+	await pushSatelliteBundle(link, bundle);
+	assert.ok(!link.calls.some((call) => call[0] === 15));
 });

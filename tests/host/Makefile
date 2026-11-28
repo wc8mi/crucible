@@ -1622,7 +1622,8 @@ SAT_SERVICE := $(CORE)/satellite/service.c $(SAT_ORBIT)
 
 satelliteStoreTest: satelliteStoreTest.c $(SAT_STORE) \
 		$(wildcard $(CORE)/debuglink/*.h $(CORE)/satellite/*.h $(CORE)/storage/*.h) sim/sim_flash.h
-	$(CC) $(CFLAGS) -I$(ROOT)/hal -I. -Wshadow -DCONFIG_SATELLITE_TLE=1 -o $@ satelliteStoreTest.c $(SAT_STORE)
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -I. -Wshadow -DCONFIG_SATELLITE_TLE=1 -DCONFIG_POSITION=1 -DCONFIG_CLOCK=1 \
+		-o $@ satelliteStoreTest.c $(SAT_STORE) $(CORE)/clock/clock.c $(CORE)/clock/utc.c
 
 run: run-satellite
 run-satellite: clockTest satelliteStoreTest satelliteChannelsTest satelliteOrbitTest satelliteServiceTest

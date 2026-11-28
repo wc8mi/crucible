@@ -7,7 +7,7 @@ import { MAX_SELECTED_PROFILES, tleEpochMilliseconds } from "./satellite-tle.js"
 
 const COMMAND = 0x26;
 const OP = Object.freeze({ INFO: 0, LIST: 1, DATA: 3, COMMIT: 4, ABORT: 5,
-	REPLACE_BEGIN: 9, PROFILE_STAGE: 10, PROFILE_VALUES_GET: 11, PROFILE_STAGE_CHUNK: 12 });
+	REPLACE_BEGIN: 9, PROFILE_STAGE: 10, PROFILE_VALUES_GET: 11, PROFILE_STAGE_CHUNK: 12, CLOCK_SET: 15 });
 const SINGLE_BAND_ERROR = "tools.satellite.status.single_band";
 const OTHER_BAND_ERROR = "tools.satellite.status.band_error";
 
@@ -106,7 +106,22 @@ async function checkProfileBands(link, profiles) {
 	}
 }
 
-export async function pushSatelliteBundle(link, bundle, onProgress = () => {}) {
+// Protocol v9: the computer's UTC, so a radio with no GPS fix can predict passes at once. Best effort: a radio
+// without a clock answers UNAVAILABLE and one that refuses the time keeps its own; neither stops the push
+export async function setRadioClock(link, milliseconds) {
+	const payload = new Uint8Array(5);
+	payload[0] = OP.CLOCK_SET;
+	put32(new DataView(payload.buffer), 1, Math.floor(milliseconds / 1000));
+	try {
+		await link.request(COMMAND, payload);
+		return true;
+	} catch (error) {
+		if (error?.status === undefined) throw error;
+		return false;
+	}
+}
+
+export async function pushSatelliteBundle(link, bundle, onProgress = () => {}, now = Date.now) {
 	if (bundle?.schema_version !== 3 || !Array.isArray(bundle.records) || !Array.isArray(bundle.profiles) ||
 	    bundle.records.length < 1 || bundle.records.length > MAX_SELECTED_PROFILES || bundle.profiles.length !== bundle.records.length)
 		throw new Error("Invalid satellite bundle");
@@ -128,6 +143,7 @@ export async function pushSatelliteBundle(link, bundle, onProgress = () => {}) {
 		throw Object.assign(new Error(`This radio keeps at most ${radioMax} satellites`),
 			{ translationKey: "tools.satellite.status.radio_limit", translationParams: { n: radioMax } });
 	await checkProfileBands(link, bundle.profiles);
+	if (info[0] >= 9) await setRadioClock(link, now());
 
 	const data = encodeSatelliteRecords(bundle.records);
 	const crc = satelliteCrc32(data);
