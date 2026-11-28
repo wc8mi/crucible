@@ -15,6 +15,10 @@
 #include "i18n.h"
 #include "config.h"	// the switches that shape the types below
 
+// The keypad text editor (ui_menus.c) is built for any of these; the fixed position's Grid row needs it
+#define UI_TEXT_ENTRY	(CONFIG_CHANNEL_EDIT || CONFIG_APRS_AFSK || CONFIG_DMR_SMS || CONFIG_SATELLITE_TLE)
+#define UI_GRID_ENTRY	(CONFIG_POSITION && UI_TEXT_ENTRY)
+
 typedef enum {
 	SCR_HOME, SCR_QUICK, SCR_HUB, SCR_FIND, SCR_ACTIONS, SCR_CONTACTS, SCR_MESSAGES, SCR_MESSAGE, SCR_COMPOSE,
 	SCR_RECENT, SCR_ZONES, SCR_ZONE, SCR_TOOLS, SCR_SETTINGS, SCR_GROUP, SCR_PICKER, SCR_INFO, SCR_CONFIRM,
@@ -46,6 +50,9 @@ typedef enum {
 	SCR_SATELLITE_PASSES,		// Tools > Satellite: predict and select the next installed-TLE passes
 	SCR_SATELLITE,			// selected satellite: live pass details and tracking controls
 	SCR_SATELLITE_TEXT,		// one 69-character TLE line
+#if UI_GRID_ENTRY
+	SCR_GRID_TEXT,			// Fixed position > Grid: a Maidenhead locator typed (ui_menus_grid_text)
+#endif
 #if CONFIG_CLOCK
 	SCR_CLOCK,			// Settings > Location > Date & time: the UTC clock (ui_clock.c)
 #endif
@@ -96,6 +103,9 @@ void ui_satellite_passes_tick(void);
 #endif
 #if CONFIG_CLOCK
 void ui_clock_tick(uint32_t now_ms);
+#endif
+#if UI_GRID_ENTRY
+void ui_menus_grid_text(char *target, uint8_t max, void (*done)(void));	// done: kept (target holds it)
 #endif
 
 // A filtered list's raw row and its label (NULL: empty); false stops the pass

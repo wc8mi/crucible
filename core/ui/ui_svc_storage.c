@@ -966,6 +966,21 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 	}
 }
 
+#if CONFIG_POSITION
+// Both halves at once: set one after the other, a report between them would send half the old position
+bool ui_svc_position_set_fixed(int32_t lat_e7, int32_t lon_e7)
+{
+	if (lat_e7 < -900000000 || lat_e7 > 900000000 || lon_e7 < -1800000000 || lon_e7 > 1800000000)
+		return false;
+	position_cfg_t pc;
+	position_get_cfg(&pc);
+	pc.fix_lat = lat_e7;
+	pc.fix_lon = lon_e7;
+	position_set_cfg(&pc, hal_millis());
+	return true;
+}
+#endif
+
 // --- Codeplug writes, on the housekeeping task (storage_job_post) ---
 
 // why: a key (TRN). The UI shows it in the language in use (tr), so this task needs no language

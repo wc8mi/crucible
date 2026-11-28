@@ -8,6 +8,9 @@
 // "DDD.DDDD" from the left (a longitude's first digit of 2-9 gets its leading zero by itself), Up / Down (or the knob)
 // switch N / S or E / W, BACK takes the last digit back, OK saves (the digits not typed are zeros). Opening the editor
 // shows the stored value; the first digit starts over.
+//
+// Grid (with the text editor, UI_GRID_ENTRY): a Maidenhead locator of 4, 6 or 8 characters ("EN82mn") sets both at
+// once, to the center of its square. The row shows the stored position's 6-character square.
 
 #include "config.h"
 #if CONFIG_POSITION
@@ -15,8 +18,15 @@
 #include "ui_svc.h"
 #include "fmt.h"
 #include "i18n.h"
+#if UI_GRID_ENTRY
+#include "position/maidenhead.h"
+#endif
 
-enum { PP_LAT, PP_LON, PP_COUNT };
+enum { PP_LAT, PP_LON,
+#if UI_GRID_ENTRY
+	PP_GRID,
+#endif
+	PP_COUNT };
 #define POS_DEC		4u		// decimal places typed
 #define POS_DIGITS_MAX	7u
 
@@ -72,11 +82,28 @@ static uint16_t pos_count(void) { return PP_COUNT; }
 
 static void pos_item(uint16_t i, ui_item_t *it)
 {
-	static const tr_id_t names[] = { TRN(POS_LABEL_LATITUDE, "Latitude"), TRN(POS_LABEL_LONGITUDE, "Longitude") };
+	static const tr_id_t names[] = { TRN(POS_LABEL_LATITUDE, "Latitude"), TRN(POS_LABEL_LONGITUDE, "Longitude"),
+#if UI_GRID_ENTRY
+		TRN(WORD_GRID, "Grid"),
+#endif
+	};
 	str_copy(it->label, sizeof it->label, tr(names[i]));
 	it->num = (char)('1' + i);
 	sbuf_t b;
 	sb_init(&b, it->value, sizeof it->value);
+#if UI_GRID_ENTRY
+	if (i == PP_GRID) {
+		int32_t lat = ui_svc_setting_get(UI_SET_POS_FIXED_LAT), lon = ui_svc_setting_get(UI_SET_POS_FIXED_LON);
+		if (lat == 0 && lon == 0) {
+			sb_str(&b, TR(VALUE_NOT_SET, "Not set"));
+		} else {
+			char loc[MAIDENHEAD_MAX + 1];
+			maidenhead_format(lat, lon, 6, loc);
+			sb_str(&b, loc);
+		}
+		return;
+	}
+#endif
 	bool edit = pos_editing && i == ui_frame()->focus;
 	if (edit) {
 		pos_text(&b, i, pos_n != 0 ? pos_typed(i) : pos_stored, pos_neg, true, pos_n != 0);
@@ -108,9 +135,33 @@ static void pos_save(uint16_t row)
 	pos_editing = false;
 }
 
+#if UI_GRID_ENTRY
+static char pos_grid[MAIDENHEAD_MAX + 1];
+
+// The text editor kept a locator: both halves at once, or a toast and no change
+static void pos_grid_kept(void)
+{
+	int32_t lat, lon;
+	if (!maidenhead_parse(pos_grid, &lat, &lon)) {
+		ui_toast(TR(POS_TOAST_GRID, "Grid: 4, 6 or 8 characters"));
+		return;
+	}
+	if (!ui_svc_position_set_fixed(lat, lon))
+		ui_toast(TR(POS_TOAST_NOT_SAVED, "Position not saved"));
+}
+#endif
+
 static void pos_select(uint16_t i, bool hold)
 {
 	(void)hold;
+#if UI_GRID_ENTRY
+	if (i == PP_GRID) {
+		pos_editing = false;
+		pos_grid[0] = '\0';	// typed fresh: the editor starts empty
+		ui_menus_grid_text(pos_grid, MAIDENHEAD_MAX, pos_grid_kept);
+		return;
+	}
+#endif
 	if (pos_editing) {
 		pos_save(i);
 	} else {
@@ -122,7 +173,7 @@ static void pos_select(uint16_t i, bool hold)
 static bool pos_key(const input_event_t *ev)
 {
 	uint16_t row = ui_frame()->focus;
-	if (!pos_editing) {
+	if (!pos_editing || row >= 2u) {
 		return false;
 	}
 	bool press = ev->gesture == GESTURE_PRESS || ev->gesture == GESTURE_LONG;

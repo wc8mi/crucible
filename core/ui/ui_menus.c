@@ -2150,7 +2150,7 @@ uint8_t ui_menus_zones_moved(ui_frame_t *stack, uint8_t sp, uint32_t from, uint3
 }
 #endif
 
-#if CONFIG_CHANNEL_EDIT || CONFIG_APRS_AFSK || CONFIG_DMR_SMS || CONFIG_SATELLITE_TLE
+#if UI_TEXT_ENTRY
 // ======================= Text entry: keypad letters (ui.md 2.1) =======================
 // Phone keypad: in ABC / abc, 2-9 cycle their letters, the digit, then the letters in the other case (ABC: A B C 2 a b
 // c); 1 cycles punctuation and 0 a space, 0 and a few signs. The same key within 1 s takes the next one, another key
@@ -2179,6 +2179,9 @@ enum { TEXT_NAME, TEXT_MESSAGE, TEXT_CALLSIGN,
 #if CONFIG_SATELLITE_TLE
 	TEXT_SATELLITE,
 #endif
+#if UI_GRID_ENTRY
+	TEXT_GRID,
+#endif
 	TEXT_PREFIXES };
 static uint8_t text_prefix;
 
@@ -2201,6 +2204,10 @@ static void text_open(char *target, uint8_t max, uint8_t screen)
 #if CONFIG_SATELLITE_TLE
 	if (screen == SCR_SATELLITE_TEXT)
 		text_prefix = TEXT_SATELLITE;
+#endif
+#if UI_GRID_ENTRY
+	if (screen == SCR_GRID_TEXT)
+		text_prefix = TEXT_GRID;
 #endif
 	ui_push(screen, 0);
 }
@@ -2239,6 +2246,13 @@ void ui_menus_satellite_text(char *target, uint8_t line, void (*done)(void))
 #endif
 #if CONFIG_APRS_AFSK
 static void ui_text_open_to(char *target, uint8_t max) { text_open(target, max, SCR_APRS_TO); }
+#endif
+#if UI_GRID_ENTRY
+void ui_menus_grid_text(char *target, uint8_t max, void (*done)(void))
+{
+	text_open(target, max, SCR_GRID_TEXT);
+	text_done = done;
+}
 #endif
 
 static void text_enter(void)
@@ -2286,12 +2300,16 @@ static void text_append(char c)
 
 static void text_draw(void)
 {
-	static const tr_id_t prefixes[TEXT_PREFIXES] = { TRN(LABEL_NAME, "Name"), TRN(WORD_MESSAGE, "Message"),
+	static const tr_id_t prefixes[TEXT_PREFIXES] = {
+		[TEXT_NAME] = TRN(LABEL_NAME, "Name"), [TEXT_MESSAGE] = TRN(WORD_MESSAGE, "Message"),
+		[TEXT_CALLSIGN] = TRN(TEXT_TITLE_CALLSIGN, "Callsign"),
 #if CONFIG_SATELLITE_TLE
-		TRN(TEXT_TITLE_CALLSIGN, "Callsign"), TRN(SATELLITE_2, "Satellite") };
-#else
-		TRN(TEXT_TITLE_CALLSIGN, "Callsign") };
+		[TEXT_SATELLITE] = TRN(SATELLITE_2, "Satellite"),
 #endif
+#if UI_GRID_ENTRY
+		[TEXT_GRID] = TRN(WORD_GRID, "Grid"),
+#endif
+	};
 	static const char *const modes[TEXT_MODES] = { "ABC", "123", "abc" };
 #if CONFIG_SATELLITE_TLE
 	static const tr_id_t satellite_titles[2][TEXT_MODES] = {
@@ -2447,6 +2465,12 @@ static const ui_scr_def_t text_screen = {
 #if CONFIG_SATELLITE_TLE
 static const ui_scr_def_t satellite_text_screen = {
 	.name = "satellite-tle-text", .flags = 0, .key = text_key_fn, .enter = text_enter, .draw = text_draw,
+};
+#endif
+
+#if UI_GRID_ENTRY
+static const ui_scr_def_t grid_text_screen = {
+	.name = "grid-text", .flags = 0, .key = text_key_fn, .enter = text_enter, .draw = text_draw,
 };
 #endif
 
@@ -9127,6 +9151,9 @@ const ui_scr_def_t *const ui_scr[SCR_COUNT] = {
 #if CONFIG_CLOCK
 	[SCR_CLOCK] = &ui_clock_screen,
 #endif
+#endif
+#if UI_GRID_ENTRY
+	[SCR_GRID_TEXT] = &grid_text_screen,
 #endif
 #if CONFIG_CRASH_SCREEN
 	[SCR_CRASH] = &crash_screen,

@@ -1520,6 +1520,16 @@ static const flow_t flows[] = {
 	{ "L latitude after a refused digit", "ok 7 5 down down ok", "1 9 5 ok", "pos_lat=900000000", 4, false },
 	{ "L latitude BACK takes a digit back", "ok 7 5 down down ok", "1 3 9 back 3 ok", "pos_lat=330000000", 6, false },
 	{ "L latitude BACK leaves unchanged", "ok 7 5 down down ok", "1 1 back back", "pos_lat=0 screen=fixed-pos", 4, false },
+	// Grid: a Maidenhead locator sets both, to its square's center (EN82mn: 42.5625 N, 82.9583 W)
+	{ "L grid row opens the editor empty", "ok 7 5 down down ok down down", "ok", "screen=grid-text shows=Grid", 1, false },
+	{ "L grid typed sets latitude and longitude", "ok 7 5 down down ok down down ok",
+	  "3 3 6 6 long:8 long:2 6 wait:1100 6 6 ok",
+	  "screen=fixed-pos pos_lat=425625000 pos_lon=-829583334 shows=EN82mn", 11, false },
+	{ "L grid of 4 characters", "ok 7 5 down down ok down down ok", "3 3 6 6 long:8 long:2 ok",
+	  "pos_lat=425000000 pos_lon=-830000000 shows=EN82mm", 7, false },
+	{ "L grid refused leaves the position", "ok 7 5 down down ok down down ok", "3 3 6 ok",
+	  "screen=fixed-pos pos_lat=0 toast=Grid:_4,_6_or_8_characters shows=Not_set", 4, false },
+	{ "L grid BACK on empty leaves", "ok 7 5 down down ok down down ok", "back", "screen=fixed-pos pos_lat=0", 1, false },
 	// Tools > Position's pages (CONFIG_GPS_SKY, ui_gps.c): Up / Down or the digits turn them
 	{ "G GPS status page", "", "ok 6 2", "shows=3D_Fix", 3, false },
 	{ "G GPS sky page", "ok 6 2", "down", "screen=gps shows=Sky", 1, false },

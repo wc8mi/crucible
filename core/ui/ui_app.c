@@ -2358,6 +2358,9 @@ void ui_app_key(const input_event_t *ev)
 	// is a delete. It unlocks from anywhere (auto lock can lock with a menu open)
 	bool typing = stack[sp].scr == SCR_TEXT || stack[sp].scr == SCR_APRS_TO ||
 		stack[sp].scr == SCR_MESSAGE_TEXT;
+#if UI_GRID_ENTRY
+	typing = typing || stack[sp].scr == SCR_GRID_TEXT;
+#endif
 	if (ui_st.locked) {
 		if (lock_key) {
 			set_locked(false);

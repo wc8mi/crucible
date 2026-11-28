@@ -128,6 +128,9 @@ WEAK bool ui_svc_call_alert(uint32_t id) { (void)id; return false; }
 WEAK uint8_t ui_svc_ars_state(void) { return UI_ARS_OFF; }
 
 WEAK bool ui_svc_position(ui_position_t *out) { (void)out; return false; }
+#if CONFIG_POSITION
+WEAK bool ui_svc_position_set_fixed(int32_t lat_e7, int32_t lon_e7) { (void)lat_e7; (void)lon_e7; return false; }
+#endif
 #if CONFIG_GPS && CONFIG_POSITION && CONFIG_SATELLITE_TLE
 WEAK bool ui_svc_position_save_gps(void) { return false; }
 #endif

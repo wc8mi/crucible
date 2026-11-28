@@ -279,12 +279,20 @@ sfrTest: $(SFRSRC) $(CORE)/dmr/sfr.h
 # APRS protocol layers (AX.25, HDLC, AFSK, KISS, formats, NMEA and its satellites, beacon triggers, iGate rules)
 TESTS   += aprsTest
 NMEALIB := $(CORE)/position/nmea.c $(CORE)/position/nmea_sky.c
-POSLIB  := $(CORE)/position/position.c $(NMEALIB) $(CORE)/clock/clock.c $(CORE)/clock/utc.c
+POSLIB  := $(CORE)/position/position.c $(CORE)/position/maidenhead.c $(NMEALIB) $(CORE)/clock/clock.c $(CORE)/clock/utc.c
 APRSLIB := $(CORE)/aprs/ax25.c $(CORE)/aprs/hdlc.c $(CORE)/aprs/afsk.c $(CORE)/aprs/kiss.c $(CORE)/aprs/aprs_fmt.c \
            $(CORE)/aprs/aprs_beacon.c $(CORE)/aprs/aprs_igate.c
 
 aprsTest: aprsTest.c $(APRSLIB) $(NMEALIB) $(wildcard $(CORE)/aprs/*.h)
 	$(CC) $(CFLAGS) -o $@ aprsTest.c $(APRSLIB) $(NMEALIB) -lm
+
+# Maidenhead locators (core/position/maidenhead.c)
+TESTS   += maidenheadTest
+maidenheadTest: maidenheadTest.c $(CORE)/position/maidenhead.c $(CORE)/position/maidenhead.h
+	$(CC) $(CFLAGS) -o $@ maidenheadTest.c $(CORE)/position/maidenhead.c
+run: run-maidenhead
+run-maidenhead: maidenheadTest
+	./maidenheadTest
 
 run: $(TESTS)
 	./spkAuxTest
@@ -802,7 +810,7 @@ i18nTestDefault: i18nTest.c $(I18N) $(LANG_H) $(wildcard $(CORE)/ui/*.h $(CORE)/
 # the long-press rules; uiSim renders screens to PNG (make ui-gallery: docs/ux/screens/, contact sheets in
 # docs/ux/screens/sheets/). Built without the __attribute__ override above so the weak service stubs
 # (ui_svc_stub.c) give way to the simulator's.
-UIAPP   := $(UI) $(CORE)/ui/ui_app.c $(CORE)/ui/ui_menus.c $(CORE)/ui/ui_rooms.c $(CORE)/ui/ui_find.c $(CORE)/ui/ui_aprs.c $(CORE)/ui/ui_position.c $(CORE)/ui/ui_gps.c $(CORE)/ui/ui_satellite.c $(CORE)/ui/ui_clock.c $(CORE)/clock/utc.c $(CORE)/ui/ui_dual.c $(CORE)/radio/tones.c \
+UIAPP   := $(UI) $(CORE)/ui/ui_app.c $(CORE)/ui/ui_menus.c $(CORE)/ui/ui_rooms.c $(CORE)/ui/ui_find.c $(CORE)/ui/ui_aprs.c $(CORE)/ui/ui_position.c $(CORE)/ui/ui_gps.c $(CORE)/ui/ui_satellite.c $(CORE)/ui/ui_clock.c $(CORE)/clock/utc.c $(CORE)/position/maidenhead.c $(CORE)/ui/ui_dual.c $(CORE)/radio/tones.c \
            $(CORE)/codeplug/codeplug_talk.c $(CORE)/codeplug/zone_edit.c $(CORE)/codeplug/zone_shift.c $(CORE)/radio/radio_am.c \
            $(CORE)/radio/radio_bcast.c $(CORE)/support/sha256.c $(CORE)/support/image_hash.c \
            $(CORE)/support/support_info.c sim/ui_sim.c sim/ui_png.c

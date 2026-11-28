@@ -158,6 +158,12 @@ The position is not only APRS's: DMR calls and location requests (LRRP) use the 
 
 Four decimal places put you within about 11 m. You can also type "latitude" or "fixed" on Home to find the page.
 
+Or type your Maidenhead grid square instead. Select **Grid** on the same page and press OK, type 4, 6 or 8
+characters (`EN82`, `EN82mn` or `EN82mn47`; either case), and press OK. The radio sets latitude and longitude to the
+center of that square. Six characters put you within about 5 km, which is enough for APRS and satellite passes. The
+Grid row then shows your square. Typing works as in any text field ([Text entry](07-channels-zones-vfo.md#text-entry)): in ABC mode a
+held digit types the digit. Without a keypad, Up and Down step the letter and OK adds the next one.
+
 ## GPS status
 
 **Tools > Position** shows what the radio's GPS is doing, on four pages. Press Up or Down (or turn the knob) for the
