@@ -190,7 +190,8 @@ The result is `build/crucible-site/`. Copy it to `/crucible/` on the tinker host
   `core/satellite/frequency.c`; its listen-only and six-digit satellites need firmware with satellite protocol 8)
 - builds the shared Codeplug Editor at `channels/index.html` in the same shell, titled Channels. The front page links
   it. The editor's root carries three switches: `data-targets="all"` checks each channel on every Crucible radio
-  (the editor's **Made for** picker, read from `radios.json` `codeplug.profiles`); `data-update="off"` drops the offer
+  (the editor's **Made for** picker, read from `radios.json` `codeplug.profiles`), and offers only the channel modes
+  and systems a Crucible radio runs, so no trunking, even with no radio picked; `data-update="off"` drops the offer
   of RadioFoundry releases after a read; `data-rid="file"` builds the DMR ID database from a `user.csv` file only,
   since the RadioID API needs a proxy the page's policy does not allow. CSV import and export work as upstream's
 - fails the build if a page links to a local file that is not there
