@@ -401,7 +401,7 @@ is NXDN conventional voice at 9600 bit/s (12.5 kHz) or 4800 bit/s (6.25 kHz), th
 
 - It hears clear voice calls on every radio access number (RAN), to every group. Encrypted calls stay silent.
 - PTT sends a voice call to the NXDN radio default's talkgroup, with its TX RAN and rate: on a new radio group 1,
-  RAN 1, 4800 bit/s. It sends as unit 1 until a computer sets another ID.
+  RAN 1, 4800 bit/s. Its unit ID is the codeplug's NXDN ID, else your DMR ID when it is 65519 or lower, else 1.
 - Home shows "NXDN", what PTT calls ("TG 1", or "All"), the RAN sent and the rate ("RAN 1 4800"). During a call it
   shows who calls and where, or why the call isn't played. FM's tone tile says "FM only: this is NXDN".
 - Quick settings tile **8** is the rate: **OK** changes it between 4800 and 9600 bit/s and keeps it.
@@ -411,7 +411,7 @@ is NXDN conventional voice at 9600 bit/s (12.5 kHz) or 4800 bit/s (6.25 kHz), th
 - To call another group or a unit for now, pick it in **Contacts** or type its ID on Home and press **OK**. **Back** on
   Home goes back to the radio default's talkgroup. Hold **OK** on a group to keep it as the talkgroup. NXDN IDs go up
   to 65519.
-- The unit ID can be changed only from a computer for now (`rfoundry_debug.py radio nxdn`).
+- A computer can set another unit ID for now (`rfoundry_debug.py radio nxdn`).
 - Some radios only transmit NXDN or only receive it ([feature matrix](../feature-matrix.md)). One that only receives
   says "This mode: receive only" on PTT.
 
