@@ -33,6 +33,7 @@
 #include "debuglink/debuglink_proto.h"
 #include "codeplug/codeplug.h"
 #include "codeplug/dmr_iddb.h"
+#include "ysf/ysf_codeplug.h"
 #include "settings/settings.h"
 #include "storage/storage.h"
 #include "sim/sim_flash.h"
@@ -214,6 +215,11 @@ static void detail(const uint32_t *ids, unsigned id_count)
 		       " burst %u alias %u\n", c.color_code, c.timeslot, (unsigned)c.contact, (unsigned)c.listen_list,
 		       (unsigned)c.dmr_id, c.dmo, c.rx_only, c.scan_skip, c.vox, c.no_beep, c.no_eco, c.roam, c.tone_burst,
 		       c.alias_tx);
+		ysf_chan_t y;
+		if (ysf_chan_load(n, &c, &y)) {
+			printf("ysf %u txdgid %u rxdgid %u voice %u narrow %u\n", (unsigned)n, y.tx_dgid, y.rx_dgid, y.voice,
+			       y.narrow);
+		}
 	}
 	for (uint16_t z = 0; z < codeplug_zone_count(); z++) {
 		zone_t zn;
