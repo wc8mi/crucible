@@ -241,8 +241,15 @@ def local_release(zip_path):
     path = Path(zip_path)
     tag = path.name.removesuffix('.zip')
     tag = tag.removeprefix('crucible-') if tag.startswith(('crucible-crucible-', 'crucible-v')) else tag
-    # a release (v0.1.0) is one; a beta and the old dated labels are test versions
-    prerelease = crucible.parse_tag(tag) is None or crucible.is_prerelease(tag)
+    # build.json says whether a Crucible version is a test release (crucible.toml [release] prerelease); the old
+    # dated labels always were
+    prerelease = True
+    if crucible.parse_tag(tag) is not None:
+        try:
+            with zipfile.ZipFile(path) as z:
+                prerelease = bool(json.loads(z.read('build.json')).get('prerelease', True))
+        except (OSError, KeyError, ValueError, zipfile.BadZipFile):
+            pass
     return {'tag': tag, 'name': tag, 'prerelease': prerelease, 'published': '', 'url': '', 'notes': '', 'zip': path}
 
 
@@ -659,10 +666,13 @@ def self_test():
         out = d / 'out'
         index = write_releases([local_release(zpath)], out, {'b1'}, 'o/r')
         assert index['releases'][0]['tag'] == 'crucible-t-1'
-        assert local_release('x/crucible-v0.1.0-beta.2.zip')['tag'] == 'v0.1.0-beta.2'
-        assert local_release('x/crucible-v0.1.0-beta.2.zip')['prerelease']
-        assert local_release('x/crucible-v0.1.0.zip') | {'zip': None} == {'tag': 'v0.1.0', 'name': 'v0.1.0', 'prerelease': False,
+        assert local_release('x/crucible-v0.1.0.zip') | {'zip': None} == {'tag': 'v0.1.0', 'name': 'v0.1.0', 'prerelease': True,
                                                                        'published': '', 'url': '', 'notes': '', 'zip': None}
+        for flag in (True, False):
+            vzip = d / f'crucible-v0.1.{int(flag)}.zip'
+            with zipfile.ZipFile(vzip, 'w') as z:
+                z.writestr('build.json', json.dumps({'version': vzip.stem[9:], 'prerelease': flag}))
+            assert local_release(vzip)['tag'] == vzip.stem[9:] and local_release(vzip)['prerelease'] is flag
         assert [i['board'] for i in index['releases'][0]['images']] == ['b1'], 'only Crucible boards'
         assert (out / 'releases' / 'crucible-t-1' / 'i.bin').read_bytes() == b'\x01\x02\x03'
         assert index['releases'][0]['images'][0]['options'] == {'POWER': '5w'}
