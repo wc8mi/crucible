@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // Codeplug tables as CSV (RFC 4180): one file per table, a header row of fixed English names, references by name
 // (a channel's contact, a zone's channels). Import matches rows to the records already there by number, then by
 // name, so references from other tables follow an edited record; records missing from the file are removed and
@@ -9,6 +10,9 @@
 import { parseFreq, parseTone, mhz } from "./fields.js";
 import { LIMITS, POWER_NAMES, CALL_TYPES, validDtmf } from "./records.js";
 import { newChannel, newContact, remove, assignNumbers } from "./model.js";
+import { KINDS, kindRow } from "./modes.js";
+import { setKind } from "./channelmodes.js";
+import { VOICES as YSF_VOICES } from "./mode_ysf.js";
 
 // --- RFC 4180 ---
 
@@ -146,6 +150,67 @@ const asWord = (words, dflt, lo, hi) => (s) => {
 const POWER = { ...POWER_NAMES };
 const powerText = (n) => POWER_NAMES[n] || String(n);
 const MODES = { fm: "FM", dmr: "DMR" };
+const YSF = 103;
+// A file's other words for a mode (the fork and other tools write C4FM for YSF)
+const MODE_WORDS = { c4fm: YSF, fusion: YSF, analog: "fm", digital: "dmr" };
+
+// The Mode column: FM, DMR, or the channel's kind by its short name (P25, NXDN, YSF, T3, P25T, AES), so a file read back
+// keeps each channel's mode. A file can make a channel YSF, P25 or NXDN (kinds that need no system: optionalSystem or
+// none); a kind that needs a system (the trunked ones) only stays what it was
+const modeText = (r) => (r.kind ? kindRow(r.kind)?.short ?? MODES[r.mode] : MODES[r.mode]);
+function modeSet(r, s, m) {
+	const v = s.trim().toLowerCase();
+	if (!v) return;
+	const plain = Object.keys(MODES).find((k) => MODES[k].toLowerCase() === v) ?? (typeof MODE_WORDS[v] === "string" ? MODE_WORDS[v] : null);
+	if (plain) {
+		if (r.kind) setKind(m, r, 0, plain);
+		r.mode = plain;
+		return;
+	}
+	const row = KINDS.find((k) => k.short.toLowerCase() === v || k.token.toLowerCase() === v) ?? (MODE_WORDS[v] ? kindRow(MODE_WORDS[v]) : null);
+	const allowed = [...Object.values(MODES), ...KINDS.filter((k) => !needsSystem(k)).map((k) => k.short)].join(", ");
+	if (!row) throw new Bad("bad_value", { value: s.trim(), allowed });
+	if (r.kind === row.id) return;
+	if (needsSystem(row)) throw new Bad("mode_system", { mode: row.short });
+	setKind(m, r, row.id);
+}
+const needsSystem = (k) => !!k.module.systemType && !k.module.optionalSystem;
+
+// A YSF column: the channel's YSF field, blank on other channels; a value on another channel is a problem, the row kept
+const ysfCol = (header, aliases, get, put) => ({
+	header, aliases, key: `ysf.${header}`,
+	get: (r) => (r.kind === YSF && r.params ? get(r.params) : ""),
+	set: (r, s, m, bad) => {
+		if (!s.trim()) return;
+		if (r.kind !== YSF || !r.params) {
+			bad(new Bad("not_ysf"));
+			return;
+		}
+		// a copy: the row's record is a shallow copy of the channel, and a skipped row must leave it as it was
+		r.params = { ...r.params };
+		put(r.params, s);
+	},
+});
+const YSF_VOICE = { dn: "DN", vw: "VW", vd1: "V/D 1" };
+// the FICH DT codes and the names other tools give each voice mode
+const YSF_VOICE_WORDS = { 0: "vd1", 2: "dn", 3: "vw", vd1: "vd1", "vdmode1": "vd1", "v/d1": "vd1", "v/dmode1": "vd1", dn: "dn",
+	"vd2": "dn", "v/d2": "dn", "vdmode2": "dn", "v/dmode2": "dn", vw: "vw", voicewide: "vw", "voicefr": "vw", fr: "vw" };
+const asYsfVoice = (s) => {
+	const v = YSF_VOICE_WORDS[s.trim().toLowerCase().replace(/[\s_-]/g, "")];
+	if (!v || !YSF_VOICES.includes(v)) throw new Bad("bad_value", { value: s.trim(), allowed: Object.values(YSF_VOICE).join(", ") });
+	return v;
+};
+const asNarrow = (s) => {
+	const v = s.trim().toLowerCase();
+	if (["narrow", "n", "nfm", "12.5", "1"].includes(v)) return true;
+	if (["wide", "w", "wfm", "25", "0"].includes(v)) return false;
+	throw new Bad("bad_value", { value: s.trim(), allowed: "Wide, Narrow" });
+};
+const asDgid = (s) => {
+	const n = Number(s.trim());
+	if (!Number.isInteger(n) || n < 0 || n > 99) throw new Bad("range", { min: 0, max: 99 });
+	return n;
+};
 const TYPES = Object.fromEntries(CALL_TYPES.map((k) => [k, k[0].toUpperCase() + k.slice(1)]));
 
 // --- References by name ---
@@ -294,7 +359,7 @@ export const TABLES = {
 		columns: [
 			NUMBER(LIMITS.channels),
 			c("Name", "name", asName(LIMITS.name), undefined, ["Channel Name", "Channel"]),
-			c("Mode", "mode", asWord(MODES, "fm"), (r) => MODES[r.mode], ["Channel Mode", "Channel Type", "Type"]),
+			{ header: "Mode", aliases: ["Channel Mode", "Channel Type", "Type"], key: "mode", get: modeText, set: modeSet },
 			c("RX Frequency (MHz)", "rxHz", asFreq(), (r) => mhz(r.rxHz), ["RX Frequency", "RX Freq", "Receive Frequency", "RX"]),
 			c("TX Frequency (MHz)", "txHz", asFreq(), (r) => mhz(r.txHz), ["TX Frequency", "TX Freq", "Transmit Frequency", "TX"]),
 			c("Power", "power", asWord(POWER, 0, 0, 10), (r) => powerText(r.power), ["TX Power"]),
@@ -315,7 +380,12 @@ export const TABLES = {
 			ref("RX Group List", "rxList", "rxLists", ["Group List", "RX List"]),
 			ref("APRS", "aprs", "aprs", ["APRS Configuration"]),
 			c("DMR ID", "dmrId", asId, (r) => r.dmrId || "", ["Channel DMR ID"]),
-			c("RX Only", "rxOnly", asBool, (r) => yesNo(r.rxOnly)),
+			// a channel of a kind transmits by its tag (the record's bit is the safe stand-in), as the channel form shows it
+			{ header: "RX Only", aliases: [], key: "rxOnly", get: (r) => yesNo(r.kind ? !r.tagTx : r.rxOnly), set: (r, s) => {
+				const v = asBool(s);
+				if (r.kind) r.tagTx = !v;
+				else r.rxOnly = v;
+			} },
 			c("All Skip", "allSkip", asBool, (r) => yesNo(r.allSkip), ["Scan Skip"]),
 			c("Zone Skip", "zoneSkip", asBool, (r) => yesNo(r.zoneSkip)),
 			c("VOX", "vox", asBool, (r) => yesNo(r.vox)),
@@ -333,6 +403,11 @@ export const TABLES = {
 			c("SFR", "sfr", asBool, (r) => yesNo(r.sfr)),
 			c("SFR A", "sfrA", asInt(0, 255, 0)),
 			c("SFR B", "sfrB", asInt(0, 255, 0)),
+			ysfCol("YSF TX DG-ID", ["TX DG-ID", "DG-ID", "DGID"], (p) => p.txDgid, (p, s) => { p.txDgid = asDgid(s); }),
+			ysfCol("YSF RX DG-ID", ["RX DG-ID"], (p) => p.rxDgid, (p, s) => { p.rxDgid = asDgid(s); }),
+			ysfCol("YSF Voice Mode", ["YSF DT", "Data Type", "YSF Data Type", "Voice Mode"], (p) => YSF_VOICE[p.voice] ?? "DN",
+				(p, s) => { p.voice = asYsfVoice(s); }),
+			ysfCol("YSF Deviation", ["Deviation"], (p) => (p.narrow ? "Narrow" : "Wide"), (p, s) => { p.narrow = asNarrow(s); }),
 		],
 		create: () => newChannel(),
 		required: ["name", "rxHz"],
@@ -420,6 +495,9 @@ export function importTable(m, text, table = detect(text)) {
 	const spec = TABLES[table];
 	const rows = parse(text);
 	const { found, unknown } = mapHeader(spec, rows[0] || []);
+	// Mode first (it sets a channel's kind, and so which kind's fields the row's other cells fill), the rest in the
+	// file's order, as its problems are reported
+	const ordered = [...found.filter((f) => f.col.key === "mode"), ...found.filter((f) => f.col.key !== "mode")];
 	const problems = [];
 	const keys = new Set(found.map((f) => f.col.key));
 	const hasNumber = keys.has("number");
@@ -445,7 +523,7 @@ export function importTable(m, text, table = detect(text)) {
 		else taken.add(rec);
 		const work = { ...rec };
 		let skip = false;
-		for (const { col, index } of found) {
+		for (const { col, index } of ordered) {
 			try {
 				col.set(work, row[index] ?? "", m, (e) => problems.push({ row: i + 1, column: col.header, code: e.code, params: e.params }));
 			} catch (e) {
