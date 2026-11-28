@@ -36,6 +36,7 @@
 #include "satellite/service.h"
 #endif
 #if CONFIG_CLOCK
+#include "board.h"
 #include "clock/clock.h"
 #endif
 #if CONFIG_ZONE_WRITE
@@ -428,6 +429,10 @@ void radio_core_start(void)
 #endif
 #if CONFIG_CLOCK
 	clock_set_lock(copy_lock, copy_unlock);
+	if (board.system != NULL) {
+		const clock_rtc_t rtc = { board.system->rtc_get, board.system->rtc_set };
+		clock_set_rtc(&rtc);
+	}
 #endif
 #if CONFIG_DMR_DATA_CORE
 	dmrDataServiceSetLock(data_lock, data_unlock);

@@ -18,6 +18,9 @@
 #include "radio/tx_limit.h"
 #include "radio/pa_keyup.h"
 #include "storage/storage.h"
+#if CONFIG_CLOCK
+#include "clock/clock.h"
+#endif
 #if CONFIG_VOICE_CAPTURE
 #include "dmr/ambe/ambeVoice.h"
 #endif
@@ -108,6 +111,19 @@ static void core_section(const radio_view_t *v, dl_text_t *t)
 	dl_text(t, "satellite.tracking=%u\nsatellite.index=%u\nsatellite.status=%u\nsatellite.pass_valid=%u\n",
 		satellite.tracking.tracking, satellite.tracking.index, satellite.tracking.status,
 		have_satellite && satellite.valid);
+#endif
+#if CONFIG_CLOCK
+	{
+		// UTC seconds as an unsigned (good to 2106), where it came from and how long ago; clock.rtc: the board has one
+		static const char *const clock_src[] = { "none", "rtc", "manual", "host", "gps" };
+		int64_t utc_s = 0;
+		uint8_t src = CLOCK_SRC_NONE;
+		uint32_t now = hal_millis();
+		bool set = clock_now(&utc_s, &src, now);
+		dl_text(t, "clock.utc=%u\nclock.src=%s\nclock.age_s=%u\nclock.rtc=%u\n", set ? (unsigned)utc_s : 0u,
+			clock_src[src <= CLOCK_SRC_GPS ? src : 0], set ? (unsigned)clock_age_s(now) : 0u,
+			board.system != NULL && board.system->rtc_get != NULL);
+	}
 #endif
 	dl_text(t, "zone_index=%u\nzone_pos=%u\nzone_size=%u\nzone_count=%u\n", v->zone_index, v->zone_pos, v->zone_size,
 		(unsigned)codeplug_zone_count());

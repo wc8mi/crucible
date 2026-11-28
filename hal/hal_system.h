@@ -67,6 +67,11 @@ typedef struct {
 	// application's base, a first stage included, to the end of the data's load copy). read() reads it: the support
 	// info's image hash (docs/spec/support-info.md 3)
 	void (*image)(uint32_t *addr, uint32_t *len);
+	// Optional (NULL: none): the real-time clock, in UTC seconds since 1970 (docs/spec/clock.md). rtc_get is false
+	// while the RTC has no clock or this firmware never set it; rtc_set is false when the clock can't be started.
+	// Called from one task at a time, never from an interrupt; each may wait a few milliseconds for the RTC
+	bool (*rtc_get)(int64_t *utc_s);
+	bool (*rtc_set)(int64_t utc_s);
 #if defined(CONFIG_STUB_ENTRY) && CONFIG_STUB_ENTRY
 	uint32_t stub_run_addr;		// last, so a file built without config.h sees the same layout before it
 	// Optional (NULL: any image): the loaded image may run here. The STM32 refuses one that doesn't feed the IWDG

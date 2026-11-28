@@ -40,6 +40,26 @@ Writes happen only in `clock_tick()`, in the radio task, outside the clock's loc
 | Later fixes | At most once an hour (`CLOCK_RTC_SYNC_MS`) |
 | Start-up from the RTC | None |
 
+Whether a radio's RTC keeps time with the power off depends on a backup supply, which no radio's page confirms yet.
+`test_clock_rtc_across_power_off` (manual, [tests/hil](../../tests/hil/README.md)) records it. A restart keeps it.
+
+### STM32F4
+
+`platform/stm32f4/rtc.c`, UTC in the calendar, 24-hour, prescalers 127 and 255 for 1 Hz from the 32.768 kHz LSE.
+
+| Rule | Why |
+|---|---|
+| Never reset the backup domain | It would clear the other backup registers and stop an RTC the stock firmware runs |
+| Take the RTC only when its clock is the LSE, or none is chosen yet (then select the LSE) | Changing the clock needs a backup domain reset |
+| Trust the calendar only with the marker `0x52544331` in `BKP17R` | Written with the time; a calendar another firmware set may be local time |
+| Years 2000-2099 | The calendar holds two year digits |
+
+| Backup register | Use |
+|---|---|
+| `BKP17R` | RTC calendar written by this firmware, in UTC (`rtc.c`) |
+| `BKP18R` | A board's power flag, where a board needs one |
+| `BKP19R` | ROM bootloader request (`sysboot.c`, `REBOOT` mode 1) |
+
 ## Locking
 
 The clock has its own lock (`clock_set_lock`; the radio task gives the scheduler lock). The position service feeds it
@@ -49,3 +69,14 @@ from `position_nmea()` after releasing its own lock, so the two are never held t
 
 Satellite prediction reads UTC through `satellite_utc_now()` ([satellite.md](satellite.md)). Without `CONFIG_CLOCK`
 it falls back to a fresh NMEA time from the position service (60 s).
+
+## Debug link
+
+The core view ([debuglink.md](debuglink.md)) has:
+
+| Key | Value |
+|---|---|
+| `clock.utc` | UTC seconds since 1970; 0 while unset |
+| `clock.src` | `none`, `rtc`, `manual`, `host` or `gps` |
+| `clock.age_s` | Seconds since the source set it |
+| `clock.rtc` | 1 when the board has an RTC |
