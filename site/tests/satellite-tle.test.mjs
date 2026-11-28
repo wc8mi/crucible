@@ -318,6 +318,30 @@ test("rejects malformed, stale, and unselected catalog data", () => {
 	assert.throws(() => parseTleCatalog("Name\n1 25544\n"), /incomplete TLE pair/);
 });
 
+test("a repeated catalog ID keeps the first of identical lines and leaves out differing ones", () => {
+	const [iss1, iss2, so50Name, so501, so502] = SAMPLE.split("\n").slice(1, 6);
+	// two objects published under one element set, as in PE0SAT's list
+	const shared = parseTleCatalog(`${SAMPLE}ISS COPY\n${iss1}\n${iss2}\n`);
+	assert.deepEqual(shared.map(({ catalog_id }) => catalog_id), [25544, 27607, 43017]);
+	assert.equal(shared[0].name, "ISS (ZARYA)");
+	// two element sets for one ID: that ID is left out, the rest stays usable
+	const other = iss2.replace("51.6325", "51.6326");
+	const conflict = parseTleCatalog(`${SAMPLE}ISS OTHER\n${iss1}\n${other}\n`);
+	assert.deepEqual(conflict.map(({ catalog_id }) => catalog_id), [27607, 43017]);
+	assert.throws(() => buildTleBundle(conflict, [25544], { now: new Date("2026-11-14T00:00:00Z") }), /missing selected IDs: 25544/);
+	assert.throws(() => parseTleCatalog(`ISS\n${iss1}\n${iss2}\nISS B\n${iss1}\n${other}\n`), /No TLE records/);
+	assert.equal(so50Name, "SO-50");
+	assert.ok(so501 && so502);
+});
+
+test("an Alpha-5 catalog number is skipped, a malformed one rejected", () => {
+	const alpha = "NEW OBJECT\n1 A0240U 26179A   26331.58728273  .00000456  00000-0  42087-4 0  9998\n" +
+		"2 A0240  97.4000 100.0000 0010000  90.0000 270.0000 15.00000000  1234\n";
+	assert.deepEqual(parseTleCatalog(alpha + SAMPLE).map(({ catalog_id }) => catalog_id), [25544, 27607, 43017]);
+	assert.throws(() => parseTleCatalog(alpha.replaceAll("A0240", "I0240") + SAMPLE), /invalid NORAD catalog ID/);
+	assert.throws(() => parseTleCatalog(alpha), /No TLE records/);
+});
+
 test("accepts bulletin satellites with manually supplied frequency profiles", () => {
 	const customText = `Manual satellite\n1 99001U 26001A   26317.20662175  .00008559  00000+0  16132-3 0  9998\n2 99001  51.6325 282.6584 0007349  20.2588 339.8690 15.49346920594858\n`;
 	const catalog = parseTleCatalog(customText);
