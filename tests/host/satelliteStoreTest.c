@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The debug-link satellite TLE store on simulated NOR: bounded capacity, merged commits, input validation and aborts.
 #include <stdio.h>
 #include <string.h>
@@ -95,7 +96,7 @@ static void make_line(uint8_t *line, char number, uint32_t id, const char *epoch
 	line[0] = (uint8_t)number;
 	line[1] = ' ';
 	static const char alpha5[] = "ABCDEFGHJKLMNPQRSTUVWXYZ";	// 10 to 33: Alpha-5 skips I and O
-	line[2] = (uint8_t)(id < 100000u ? '0' + id / 10000u : alpha5[id / 10000u - 10u]);
+	line[2] = (uint8_t)(id < 100000u ? (char)('0' + id / 10000u) : alpha5[id / 10000u - 10u]);
 	line[3] = (uint8_t)('0' + id / 1000u % 10u);
 	line[4] = (uint8_t)('0' + id / 100u % 10u);
 	line[5] = (uint8_t)('0' + id / 10u % 10u);
@@ -742,7 +743,8 @@ static void test_alpha5_and_listen_only_profiles(void)
 	CHECK(command(list, sizeof(list)) == 10u && output[0] == DL_ST_OK && output[1] == 1u &&
 	      get32(output + 2u) == 101102u);
 
-	satellite_frequency_profile_t listen[2] = {
+	// Full-size arrays: the store's prototypes declare [SATELLITE_PROFILE_MAX], and GCC checks a call against it
+	satellite_frequency_profile_t listen[SATELLITE_PROFILE_MAX] = {
 		{ 59112u, "SONATE-2", 145880000u, 0u, 0u },
 		{ 101101u, "SO-131", 436888000u, 145925000u, 0u },
 	};
@@ -752,7 +754,7 @@ static void test_alpha5_and_listen_only_profiles(void)
 	listen[0].tx_tone_tenths = 0u;
 	listen[0].catalog_id = SATELLITE_CATALOG_ID_MAX + 1u;
 	CHECK(!satellite_store_frequency_profiles_set(2u, listen));
-	static const uint32_t catalog_ids[] = { 59112u, 101101u, 101102u, 43770u };
+	static const uint32_t catalog_ids[SATELLITE_PROFILE_MAX] = { 59112u, 101101u, 101102u, 43770u };
 	CHECK(satellite_store_profiles_set(4u, catalog_ids));
 	CHECK(satellite_frequency_profile(43770u, &readback) && readback.tx_hz == 0u);
 
