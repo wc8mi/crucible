@@ -7,7 +7,7 @@
 **English** · [简体中文](README.zh.md)
 
 **Experimental firmware for five DMR radios, by KF8S.** Crucible is a downstream build of
-[RadioFoundry](https://github.com/radiofoundry/radiofoundry): the same MIT-licensed core, cut down to the radios we
+[RadioFoundry](https://github.com/radiofoundry/radiofoundry): the same core, cut down to the radios we
 use and tuned the way we like them.
 
 > [!IMPORTANT]
@@ -74,8 +74,10 @@ RadioFoundry too, report it there.
 
 ## License and credit
 
-MIT ([LICENSE](LICENSE)). Crucible is built on RadioFoundry, copyright The RadioFoundry Authors ([AUTHORS](AUTHORS),
-[CONTRIBUTORS](CONTRIBUTORS)). Crucible's changes are copyright David Behnke. The license notices stay with every
+GPL-3.0-or-later ([LICENSE](LICENSE)). Crucible is built on RadioFoundry, copyright The RadioFoundry Authors
+([AUTHORS](AUTHORS), [CONTRIBUTORS](CONTRIBUTORS)), whose files stay under the MIT license
+([LICENSE-MIT](LICENSE-MIT)). Crucible's changes are copyright David Behnke. Code from other projects keeps its
+authors' notices; who wrote what is in [CREDITS.md](CREDITS.md). The license notices stay with every
 file, image and release, as [FORKING.md](FORKING.md) describes. Third-party licenses are in [LICENSES/](LICENSES/).
 
 Crucible's maintainer notes (building, releasing, merging RadioFoundry): [CRUCIBLE.md](CRUCIBLE.md).

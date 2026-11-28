@@ -16,6 +16,10 @@
 #ifndef RFOUNDRY_WORDMARK_REST
 #define RFOUNDRY_WORDMARK_REST		""
 #endif
+// About's License: line. Crucible as a whole is GPL-3.0-or-later; the RadioFoundry files keep their MIT notice
+#ifndef RFOUNDRY_LICENSE_LINE
+#define RFOUNDRY_LICENSE_LINE		"GPL-3.0-or-later. RadioFoundry parts MIT, (c) 2026 The RadioFoundry Authors"
+#endif
 // 1: the splash draws the mark in core/ui/product_mark.h instead of RadioFoundry's hexagon
 #ifndef RFOUNDRY_PRODUCT_MARK
 #define RFOUNDRY_PRODUCT_MARK		1

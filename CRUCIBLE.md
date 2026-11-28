@@ -10,9 +10,10 @@ agents alike. Everything in [AGENTS.md](AGENTS.md) still applies. This page adds
 
 ## Rules
 
-1. **Upstream first.** A change that would help RadioFoundry goes to RadioFoundry as a pull request from a feature
-   branch, and comes back with the next merge. Crucible carries only what upstream won't take or what is ours alone:
-   the identity, the radio subset, our defaults, packaging, the flasher site. Keep that carried diff small.
+1. **Our own project, upstream's changes welcome.** Crucible is GPL-3.0-or-later and sends nothing back to
+   RadioFoundry. We still merge `upstream/main` (MIT code may go into a GPL work) and take the best of other firmware
+   under GPL-3.0-compatible licenses, with credit ([CREDITS.md](CREDITS.md), [AGENTS.md](AGENTS.md) rule 1). Keep
+   the diff in RadioFoundry's own files small, so the merges stay cheap.
 2. **Merge, never rebase.** `main` merges `upstream/main`. Shared history is what keeps those merges cheap. Never
    rewrite `main`.
 3. **Thin identity layer.** What users see says Crucible. Internal names stay RadioFoundry's (`rfoundry_*` files,
@@ -22,7 +23,8 @@ agents alike. Everything in [AGENTS.md](AGENTS.md) still applies. This page adds
 4. **Five radios.** `crucible.toml [radios]` lists them. Releases, CI, the generated docs and the flasher read that
    list. Other boards' files stay untouched: deleting them would turn every upstream change to them into a conflict.
    This list is the one exception to AGENTS.md's "no list of radios" rule.
-5. **Keep the notices.** `LICENSE`, `AUTHORS`, `CONTRIBUTORS` and every SPDX and copyright line stay. A file we change
+5. **Keep the notices, give credit.** `LICENSE` (GPL-3.0), `LICENSE-MIT` (RadioFoundry's), `AUTHORS`,
+   `CONTRIBUTORS`, [CREDITS.md](CREDITS.md) and every SPDX and copyright line stay. A file we change
    gets `Copyright (c) 2026 David Behnke` below the existing lines, never in place of them ([FORKING.md](FORKING.md)).
 6. **Not RadioFoundry.** Nothing we publish may look like it comes from, or is supported by, the RadioFoundry project.
    Support questions come to us. Crucible sends nothing to RadioFoundry's services (build API, flash log, error
@@ -109,7 +111,7 @@ the debug link's `release=`); the Git commit, build-source metadata and crash ID
 board under their dated `kf8s-` and `kf8sysf-` labels.
 
 Output is under `build/kf8s/<version>/`. The ZIP includes every image and manifest, `SHA256SUMS`, build metadata,
-`LICENSE`, `AUTHORS`, `CONTRIBUTORS` and third-party licenses. Keep those notices when sharing it, as
+`LICENSE`, `LICENSE-MIT`, `CREDITS.md`, `AUTHORS`, `CONTRIBUTORS` and third-party licenses. Keep those notices when sharing it, as
 [FORKING.md](FORKING.md) requires. No AMBE codec is included.
 
 Host tests and firmware checks do not replace listening tests on the radios. No build command flashes or keys a radio.
