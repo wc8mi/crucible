@@ -27,7 +27,7 @@ export function powerByte(level, count) {
 	return count < 2 || count >= 9 ? level + 1 : Math.floor((level * 9 + Math.floor((count - 1) / 2)) / (count - 1)) + 1;
 }
 export function powerLevel(byte, count) {
-	return count >= 9 ? Math.min(byte - 1, count - 1) : Math.floor(((byte - 1) * (count - 1) + 4) / 9);
+	return count >= 9 ? Math.min(byte - 1, count - 1) : Math.floor(((Math.min(byte, 10) - 1) * (count - 1) + 4) / 9);
 }
 
 export function powerNames(profile, hz) {

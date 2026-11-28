@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 David Behnke -->
 
 # The Codeplug Editor
 
@@ -114,3 +115,20 @@ through the proxy), templates and outputs. `chirp.test.mjs` covers the CHIRP CSV
 can't read, and the CHIRP image reader: a made-up image in the documented layout, other radios, cut short images and
 receive-only channels. `qdmr.test.mjs` covers the YAML parser, the mapping, round trips and the converters; when
 `dmrconf` (qdmr's command line tool) is installed it also encodes an exported file. Nothing reaches the network.
+
+`simradios.test.mjs` runs the editor against simulated radios. `fixtures.py` builds `cpsSim` once per image of each
+radio with a codeplug (`make -C tests/host sim-radio`), from a generated header: the board name, flash map and
+codeplug base from `tools/boards.py`, the power levels from `radio_profiles()`, and the full build's features. The
+radio side is the firmware's own CPS, codeplug and power view code. For each image the tests check:
+
+| Test | What it checks |
+|---|---|
+| Identify | The radio and image found by name, the power levels read from the radio, fast protocol where the firmware has it |
+| Write and read | One codeplug with every power step, FM, DMR, P25, NXDN and YSF: the radio runs each channel at the level the editor shows, and the editor reads the codeplug back unchanged |
+| CPS only | The same codeplug through the older protocol |
+| Small change | One block written, nothing changed outside the codeplug, the staging area and the journal |
+| Cable pulled | A write cut off leaves every channel readable (unchanged where the radio stages a write), and the write done again succeeds |
+| Radio Default | The radio's own power setting reaches the editor |
+
+Two more tests move one codeplug from radio to radio and find a radio that reports an older name. What the simulation
+can't show (USB and serial timing, the radio's screen, the transmitter's power) needs a check on the radio.

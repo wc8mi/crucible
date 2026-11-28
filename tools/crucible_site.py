@@ -311,9 +311,10 @@ def catalog_words(page, project, extra=None):
     return page[:i18n.start(2)] + catalog + page[i18n.end(2):]
 
 
-def shell(page, project, assets, built, root, title, body, help_more=''):
+def shell(page, project, assets, built, root, title, body, help_more='', styles=()):
     """A shared site page in Crucible's head, band and foot. root leads from the page to the site root ('' or
-    '../../'); body is the new body tag; help_more follows the help line in the foot."""
+    '../../'); body is the new body tag; help_more follows the help line in the foot; styles are the page's own
+    stylesheets under static/, loaded before the shared ones."""
     name = html.escape(project['name'])
     head = (f'<head>\n<meta charset="utf-8">\n{CSP}\n<meta name="viewport" content="width=device-width, initial-scale=1">\n'
             f'<title>{title}</title>\n<meta name="description" content="{html.escape(project["tagline"])}">\n'
@@ -321,6 +322,7 @@ def shell(page, project, assets, built, root, title, body, help_more=''):
             f'<link rel="icon" href="{root}crucible/icon-32.png?v={assets}" type="image/png" sizes="32x32">\n'
             f'<link rel="apple-touch-icon" href="{root}crucible/icon-180.png?v={assets}">\n'
             f'<link rel="preload" href="{root}crucible/fonts/barlow-condensed-700-latin.woff2" as="font" type="font/woff2" crossorigin>\n'
+            + ''.join(f'<link rel="stylesheet" href="{root}static/{x}?v={assets}">\n' for x in styles) +
             f'<link rel="stylesheet" href="{root}static/css/tokens.css?v={assets}">\n'
             f'<link rel="stylesheet" href="{root}static/css/site.css?v={assets}">\n'
             f'<link rel="stylesheet" href="{root}crucible/crucible.css?v={assets}">\n'
@@ -395,6 +397,33 @@ def satellite_page(tle, project, assets, built):
             + m.group(6) + page[m.end():])
     m = one(r'<section class="wrap section satellite-tle" id="satellite-tle"', page, 'satellite form')
     page = page[:m.end()] + f' data-amsat-api="{SAT_API}" data-pe0sat-api="{SAT_PE0SAT_API}"' + page[m.end():]
+    return page
+
+
+# The channel editor: the shared Codeplug Editor (site/templates/codeplug.html) in Crucible's shell. One file serves
+# every Crucible radio (data-targets="all" checks a channel on each); RadioFoundry's releases are not offered
+# (data-update="off"), and the DMR ID database comes from a user.csv file only, since the RadioID API needs a proxy
+# the page's policy does not allow (data-rid="file")
+EDITOR_PAGE = 'channels/index.html'
+EDITOR_LEAD = ('Edit channels, zones and contacts for every {name} radio. One file works on each radio. Read the radio '
+               'over USB, or open a file. Write the radio, or save a file or a CSV list. Your data stays on your computer.')
+
+
+def editor_page(editor, project, assets, built):
+    """The shared Codeplug Editor page in Crucible's shell."""
+    page = catalog_words(editor, project)
+    name = html.escape(project['name'])
+    page = shell(page, project, assets, built, '../', f'{name} · Channels',
+                 '<body class="page-codeplug" data-root="../" data-home="../" data-gl-more="More">',
+                 'Report a Problem saves a file. Attach the file to the issue. ',
+                 styles=('vendor/tom-select/tom-select.default.css',))
+    m = one(r'(<section class="wrap section page-head compact">\s*<h1>)(.*?)(</h1>\s*<p class="lead">)(.*?)(</p>)',
+            page, 'editor page head')
+    page = page[:m.start()] + m.group(1) + 'Channels' + m.group(3) + EDITOR_LEAD.format(name=name) + m.group(5) + page[m.end():]
+    m = one(r'<div id="editor" class="editor"', page, 'editor root')
+    page = page[:m.end()] + ' data-targets="all" data-update="off" data-rid="file"' + page[m.end():]
+    if 'tom-select.complete.min.js' not in page:
+        raise SiteError('editor page: tom-select is not loaded (the shared page changed?)')
     return page
 
 
@@ -608,6 +637,8 @@ def build(out, packages, github, site_out=None):
         (out / 'update.html').write_text(crucible_page(flash, project, assets, built))
         (out / SAT_PAGE).parent.mkdir(parents=True)
         (out / SAT_PAGE).write_text(satellite_page((site / SAT_PAGE).read_text(), project, assets, built))
+        (out / EDITOR_PAGE).parent.mkdir(parents=True)
+        (out / EDITOR_PAGE).write_text(editor_page((site / 'codeplug' / 'index.html').read_text(), project, assets, built))
         no_upstream_api(out)
         template = (ROOT / 'site' / 'crucible' / 'installer' / 'page.html').read_text()
         posts = read_news(ROOT / 'site' / 'crucible' / 'news', radio_names(radios['radios']))
@@ -733,6 +764,24 @@ def self_test():
     assert '<h1>Satellites</h1>' in sat and 'eyebrow' not in sat and 'tools/index.html' not in sat and 'site-header' not in sat
     assert f'id="satellite-tle" data-amsat-api="{SAT_API}" data-pe0sat-api="{SAT_PE0SAT_API}"' in sat
     assert not any(a.startswith(('/', 'http')) for a in (SAT_API, SAT_PE0SAT_API))
+    # the channel editor: the shared page in Crucible's shell, set for every Crucible radio, with no update offer and
+    # no RadioID API; tom-select's stylesheet survives the new head
+    ed = ('<html><head><title>x</title><link rel="stylesheet" href="../static/vendor/tom-select/tom-select.default.css"></head>'
+          '<body class="page-codeplug" data-root="../"><header class="site-header">h</header><main>'
+          '<section class="wrap section page-head compact">\n\t<h1>Codeplug Editor</h1>\n\t<p class="lead">Edit RadioFoundry.</p>\n</section>'
+          '<div id="editor" class="editor"></div></main><footer class="site-footer">f</footer>'
+          '<script src="../static/vendor/tom-select/tom-select.complete.min.js"></script>'
+          '<script type="application/json" id="i18n">{"editor.title": "RadioFoundry Codeplug Editor"}</script></body></html>')
+    edp = editor_page(ed, proj, '1', 'v')
+    assert '<h1>Channels</h1>' in edp and 'Codeplug Editor</h1>' not in edp and CSP in edp
+    assert '<div id="editor" class="editor" data-targets="all" data-update="off" data-rid="file"' in edp
+    assert 'href="../static/vendor/tom-select/tom-select.default.css?v=1"' in edp and '"Crucible Codeplug Editor"' in edp
+    try:
+        editor_page(ed.replace('tom-select.complete.min.js', 'x.js'), proj, '1', 'v')
+    except SiteError:
+        pass
+    else:
+        raise AssertionError('an editor page without tom-select passed')
     assert CSP in sat and 'amsat.org' not in CSP and 'pe0sat' not in CSP and 'location.replace("../../#terms")' in sat and '"Crucible"' in sat
     assert 'href="../../crucible/crucible.css?v=1"' in sat and 'class="cx-brand" href="../../"' in sat
     assert all(len(x.split()) <= 25 for x in re.split(r'(?<=\.) ', SAT_LEAD))
@@ -813,6 +862,8 @@ def self_test():
         for x in sentences(para):
             assert not re.search(banned, x, re.I) and len(x.split()) <= 25, f'front page: {x}'
     assert f'href="{SAT_PAGE}"' in home, 'the front page links the satellite page'
+    assert f'href="{EDITOR_PAGE}"' in home, 'the front page links the channel editor'
+    assert not re.search(banned, EDITOR_LEAD, re.I) and all(len(x.split()) <= 25 for x in sentences(EDITOR_LEAD))
     assert not re.search(banned, SAT_LEAD, re.I)
     for v in WORDS.values():
         assert not re.search(banned, v, re.I), v

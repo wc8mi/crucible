@@ -1741,6 +1741,7 @@
  "editor.call.private": "Privada",
  "editor.call.all": "Llamada general",
  "editor.power.default": "Predeterminada de la radio",
+ "editor.power.factory": "De fábrica: {power}",
  "editor.power.min": "Mínima",
  "editor.power.low": "Baja",
  "editor.power.mid": "Media",
@@ -2463,5 +2464,13 @@
  "screen.caller_database_dual_p25": "Identidad del llamante P25 en doble escucha",
  "screen.channel_power_default": "Editor de canal: heredar la potencia predeterminada de la radio",
  "screen.power_default": "Ajustes: elegir la potencia de transmisión predeterminada",
- "screen.power_quick": "Ajustes rápidos: elegir cualquier potencia de transmisión compatible"
+ "screen.power_quick": "Ajustes rápidos: elegir cualquier potencia de transmisión compatible",
+ "editor.target.label": "Hecho para",
+ "editor.target.any": "Cualquier radio",
+ "editor.target.all": "Las {n} radios",
+ "editor.power.across": "Potencia en cada radio",
+ "editor.problem.target_rx": "{radios}: no puede recibir en esta frecuencia RX.",
+ "editor.problem.target_rx_ext": "{radios}: recibe esta frecuencia RX solo con RX fuera de banda activado.",
+ "editor.problem.target_tx": "{radios}: no puede transmitir en esta frecuencia TX.",
+ "editor.problem.target_mode": "{radios}: el firmware no tiene {mode}."
 }

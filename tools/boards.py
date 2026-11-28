@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 David Behnke
 """The board registry: one place for every fact about a radio that isn't the build itself (issue #106).
 
 Sources, each fact in one of them:
@@ -499,6 +500,103 @@ def write_floor(board_dir):
     return 0
 
 
+def _pp_value(expr, defines, unknown):
+    """A preprocessor condition as 0 or 1: names from defines, any other name as unknown. Only names, integers,
+    defined(), comparisons, !, && and || (what board files use); anything else raises."""
+    py = re.sub(r"\bdefined\s*\(\s*(\w+)\s*\)|\bdefined\s+(\w+)",
+                lambda m: "1" if (m.group(1) or m.group(2)) in defines else "0", expr)
+    py = re.sub(r"\b([A-Za-z_]\w*)\b", lambda m: str(int(defines.get(m.group(1), unknown))), py)
+    py = re.sub(r"(\d+)[uUlL]+", r"\1", py).replace("&&", " and ").replace("||", " or ")
+    py = re.sub(r"!(?!=)", " not ", py)
+    if not re.fullmatch(r"[\d\s()<>=!andort]*", py):
+        raise RegistryError("preprocessor condition %r: not understood" % expr)
+    return int(bool(eval(py, {"__builtins__": {}})))	# noqa: S307 (digits, comparisons and boolean words only)
+
+
+def preprocess(text, defines, unknown=0):
+    """The lines of C text a build compiles: #if, #ifdef, #ifndef, #elif, #else and #endif decided by defines ({name:
+    value}); a name not in it counts as unknown. Other directives are kept."""
+    out, stack = [], []			# stack: (the group's parent on, a branch of the group taken)
+    on = True
+    for line in text.split("\n"):
+        d = re.match(r"\s*#\s*(if|ifdef|ifndef|elif|else|endif)\b(.*)", line)
+        if not d:
+            if on:
+                out.append(line)
+            continue
+        kind, rest = d.group(1), d.group(2).strip()
+        if kind in ("if", "ifdef", "ifndef"):
+            v = bool(_pp_value(rest, defines, unknown) if kind == "if" else (rest in defines) == (kind == "ifdef"))
+            stack.append((on, v))
+            on = on and v
+        elif not stack:
+            raise RegistryError("#%s without #if" % kind)
+        elif kind == "elif":
+            parent, taken = stack[-1]
+            v = not taken and bool(_pp_value(rest, defines, unknown))
+            stack[-1] = (parent, taken or v)
+            on = parent and v
+        elif kind == "else":
+            parent, taken = stack[-1]
+            stack[-1] = (parent, True)
+            on = parent and not taken
+        else:
+            on = stack.pop()[0]
+    return "\n".join(out)
+
+
+def _c_array(text, ctype, name):
+    """The body of `<ctype> <name>[] = { ... };` in text, or None."""
+    m = re.search(r"\b%s\s+%s\s*\[\s*\w*\s*\]\s*=\s*\{" % (ctype, re.escape(name)), text)
+    return _braced(text, m.end())[:-1] if m else None
+
+
+def _hz(v):
+    return int(re.sub(r"[uUlL]+$", "", v), 0)
+
+
+def radio_profile(board_dir, defines=None):
+    """What the codeplug editor knows of a board without the radio: its power levels and frequency ranges, from board_t
+    .power_names, .power_bands, .power_default and .bands in the board's sources, for the build defines gives (a build
+    option's RFOUNDRY_<OPTION>_<VALUE>). {"names": [label], "bands": [{"lo", "hi", "names"}], "default": level or
+    None, "ranges": [[lo_hz, hi_hz, tx, extra]]}; ranges keeps every range a feature switch may add (they count as on);
+    extra marks receive past the rated bands (CONFIG_RX_EXT), which also needs the user's setting on. None without a
+    board_t that names its power levels."""
+    defines = defines or {}
+    where = os.path.relpath(board_dir if isinstance(board_dir, str) else board_dir[0], ROOT)
+    for _, raw in _c_sources(board_dir):
+        text, wide = preprocess(raw, defines), preprocess(raw, defines, unknown=1)
+        bt = re.search(r"\bboard_t\s+\w+\s*=\s*\{", text)
+        if not bt:
+            continue
+        body = _braced(text, bt.end())
+        names = re.search(r"\.power_names\s*=\s*(\w+)", body)
+        if not names:
+            continue
+        labels = lambda arr: re.findall(r'"([^"]*)"', _c_array(text, r"char\s*\*\s*const", arr) or "")
+        out = {"names": labels(names.group(1)), "bands": [], "default": None, "ranges": []}
+        pb = re.search(r"\.power_bands\s*=\s*(\w+)", body)
+        for lo, hi, arr in re.findall(r"\{\s*(\w+)\s*,\s*(\w+)\s*,\s*(\w+)\s*\}",
+                                      (_c_array(text, "board_power_band_t", pb.group(1)) or "") if pb else ""):
+            out["bands"].append({"lo": _hz(lo), "hi": _hz(hi), "names": labels(arr)})
+        d = re.search(r"\.power_default\s*=\s*(\d+)", body)
+        if d:
+            out["default"] = int(d.group(1))
+        def ranges(src):
+            sbt = re.search(r"\bboard_t\s+\w+\s*=\s*\{", src)
+            b = re.search(r"\.bands\s*=\s*(\w+)", _braced(src, sbt.end())) if sbt else None
+            return [[_hz(lo), _hz(hi), tx == "true"] for lo, hi, tx in re.findall(
+                r"\{\s*(\w+)\s*,\s*(\w+)\s*,\s*(true|false)\s*\}", (_c_array(src, "band_t", b.group(1)) or "") if b else "")]
+        rated = ranges(preprocess(raw, dict(defines, CONFIG_RX_EXT=0), unknown=1))
+        out["ranges"] = [r + [r not in rated] for r in ranges(wide)]
+        if not out["names"] or any(len(x["names"]) != len(out["names"]) for x in out["bands"]):
+            raise RegistryError("%s: power_names and power_bands must list the same number of levels" % where)
+        if out["default"] is not None and out["default"] >= len(out["names"]):
+            raise RegistryError("%s: power_default is past the last level" % where)
+        return out
+    return None
+
+
 def openfw_bases(mcu_defs):
     """(EEPROM image, flash image) data flash addresses the code builds in (core/codeplug: the no-map defaults and the
     DMR ID database's areas), from board.mk MCU_DEFS -DCODEPLUG_OPENFW_EEPROM_BASE / _FLASH_BASE, else 0 and 0x20000."""
@@ -797,13 +895,29 @@ class Board:
     def codeplug(self):
         """Where the codeplug lives, for the codeplug editor: the data flash address of the open-firmware image (the
         editor adds it on the wire), the end of the room for it and the DMR ID database, whether the radio takes a
-        codeplug over TFTP (a staging area), and the names the radio reports on the debug link. None without a flash
-        map."""
+        codeplug over TFTP (a staging area), the names the radio reports on the debug link, and each image's power
+        levels and frequency ranges (radio_profiles). None without a flash map."""
         m = self.flash_map
         if "openfw_eeprom" not in m or "openfw_end" not in m:
             return None
         return {"base": m["openfw_eeprom"], "end": m["openfw_end"], "tftp": "staging_addr" in m,
-                "names": sorted(set(self.debuglink_names()))}
+                "names": sorted(set(self.debuglink_names())), "profiles": self.radio_profiles()}
+
+    def radio_profiles(self):
+        """radio_profile() for each image the board builds, the default first: [{"board_name", "build", "title",
+        ...profile}]. board_name is what that image reports (debug link board=), so the editor finds the profile of a
+        radio on the line; build and title are the first build option's value and title ("" without options)."""
+        out = []
+        lit = next((n for n, _ in self.source_names if n), self.id)
+        opts = self.data.get("build_options", [])
+        for o, v in [(o, v) for o in opts[:1] for v in o["values"]] or [(None, None)]:
+            # as the Makefile defines them: RFOUNDRY_<OPTION>_<VALUE> 1 for the build's value, 0 for the others
+            defines = {"RFOUNDRY_%s_%s" % (o["name"], x["id"].upper()): int(x is v) for x in o["values"]} if o else {}
+            p = radio_profile(self.source_dirs, defines)
+            if p:
+                out.append({"board_name": v.get("board_name", lit) if v else lit, "build": v["id"] if v else "",
+                            "title": v["title"] if v else "", **p})
+        return out
 
     @property
     def codec_slot(self):
@@ -957,6 +1071,7 @@ def load(root=ROOT, only=None):
                          {**unsupported_reasons(os.path.join(root, "config", "features.mk")),
                           **unsupported_reasons(os.path.join(root, "platform", plat.id, "config.mk")),
                           **unsupported_reasons(os.path.join(bdir, "config.mk"))}, flash_map(srcs))
+        out[bid].source_dirs = srcs
         out[bid].write_floor = write_floor(srcs)
         out[bid].volts = source_volts(srcs)
         out[bid].nand_geo = nand_geometry(srcs) if out[bid].nand else None
@@ -1965,6 +2080,34 @@ def self_test():
                     "static const hal_power_t p = { .supply_mv = rd };") == "supply", "volts: the supply")
         ok(volts_of("// .caps = CAP_NO_BATTERY\nconst board_t board = { .caps = 0 };") == "battery",
            "volts: a comment doesn't count")
+        # the editor's radio profile: power levels per build option, power bands, the default and the ranges
+        ok(volts_of("") is None or radio_profile(tmpv) is None, "radio_profile: none without a board_t")
+        volts_of("#if RFOUNDRY_POWER_HI\nstatic const char *const pn[] = { \"1W\", \"10W\" };\n#else\n"
+                 "static const char *const pn[] = { \"1W\", \"5W\" };\n#endif\n"
+                 "static const char *const pv[] = { \"2W\", \"6W\" };\n"
+                 "static const board_power_band_t pb[] = {\n\t{ 136000000u, 174000000u, pv },\n};\n"
+                 "static const band_t bands[] = {\n\t{ 136000000, 174000000, true },\n#if CONFIG_AM_RX\n"
+                 "\t{ 108000000, 136000000, false },\n#endif\n#if CONFIG_RX_EXT\n"
+                 "\t{ 200000000, 260000000, false },\n#endif\n};\n"
+                 "const board_t board = { .bands = bands, .power_names = pn, .power_bands = pb,\n"
+                 "\t.power_default = 1, // high\n};")
+        lo = radio_profile(tmpv, {"RFOUNDRY_POWER_HI": 0, "RFOUNDRY_POWER_LO": 1})
+        hi = radio_profile(tmpv, {"RFOUNDRY_POWER_HI": 1, "RFOUNDRY_POWER_LO": 0})
+        ok(lo["names"] == ["1W", "5W"] and hi["names"] == ["1W", "10W"], "radio_profile: the build option's levels")
+        ok(lo["bands"] == [{"lo": 136000000, "hi": 174000000, "names": ["2W", "6W"]}] and lo["default"] == 1,
+           "radio_profile: power bands and the default")
+        ok(lo["ranges"] == [[136000000, 174000000, True, False], [108000000, 136000000, False, False],
+                            [200000000, 260000000, False, True]],
+           "radio_profile: ranges keep a switch's receive-only range; receive past the bands is marked extra")
+        ok(preprocess("a\n#if X && !Y\nb\n#elif defined(Z)\nc\n#else\nd\n#endif\ne", {"X": 1, "Z": 1}) == "a\nb\ne"
+           and preprocess("#if X\nb\n#elif defined(Z)\nc\n#else\nd\n#endif", {"Z": 1}) == "c"
+           and preprocess("#ifndef Z\nb\n#else\n#if 1\nc\n#endif\n#endif", {"Z": 1}) == "c",
+           "preprocess: #if, #elif, #else, #ifndef and nesting")
+        try:
+            preprocess("#if X(1) + 2\n#endif", {})
+            ok(False, "preprocess refuses an expression it doesn't understand")
+        except RegistryError:
+            ok(True, "preprocess refuses an expression it doesn't understand")
     finally:
         shutil.rmtree(tmpv)
 
