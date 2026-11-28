@@ -295,12 +295,18 @@ typedef struct {
 	// sits here rather than in a byte upstream may take: a Crucible release kept it at 399, now aprs_cp_freq, and a
 	// record longer than upstream's 412 bytes without this marker has it read from there at load (ADR 004)
 	int8_t mic_input;
-	uint8_t nxdn_reserved[1];	// 0; later Crucible fields
+	// Pass squelch (Crucible, docs/spec/satellite.md 4): the FM squelch while a tracked satellite is up, AOS to
+	// LOS. SETTINGS_SAT_SQUELCH_OPEN (0, as a record from before reads), a level 1 to 9, or
+	// SETTINGS_SAT_SQUELCH_NORMAL: the radio's own squelch. Past NORMAL reads Open. Was the NXDN block's spare byte
+	// (0 in every record)
+	uint8_t sat_squelch;
 } settings_t;
 #define SETTINGS_AGC_MARKER	0xA6u
 #define SETTINGS_AGC_RX_MANUAL	0x01u	// Digital AGC RX is Off: each mode's RX AGC row is in force
 #define SETTINGS_AGC_TX_MANUAL	0x02u	// Digital AGC TX is Off: each mode's TX level row is in force
 #define SETTINGS_NXDN_MARKER	0xA8u	// 0xA8 since mic_input moved into the block (ADR 004)
+#define SETTINGS_SAT_SQUELCH_OPEN	0u	// sat_squelch: open for the pass
+#define SETTINGS_SAT_SQUELCH_NORMAL	10u	// sat_squelch: the radio's own squelch (1 to 9: that level)
 #define SETTINGS_NXDN_9600	0x01u	// nxdn_flags: 9600 bit/s, else 4800
 #define SETTINGS_NXDN_RAN_MAX	63u
 #define SETTINGS_NXDN_TX_RAN	1u	// the defaults: TX RAN 1, group 1 (RX RAN 0, 4800 bit/s)

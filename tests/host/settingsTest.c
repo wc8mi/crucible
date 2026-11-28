@@ -1012,7 +1012,7 @@ static void test_settings_layout(void)
 		{ offsetof(settings_t, nxdn_tx_ran), 431 },
 		{ offsetof(settings_t, nxdn_tg), 432 },
 		{ offsetof(settings_t, mic_input), 434 },
-		{ offsetof(settings_t, nxdn_reserved), 435 },
+		{ offsetof(settings_t, sat_squelch), 435 },
 	};
 	CHECK(sizeof(settings_t) == 436);
 	for (unsigned i = 0; i < sizeof(offs) / sizeof(offs[0]); i++) {
@@ -1472,7 +1472,7 @@ static void test_settings_nxdn_default(void)
 	settings_t d;
 	settings_defaults(&d);
 	nxdn_block_is_default(&d);
-	CHECK(d.mic_input == 0 && d.nxdn_reserved[0] == 0);
+	CHECK(d.mic_input == 0 && d.sat_squelch == SETTINGS_SAT_SQUELCH_OPEN);
 
 	settings_t set = d;
 	set.squelch = 3;
