@@ -63,7 +63,7 @@ static const char *state_key(uint8_t s)
 // The channel's mode (radio_mode_t) as the view names it
 static const char *mode_key(uint8_t m)
 {
-	static const char *const names[] = { "fm", "dmr", "p25", "nxdn", "ysf" };
+	static const char *const names[] = { "fm", "dmr", "p25", "nxdn", "ysf", "m17" };
 	return m < sizeof(names) / sizeof(names[0]) ? names[m] : "?";
 }
 
@@ -754,7 +754,7 @@ void debuglink_view_section(uint8_t section, const radio_view_t *v, dl_text_t *t
 		debuglink_view_ysf(v, t);
 		break;
 	case DL_VIEW_M17:
-		debuglink_view_m17(t);
+		debuglink_view_m17(v, t);
 		break;
 #if CONFIG_DEBUGLINK_DMRIP
 	case DL_VIEW_DMRIP:

@@ -206,6 +206,7 @@ typedef enum {
 	RREQ_DETOUR,		// a detour: arg RADIO_DETOUR_MARK (arg2: backstop ms) or _RETURN
 #endif
 	RREQ_MIC,		// arg RADIO_MIC_INPUT (arg2: hal mic_input steps)
+	RREQ_M17_SET,		// radio_task.c: the same for M17 (radio_m17_set_settings)
 	// New request types go above
 
 	RREQ_COUNT		// KEEP LAST: sizes req_flags[] (radio_sm.c)

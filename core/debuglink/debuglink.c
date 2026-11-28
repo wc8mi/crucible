@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The debug link's commands (docs/spec/debuglink.md). Everything runs in the host link task, between the bytes of the
 // other protocols: each command is short (a reply of at most DL_REPLY_MAX bytes, no waiting on other tasks; radio
 // requests are queued, injected keys are timed by the input task).
@@ -200,6 +201,7 @@ static size_t cmd_reset(uint8_t *out)
 	debuglink_p25_reset();
 	debuglink_nxdn_reset();
 	debuglink_ysf_reset();
+	debuglink_m17_reset();
 	uint32_t now = hal_millis();
 	dlog("debuglink: counters reset");
 	out[0] = DL_ST_OK;

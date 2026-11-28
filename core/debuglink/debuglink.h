@@ -104,7 +104,11 @@ void debuglink_view_nxdn(const radio_view_t *v, dl_text_t *t);
 void debuglink_nxdn_reset(void);
 // The ysf section (debuglink_view_ysf.c; "ysf.built=0" without CONFIG_YSF) and its counter reset
 void debuglink_view_ysf(const radio_view_t *v, dl_text_t *t);
-void debuglink_view_m17(dl_text_t *t);
+// The m17 section (debuglink_view_m17.c; "m17.built=0" without CONFIG_M17), its counter reset, and the Codec 2
+// benchmark's keys in it (debuglink_m17_bench.c)
+void debuglink_view_m17(const radio_view_t *v, dl_text_t *t);
+void debuglink_m17_reset(void);
+void debuglink_view_m17_bench(dl_text_t *t);
 // RADIO op 45: start the Codec 2 benchmark in a task of its own (DL_ST_OK); DL_ST_BUSY running or no heap for its
 // stack, DL_ST_REFUSED not on an FM channel, DL_ST_UNAVAILABLE no voice block
 uint8_t debuglink_m17_bench(void);
@@ -143,6 +147,7 @@ enum {
 	DL_OP_NXDN = 43,
 	DL_OP_YSF = 44,
 	DL_OP_M17_BENCH = 45,
+	DL_OP_M17 = 46,
 };
 uint8_t debuglink_radio_feature_op(uint8_t op, const uint8_t *args, uint16_t len);
 // After a reply: the host port's reattach a PA key run asked for (PA_KEYRUN_FLAG_REATTACH); else a no-op
@@ -154,7 +159,8 @@ static inline bool debuglink_is_feature_op(uint8_t op)
 	       op == DL_OP_DMR_FIELDS || op == DL_OP_VFO_COPY || op == DL_OP_VOICE_TEST || op == DL_OP_DTMF ||
 	       op == DL_OP_TX_LIMIT || op == DL_OP_TX_DRIVE || op == DL_OP_PA_KEYUP || op == DL_OP_VFO_SFR ||
 	       op == DL_OP_PA_SWEEP || op == DL_OP_PA_KEYRUN || op == DL_OP_VOICE_CAPTURE ||
-	       op == DL_OP_P25 || op == DL_OP_NXDN || op == DL_OP_YSF || op == DL_OP_M17_BENCH;
+	       op == DL_OP_P25 || op == DL_OP_NXDN || op == DL_OP_YSF || op == DL_OP_M17_BENCH ||
+	       op == DL_OP_M17;
 }
 // VERSION's codec= (hal_vocoder_id; the name the host tests use)
 static inline const char *debuglink_codec_id(const hal_vocoder_t *v)

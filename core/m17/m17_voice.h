@@ -74,8 +74,9 @@ void m17_voice_rx_end(void);
 void m17_voice_tx(bool on);
 // Two encoded frames for a stream frame (provider's task); false with fewer queued
 bool m17_voice_tx_take(uint8_t payload[M17_STREAM_BYTES]);
-// The 20 ms block (the audio callback): mic in while transmitting, speaker out while receiving
-void m17_voice_block(const int16_t *mic, int16_t *spk);
+// The 20 ms block (the audio callback): mic in while transmitting, speaker out while receiving. True while a call
+// plays (the block is its sound, or the one repeat that covers a late frame): the caller routes the speaker by it
+bool m17_voice_block(const int16_t *mic, int16_t *spk);
 // Stop (radio task, after the engine stops): mem is free again
 void m17_voice_end(void);
 void m17_voice_stats(m17_voice_stats_t *out);

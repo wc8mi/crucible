@@ -69,6 +69,7 @@ Nothing is removed from the tree. A feature Crucible doesn't ship is off by defa
 |---|---|
 | FM, DMR, P25, NXDN | On |
 | YSF | On; incomplete, so every release is a pre-release until a build is stable |
+| M17 | Being written ([ADR 006](docs/crucible/adr/006-m17.md)): receive only, off until the owner turns it on in `config/crucible.mk` |
 | Trunking (DMR Tier III, P25 trunked) | Off (`config/crucible.mk`), and out of the maximal build |
 | MMDVM hotspot with split duplex, single frequency repeater, zone sharing | Off (`config/crucible.mk`), and out of the maximal build: their flash goes to YSF VW and M17 |
 | Scan delay | 5 s by default (RadioFoundry's is 2 s): the value of `RADIO_SCAN_DELAY_MS` in `core/radio/radio.h`; keep 5000u on a merge conflict |

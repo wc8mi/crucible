@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // Radio: what the core asks of the RF side, whatever chips the board has.
 // The board composes its RF chip, modem / audio chip, band and PA switching and calibration behind this.
 #ifndef HAL_RADIO_H
@@ -8,10 +9,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// RADIO_MODE_P25, RADIO_MODE_NXDN and RADIO_MODE_YSF are a channel's modes only (the radio core runs them with the
-// board in RADIO_MODE_DMR, its modem chip's digital mode, docs/spec/p25.md 7, docs/spec/nxdn.md 6, docs/spec/ysf.md
-// 5): set_mode never gets them
-typedef enum { RADIO_MODE_FM, RADIO_MODE_DMR, RADIO_MODE_P25, RADIO_MODE_NXDN, RADIO_MODE_YSF } radio_mode_t;
+// RADIO_MODE_P25, RADIO_MODE_NXDN, RADIO_MODE_YSF and RADIO_MODE_M17 are a channel's modes only (the radio core runs
+// them with the board in RADIO_MODE_DMR, its modem chip's digital mode, docs/spec/p25.md 7, docs/spec/nxdn.md 6,
+// docs/spec/ysf.md 5, docs/spec/m17.md 6): set_mode never gets them
+typedef enum { RADIO_MODE_FM, RADIO_MODE_DMR, RADIO_MODE_P25, RADIO_MODE_NXDN, RADIO_MODE_YSF, RADIO_MODE_M17 } radio_mode_t;
 typedef enum { RADIO_BW_12K5, RADIO_BW_25K } radio_bw_t;
 // hal_radio_t.mic_input's range, chip steps either side of the board's level
 #define HAL_MIC_INPUT_MIN	(-7)

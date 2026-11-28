@@ -2382,7 +2382,12 @@ static void test_vfo_dmr(void)
 #if !CONFIG_YSF
 	CHECK(debuglink_radio_feature_op(DL_OP_DMR_FIELDS, (const uint8_t[]){ RADIO_MODE_YSF, 0xFF, 0 }, 3) == DL_ST_UNAVAILABLE);
 #endif
-	CHECK(debuglink_radio_feature_op(DL_OP_DMR_FIELDS, (const uint8_t[]){ RADIO_MODE_YSF + 1, 0xFF, 0 }, 3) == DL_ST_BAD_ARG);
+#if !CONFIG_M17
+	CHECK(debuglink_radio_feature_op(DL_OP_DMR_FIELDS, (const uint8_t[]){ RADIO_MODE_M17, 0xFF, 0 }, 3) == DL_ST_UNAVAILABLE);
+	CHECK(debuglink_radio_feature_op(DL_OP_M17, (const uint8_t[]){ 0, 0 }, 2) == DL_ST_UNAVAILABLE);
+#endif
+	CHECK(debuglink_radio_feature_op(DL_OP_DMR_FIELDS, (const uint8_t[]){ RADIO_MODE_M17 + 1, 0xFF, 0 }, 3) == DL_ST_BAD_ARG);
+	CHECK(debuglink_is_feature_op(DL_OP_M17));
 	CHECK(debuglink_radio_feature_op(DL_OP_DMR_FIELDS, (const uint8_t[]){ 0xFF, 16, 0 }, 3) == DL_ST_BAD_ARG);
 	CHECK(debuglink_radio_feature_op(DL_OP_DMR_FIELDS, (const uint8_t[]){ 0xFF, 0xFF, 3 }, 3) == DL_ST_BAD_ARG);
 	CHECK(debuglink_radio_feature_op(DL_OP_DMR_FIELDS, (const uint8_t[]){ 0xFF, 0xFF }, 2) == DL_ST_BAD_ARG);
@@ -4337,6 +4342,13 @@ void radio_req_ysf_wx(uint8_t cmd, uint32_t arg, const char *text)
 {
 	if (radio_ysf_wx_arm(cmd, arg, text))
 		req(RREQ_YSF_WX, 0);
+}
+#endif
+#if CONFIG_M17
+void radio_req_m17_settings(const radio_m17_settings_t *s)
+{
+	radio_m17_set_settings(s);
+	req(RREQ_M17_SET, 0);
 }
 #endif
 // Not under test here: debuglink_view_radio.c, linked for the volume operation, refers to them
@@ -10683,6 +10695,250 @@ static void test_ysf_dual(void)
 #endif
 #endif	// CONFIG_YSF
 
+#if CONFIG_M17
+// ---- M17 in the radio core (docs/spec/m17.md 6): the far radio is a symbol source on the other fake provider, a
+// whole transmission built ahead (preamble, LSF, stream frames, EoT) and queued a chunk at a time. Receive only: PTT
+// is refused before the transmitter keys ----
+#include "m17/m17.h"
+#include "m17/m17_call.h"
+#include "m17/m17_engine.h"
+#include "m17/m17_voice.h"
+#include "m17/m17_codeplug.h"
+#include "debuglink/debuglink.h"
+
+#define MFAR_FRAMES	60
+static uint8_t mfar_syms[(MFAR_FRAMES + 3) * M17_FRAME_BYTES];
+static uint32_t mfar_n, mfar_at;	// symbols built, symbols queued
+
+static void mfar_put(const uint8_t frame[M17_FRAME_BYTES])
+{
+	memcpy(&mfar_syms[mfar_n / 4], frame, M17_FRAME_BYTES);
+	mfar_n += M17_FRAME_SYMS;
+}
+
+// A voice stream from src to dst on CAN can: frames stream frames, then EoT
+static void mfar_build(const char *src, const char *dst, uint8_t can, uint16_t type_extra, uint16_t frames)
+{
+	uint8_t lsf[M17_LSF_BYTES], frame[M17_FRAME_BYTES];
+	uint16_t type = (uint16_t)(M17_TYPE_STREAM | M17_TYPE_DATA_VOICE | (can << M17_TYPE_CAN_SHIFT) | type_extra);
+	uint64_t a;
+
+	memset(lsf, 0, sizeof lsf);
+	m17_addr_dest(dst, strlen(dst), &a);
+	m17_addr_put(&lsf[M17_LSF_DST], a);
+	m17_addr_encode(src, strlen(src), &a);
+	m17_addr_put(&lsf[M17_LSF_SRC], a);
+	lsf[M17_LSF_TYPE] = (uint8_t)(type >> 8);
+	lsf[M17_LSF_TYPE + 1] = (uint8_t)type;
+	m17_lsf_crc_set(lsf);
+	mfar_n = mfar_at = 0;
+	memset(frame, 0x77, sizeof frame);
+	mfar_put(frame);
+	m17_lsf_put(frame, lsf);
+	mfar_put(frame);
+	for (uint16_t i = 0; i < frames && i < MFAR_FRAMES; i++) {
+		uint8_t payload[M17_STREAM_BYTES], lich[M17_LICH_BYTES];
+
+		for (int k = 0; k < M17_STREAM_BYTES; k++)
+			payload[k] = (uint8_t)(i * 7u + (unsigned)k * 13u + 1u);
+		m17_lich_make(lsf, (uint8_t)(i % 6), lich);
+		m17_stream_put(frame, lich, (uint16_t)(i | (i + 1u == frames ? M17_FN_LAST : 0)), payload);
+		mfar_put(frame);
+	}
+	for (int k = 0; k < M17_FRAME_BYTES; k += 2) {
+		frame[k] = 0x55;
+		frame[k + 1] = 0x5D;
+	}
+	mfar_put(frame);
+	fake_air1.open(NULL, NULL, NULL);
+}
+
+static void mfar_step(void)
+{
+	while (mfar_at < mfar_n && fair[1].open && fair[1].qn < AIR_DEPTH) {
+		air_tx_chunk_t c = { 0 };
+		uint32_t n = mfar_n - mfar_at < AIR_CHUNK ? mfar_n - mfar_at : AIR_CHUNK;
+
+		c.nsyms = (uint16_t)n;
+		memcpy(c.syms, &mfar_syms[mfar_at / 4], (n + 3) / 4);
+		mfar_at += n;
+		if (mfar_at == mfar_n)
+			c.flags = AIR_TX_LAST;
+		fake_air1.tx_queue(&c);
+		if (!fair[1].on)
+			fake_air1.tx_begin();
+	}
+}
+
+static bool mfar_done(void) { return mfar_at == mfar_n && !fair[1].on; }
+
+// The codec side (core/m17/m17_codeplug.c, tested in m17CodeplugTest): a stored channel's block, the callsign
+static m17_chan_t stored_m17[NCH + 1];
+static char m17_call_stub[M17_CP_CALL_LEN + 1] = "N0CALL";
+bool m17_chan_load(uint16_t number, const channel_t *ch, m17_chan_t *out)
+{
+	if (ch->kind != CODEPLUG_KIND_M17 || number < 1 || number > NCH)
+		return false;
+	*out = stored_m17[number];
+	return true;
+}
+void m17_callsign(const char *radio_name, char out[M17_CP_CALL_LEN + 1])
+{
+	(void)radio_name;
+	memcpy(out, m17_call_stub, sizeof m17_call_stub);
+}
+
+static void m17_view_text(char *buf, size_t cap)
+{
+	dl_text_t t;
+	dl_text_init(&t, buf, cap);
+	debuglink_view_m17(&sm.view, &t);
+}
+
+static void m17_far_call(const char *src, const char *dst, uint8_t can, uint16_t type_extra, uint16_t frames)
+{
+	mfar_build(src, dst, can, type_extra, frames);
+	for (int i = 0; i < 400 && !mfar_done(); i++)
+		run(30);
+	run(300);	// the voice queue drains and the call ends
+}
+
+static void test_m17(void)
+{
+	radio_m17_stats_t s0, s1;
+	radio_m17_settings_t set;
+	size_t len = 0;
+	char buf[4096];
+	int keyed0;
+
+	setup_codeplug();
+	add(3, "M17 simp", 446100000, RADIO_MODE_DMR, false, 2);
+	chans[3].kind = CODEPLUG_KIND_M17;
+	chans[3].system = 0xFF;
+	stored_m17[3] = (m17_chan_t){ .can = 5, .hear_any = false, .dest = "" };
+	air_nofit = false;
+	memset(fair, 0, sizeof(fair));
+	start();
+	aud.feed = true;
+	req(RREQ_ZONE_POS, 2);
+	run(200);
+	CHECK(sm.view.ch.mode == RADIO_MODE_M17 && radio_m17_running());
+	CHECK((sm.view.m17.flags & RADIO_M17_ON) && sm.view.m17.run_can == 5 && !(sm.view.m17.flags & RADIO_M17_ANY));
+	CHECK(!(sm.view.m17.flags & RADIO_M17_NO_CALL));
+	// Memory: the engine and the voice path each have an 8-byte aligned block of their size, not the same one
+	void *em = radio_m17_engine_mem(&len);
+	CHECK(em != NULL && len >= sizeof(m17_engine_t) && ((uintptr_t)em & 7u) == 0);
+	size_t vlen = 0;
+	void *vm = radio_m17_voice_mem(&vlen);
+	CHECK(vm != NULL && vlen >= sizeof(m17_voice_mem_t) && ((uintptr_t)vm & 7u) == 0);
+	CHECK((uint8_t *)vm + vlen <= (uint8_t *)em || (uint8_t *)em + len <= (uint8_t *)vm);
+
+	// A call on the channel's CAN plays: the PCM stream starts, the speaker takes it, Codec 2 frames are played
+	radio_m17_stats(&s0);
+	CHECK(!aud.started);
+	mfar_build("N1ABC", "ALL", 5, 0, 40);
+	bool played = false, pcm = false;
+	for (int i = 0; i < 400 && !mfar_done(); i++) {
+		run(30);
+		played |= (sm.view.m17.flags & RADIO_M17_PLAYED) != 0;
+		pcm |= aud.pcm;
+	}
+	CHECK(played && pcm && aud.started);
+	CHECK(strcmp(sm.view.m17.src, "N1ABC") == 0 && strcmp(sm.view.m17.dst, "@ALL") == 0 && sm.view.m17.can == 5);
+	run(400);
+	radio_m17_stats(&s1);
+	CHECK(s1.air.rx_calls == s0.air.rx_calls + 1 && s1.lsf_ok > s0.lsf_ok && s1.frames >= s0.frames + 38);
+	CHECK(s1.c2_frames >= s0.c2_frames + 76 && s1.c2_overflows == s0.c2_overflows);	// two per stream frame; the end bit
+	// ended the call before its EoT
+	CHECK(!(sm.view.m17.flags & RADIO_M17_RX) && !aud.pcm);
+	m17_view_text(buf, sizeof buf);
+	CHECK(strstr(buf, "m17.built=1\n") && strstr(buf, "m17.on=1\n") && strstr(buf, "m17.rx.src=N1ABC\n") &&
+	      strstr(buf, "m17.run.can=5\n") && strstr(buf, "m17.run.dst=ALL\n") && strstr(buf, "m17.rx.deny=none\n"));
+
+	// Another CAN is not played; with hear-any it is
+	radio_m17_stats(&s0);
+	m17_far_call("N2DEF", "ALL", 7, 0, 20);
+	radio_m17_stats(&s1);
+	CHECK(s1.air.rx_calls == s0.air.rx_calls + 1 && s1.c2_frames == s0.c2_frames && sm.view.m17.deny == M17_DENY_CAN);
+	m17_view_text(buf, sizeof buf);
+	CHECK(strstr(buf, "m17.rx.deny=can\n") && strstr(buf, "m17.rx.can=7\n"));
+	// An encrypted call is not played either
+	radio_m17_stats(&s0);
+	m17_far_call("N2DEF", "ALL", 5, 1u << 3, 20);
+	radio_m17_stats(&s1);
+	CHECK(s1.c2_frames == s0.c2_frames && sm.view.m17.deny == M17_DENY_ENC);
+
+	// PTT: refused before anything keys (ADR 006 step 4 brings transmit)
+	keyed0 = hw.tx_calls;
+	req(RREQ_PTT, 1);
+	run(100);
+	CHECK(hw.tx_calls == keyed0 && !hw.keyed && sm.view.state == RS_TX_DENIED && sm.view.tx_deny == TXDENY_AIR_NO_TX);
+	req(RREQ_PTT, 0);
+	run(50);
+
+	// The VFO's settings (the debug link, Talk to) don't change a stored channel's; they hold on the VFO
+	set = (radio_m17_settings_t){ .can = 7, .hear_any = true, .dest = "w1aw " };
+	radio_req_m17_settings(&set);
+	run(50);
+	radio_m17_settings(&set);
+	CHECK(set.can == 7 && set.hear_any && strcmp(set.dest, "W1AW") == 0 && sm.view.m17.run_can == 5);
+	set.dest[0] = '\0';
+	strcpy(set.dest, "all");
+	radio_m17_set_settings(&set);
+	radio_m17_settings(&set);
+	CHECK(set.dest[0] == '\0');
+	set.can = 0;
+	set.hear_any = false;
+	radio_m17_set_settings(&set);
+
+	// No callsign: received calls still play; the view says so for transmit
+	m17_call_stub[0] = '\0';
+	req(RREQ_ZONE_POS, 0);
+	run(200);
+	CHECK(!radio_m17_running() && !aud.started);
+	req(RREQ_ZONE_POS, 2);
+	run(200);
+	CHECK(radio_m17_running() && (sm.view.m17.flags & RADIO_M17_NO_CALL));
+	strcpy(m17_call_stub, "N0CALL");
+
+	// The debug link (ops 31 and 46): the VFO in M17 on its settings; a call on their CAN plays
+	CHECK(debuglink_radio_feature_op(DL_OP_M17, (const uint8_t[]){ 16, 0 }, 2) == DL_ST_BAD_ARG);
+	CHECK(debuglink_radio_feature_op(DL_OP_M17, (const uint8_t[]){ 3, 2 }, 2) == DL_ST_BAD_ARG);
+	CHECK(debuglink_radio_feature_op(DL_OP_M17, (const uint8_t[]){ 3, 0, 'W', 0x01 }, 4) == DL_ST_BAD_ARG);
+	CHECK(debuglink_radio_feature_op(DL_OP_M17, (const uint8_t[]){ 3, 0, '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' },
+					 12) == DL_ST_BAD_ARG);
+	CHECK(debuglink_radio_feature_op(DL_OP_M17, (const uint8_t[]){ 3, 0, 'm', '1', '7', '-', 'M', '1', '7' }, 9) == DL_ST_OK);
+	req(RREQ_VFO, 1);
+	run(200);
+	CHECK(debuglink_radio_feature_op(DL_OP_DMR_FIELDS, (const uint8_t[]){ RADIO_MODE_M17, 0xFF, 0 }, 3) == DL_ST_OK);
+	run(200);
+	CHECK(sm.view.ch.mode == RADIO_MODE_M17 && radio_m17_running() && sm.view.m17.run_can == 3 &&
+	      strcmp(sm.view.m17.run_dst, "M17-M17") == 0);
+	radio_m17_stats(&s0);
+	m17_far_call("N3GHI", "M17-M17", 3, 0, 20);
+	radio_m17_stats(&s1);
+	CHECK(s1.c2_frames >= s0.c2_frames + 36 && sm.view.m17.deny == M17_DENY_NONE);
+	m17_view_text(buf, sizeof buf);
+	CHECK(strstr(buf, "m17.set.can=3\n") && strstr(buf, "m17.set.dst=M17-M17\n") && strstr(buf, "m17.rx.dst=M17-M17\n"));
+	req(RREQ_VFO, 0);
+	run(200);
+
+	// A board whose air interface can't carry M17: the channel is not taken as M17
+	air_nofit = true;
+	req(RREQ_ZONE_POS, 0);
+	run(200);
+	req(RREQ_ZONE_POS, 2);
+	run(200);
+	CHECK(sm.view.ch.mode != RADIO_MODE_M17 && !radio_m17_running());
+	air_nofit = false;
+	fake_air1.close();
+	aud.feed = false;
+	setup_codeplug();
+	req(RREQ_RELOAD, 0);
+	run(50);
+}
+#endif	// CONFIG_M17
+
 #if CONFIG_SCAN && CONFIG_DUAL_WATCH && CONFIG_DMR && (CONFIG_P25 || CONFIG_NXDN)
 // The air modes with DMR in a watch, without YSF in it: P25 + DMR and NXDN + DMR take turns the same way
 static void test_air_dmr_dual(void)
@@ -10745,6 +11001,9 @@ static void air_step(void)
 #endif
 #if CONFIG_YSF
 	yfar_step();
+#endif
+#if CONFIG_M17
+	mfar_step();
 #endif
 }
 #endif
@@ -13291,6 +13550,9 @@ int main(void)
 #if CONFIG_SCAN && CONFIG_DUAL_WATCH
 	test_ysf_dual();
 #endif
+#endif
+#if CONFIG_M17
+	test_m17();
 #endif
 #if CONFIG_SCAN && CONFIG_DUAL_WATCH && CONFIG_DMR && (CONFIG_P25 || CONFIG_NXDN)
 	test_air_dmr_dual();

@@ -16,7 +16,8 @@
     rfoundry_debug.py wake                           backlight on without a key event
     rfoundry_debug.py ptt --seconds S                key PTT for S seconds (at most 10; the firmware also times out)
     rfoundry_debug.py radio OP [ARG...]              channel +1, pos 3, zone 0, vfo on, freq MHZ, power lowest|LEVEL|+1, copy-vfo, ...
-    rfoundry_debug.py radio mode fm|dmr|p25|nxdn|ysf the channel's mode for now (the VFO's own in the VFO)
+    rfoundry_debug.py radio mode fm|dmr|p25|nxdn|ysf|m17
+                                                the channel's mode for now (the VFO's own in the VFO)
     rfoundry_debug.py radio p25 [nac=N] [tg=N|unit=N] [rx_tgid=N] [talkaround=auto|on|off] [unit_id=N]
                                                 the P25 settings (CONFIG_P25; RAM only, view section p25)
     rfoundry_debug.py radio nxdn [rate=9600|4800] [ran=N] [rx_ran=N] [tx_ran=N] [rx_gid=N] [tg=N|unit=N]
@@ -24,6 +25,8 @@
                                                 the NXDN settings (CONFIG_NXDN; RAM only, view section nxdn)
     rfoundry_debug.py radio ysf [dgid=N] [tx_dgid=N] [rx_dgid=N] [eq=on|off] [tone=on|off] [dcs=on|off]
                                                 the YSF DG-IDs (CONFIG_YSF; RAM only, view section ysf)
+    rfoundry_debug.py radio m17 [can=N] [any=0|1] [dst=CALL|ALL]
+                                                the M17 settings (CONFIG_M17; RAM only, view section m17)
     rfoundry_debug.py volume [N|knob]                print the speaker volume; N (0 mutes, 0..16) sets it, knob gives the knob back
     rfoundry_debug.py log [--follow]                 the firmware's dlog() ring
     rfoundry_debug.py chip                           chip ID, flash size, UID, option bytes (RDP, write protection)
@@ -245,8 +248,9 @@ OP_P25 = 42
 OP_NXDN = 43
 OP_YSF = 44
 OP_M17_BENCH = 45
+OP_M17 = 46
 P25_TALKAROUND = {"auto": 0, "on": 1, "off": 2}
-CHANNEL_MODES = {"fm": 0, "dmr": 1, "p25": 2, "nxdn": 3, "ysf": 4}
+CHANNEL_MODES = {"fm": 0, "dmr": 1, "p25": 2, "nxdn": 3, "ysf": 4, "m17": 5}
 # The VFO's SFR role names (sfrRole_t, docs/spec/sfr.md 4): off, user, user of an ERDM repeater, repeater, ERDM style
 SFR_ROLES = {"off": 0, "user": 1, "user-erdm": 2, "rpt": 3, "rpt-erdm": 4}
 OP_PA_SWEEP = 39
@@ -1431,7 +1435,7 @@ class DebugLink:
         self.radio(OP_VOLUME, bytes([VOLUME_KNOB if step == "knob" else int(step)]))
 
     def dmr_fields(self, mode=None, cc=None, ts=None):
-        """Mode ("fm" / "dmr" / "p25" / "nxdn" / "ysf"), color code 0..15 and timeslot 1 / 2, each None to keep it. On a channel these
+        """Mode ("fm" / "dmr" / "p25" / "nxdn" / "ysf" / "m17"), color code 0..15 and timeslot 1 / 2, each None to keep it. On a channel these
         are temporary changes, in the VFO the VFO's own settings (RADIO op 31). A mode the build lacks raises
         DebugLinkError "unavailable"."""
         m = 0xFF if mode is None else CHANNEL_MODES[mode]
@@ -1503,6 +1507,25 @@ class DebugLink:
         cur = {"tx_dgid": int(v["ysf.tx_dgid"]), "rx_dgid": int(v["ysf.rx_dgid"])}
         cur.update(kw)
         self.ysf_settings(**cur)
+
+    def m17_settings(self, can=0, hear_any=False, dest=""):
+        """The M17 settings (RADIO op 46; debuglink.md 3.8; RAM only, the m17 view section shows them): the CAN 0..15,
+        hear every CAN, the destination (up to 9 characters; "" or "ALL" broadcast). A stored M17 channel keeps its own;
+        the callsign is the codeplug's (m17-codeplug.md)."""
+        d = dest.encode("ascii")
+        if not 0 <= can <= 15 or len(d) > 9 or any(c < 0x20 or c > 0x7E for c in d):
+            raise ValueError("m17_settings: CAN 0..15, a destination of up to 9 printable characters")
+        self.radio(OP_M17, struct.pack("<BB", can, 1 if hear_any else 0) + d)
+
+    def m17_settings_update(self, **kw):
+        """m17_settings with the VFO's settings (the m17 view section's m17.set.*) changed only where kw says."""
+        v = self.view(["m17"])
+        if v.get("m17.built") != "1":
+            raise DebugLinkError("unavailable")
+        dst = v["m17.set.dst"]
+        cur = {"can": int(v["m17.set.can"]), "hear_any": v["m17.set.any"] == "1", "dest": "" if dst == "ALL" else dst}
+        cur.update(kw)
+        self.m17_settings(**cur)
 
     def m17_bench(self, timeout=60.0):
         """The Codec 2 benchmark (RADIO op 45; debuglink.md 3.8; ADR 006 5, the CPU gate): starts it, waits for its end
@@ -2299,6 +2322,19 @@ def cmd_radio(link, a):
             else:
                 raise SystemExit("ysf [dgid=N] [tx_dgid=N] [rx_dgid=N] [eq=on|off] [tone=on|off] [dcs=on|off]")
         link.ysf_settings_update(**kw)
+    elif op == "m17":                 # m17 [can=N] [any=0|1] [dst=CALL]
+        kw = {}
+        for a in args:
+            k, _, val = a.partition("=")
+            if k == "can":
+                kw["can"] = int(val, 0)
+            elif k == "any" and val in ("0", "1"):
+                kw["hear_any"] = val == "1"
+            elif k == "dst":
+                kw["dest"] = val
+            else:
+                raise SystemExit("m17 [can=N] [any=0|1] [dst=CALL|ALL]")
+        link.m17_settings_update(**kw)
     elif op == "m17-bench":           # m17-bench: the Codec 2 benchmark, its result
         for k, x in link.m17_bench().items():
             print(f"{k}={x}")
@@ -3251,7 +3287,7 @@ def main(argv=None):
                                   "target-clear", "privacy", "scan", "scan-vfo", "beep", "burst", "set", "usb",
                                   "usb-settings", "ppp", "vibrate", "mode", "cc", "ts", "sfr", "copy-vfo", "voice-test", "dtmf",
                                   "tx-limit", "tx-drive", "pa-keyup", "pa-sweep", "pa-keyrun", "p25", "nxdn", "ysf",
-                                  "m17-bench", "roam"])
+                                  "m17", "m17-bench", "roam"])
     p.add_argument("args", nargs="*")
     p = sub.add_parser("data", help="DMR data: sms, call alert, radio check, settings, inbox")
     p.add_argument("op", choices=["sms", "alert", "check", "settings", "inbox", "read", "emergency", "em-settings",
