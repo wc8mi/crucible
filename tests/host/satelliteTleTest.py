@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 David Behnke
 """Host tests for the explicit PC satellite TLE workflow."""
 import datetime as dt
 import json
@@ -68,8 +69,12 @@ class FakeResponse:
 
 
 class FakeRadio:
-    def __init__(self, installed=None, capacity=8, fail_data=False, protocol_version=tle.SATELLITE_PROTOCOL_VERSION):
+    def __init__(self, installed=None, capacity=8, fail_data=False, protocol_version=tle.SATELLITE_PROTOCOL_VERSION,
+                 profile_max=None):
         self.capacity = capacity
+        self.profile_max = profile_max if profile_max is not None else \
+            tle.MAX_PROFILES if protocol_version >= tle.PROFILE_SET_CHUNK_PROTOCOL_VERSION else tle.LEGACY_MAX_PROFILES
+        self.profile_set = None
         self.installed = dict(installed or {})
         self.protocol_version = protocol_version
         self.profiles = list(tle.DEFAULT_PROFILE_IDS)
@@ -97,6 +102,9 @@ class FakeRadio:
         operation = payload[0]
         args = payload[1:]
         if operation == tle.OP_INFO:
+            if self.protocol_version >= tle.PROFILE_SET_CHUNK_PROTOCOL_VERSION:
+                return 0, struct.pack("<BHHB", self.protocol_version, self.capacity, len(self.installed),
+                                      self.profile_max)
             return 0, struct.pack("<BHH", self.protocol_version, self.capacity, len(self.installed))
         if operation == tle.OP_LIST:
             (start,) = struct.unpack("<H", args)
@@ -160,6 +168,20 @@ class FakeRadio:
                 raise DebugLinkError("profile operations unsupported", 1)
             count = args[0]
             self.profiles = list(struct.unpack_from(f"<{count}I", args, 1))
+            return 0, b""
+        if operation == tle.OP_PROFILE_SET_CHUNK:
+            if self.protocol_version < tle.PROFILE_SET_CHUNK_PROTOCOL_VERSION:
+                raise DebugLinkError("unknown operation", 3)
+            total, start, count = args[0], args[1], args[2]
+            if len(args) != 3 + count * 4 or len(args) + 1 > 64 or count == 0 or start + count > total:
+                raise AssertionError("invalid profile set chunk")
+            if start == 0:
+                self.profile_set = []
+            if self.profile_set is None or len(self.profile_set) != start:
+                raise AssertionError("profile set chunks must be consecutive")
+            self.profile_set.extend(struct.unpack_from(f"<{count}I", args, 3))
+            if len(self.profile_set) == total:
+                self.profiles, self.profile_set = self.profile_set, None
             return 0, b""
         if operation == tle.OP_PROFILE_STAGE:
             transaction, count = struct.unpack_from("<HB", args)
@@ -346,7 +368,7 @@ def test_bundle_round_trip():
         loaded_custom = tle.load_bundle(path)
         check(loaded_custom["schema_version"] == 3 and loaded_custom["profiles"] == custom_profiles,
               "schema-v3 bundle round trips arbitrary frequency profiles")
-        for invalid_profiles in ([25544, 25544], [99999], list(sorted(tle.SUPPORTED_PROFILE_IDS)[:11]), []):
+        for invalid_profiles in ([25544, 25544], [99999], sorted(tle.SUPPORTED_PROFILE_IDS) * 2, []):
             try:
                 tle.validate_profile_ids(invalid_profiles)
                 check(False, f"invalid profile selection rejected: {invalid_profiles}")
@@ -419,7 +441,7 @@ def test_protocol_versions():
     check(tle.tle_catalog_id("Z9999") == 339999 and tle.tle_catalog_id("J0000") == 180000 and
           tle.tle_catalog_id("I0000") is None and tle.tle_catalog_id("O1234") is None,
           "Alpha-5 letters skip I and O")
-    radio = FakeRadio(protocol_version=9)
+    radio = FakeRadio(protocol_version=10)
     try:
         tle.radio_inventory(radio)
         check(False, "unknown protocol is rejected")
@@ -442,10 +464,10 @@ def test_install_transaction():
           "orbital-only install uses an inventory replacement")
     too_many = FakeRadio(capacity=20)
     try:
-        tle.install_records(too_many, [make_record(50000 + i) for i in range(11)])
-        check(False, "more than ten selected TLEs are rejected")
+        tle.install_records(too_many, [make_record(50000 + i) for i in range(tle.MAX_PROFILES + 1)])
+        check(False, "more than 18 selected TLEs are rejected")
     except tle.SatelliteTleError:
-        check(not too_many.calls, "more than ten selected TLEs are rejected before contacting the radio")
+        check(not too_many.calls, "more than 18 selected TLEs are rejected before contacting the radio")
     check(all(payload[0] != tle.OP_SYNC_CHANNELS for _, payload in radio.calls),
           "TLE install leaves codeplug zones and channels unchanged")
     data_calls = [payload for command, payload in radio.calls if command == tle.SATELLITE_COMMAND and
@@ -544,6 +566,51 @@ def test_install_transaction():
               "failed replacement is aborted and leaves the inventory intact")
 
 
+def test_eighteen():
+    ids = sorted(tle.SUPPORTED_PROFILE_IDS)[:17] + [99001]
+    check(len(ids) == tle.MAX_PROFILES, "17 from the catalog and one of the user's own make 18")
+    records = tle.validate_records([make_record(catalog_id) for catalog_id in ids])
+    profiles = [{"catalog_id": catalog_id, "rx_hz": 436000000 + index * 5000, "tx_hz": 145900000,
+                 "tx_tone_tenths": 670} for index, catalog_id in enumerate(ids)]
+    radio = FakeRadio(capacity=18)
+    result = tle.install_records(radio, records, ids, profiles)
+    chunks = [payload for _, payload in radio.calls if payload[0] == tle.OP_PROFILE_STAGE_CHUNK]
+    check(result["count"] == 18 and result["frequency_profiles"] == profiles and len(chunks) == 5,
+          "protocol v9 installs 18 records and profiles")
+    check(tle.parse_info(struct.pack("<BHHB", 9, 18, 0, 18)) == (9, 18, 0, 18) and
+          tle.parse_info(struct.pack("<BHH", 7, 10, 3)) == (7, 10, 3, 10), "INFO with and without profile capacity")
+    for bad in (struct.pack("<BHH", 9, 18, 0), struct.pack("<BHHB", 8, 10, 0, 10), struct.pack("<BHHB", 9, 18, 0, 0)):
+        try:
+            tle.parse_info(bad)
+            check(False, f"malformed INFO rejected: {bad.hex()}")
+        except tle.SatelliteTleError:
+            check(True, f"malformed INFO rejected: {bad.hex()}")
+    old = FakeRadio(capacity=10, protocol_version=7)
+    try:
+        tle.install_records(old, records[:11], ids[:11], profiles[:11])
+        check(False, "a ten-record radio refuses eleven")
+    except tle.SatelliteTleError as exc:
+        check("holds 10" in str(exc) and not any(p[0] == tle.OP_REPLACE_BEGIN for _, p in old.calls),
+              "a ten-record radio refuses eleven before any transfer")
+    small = FakeRadio(capacity=18, profile_max=10)
+    try:
+        tle.install_records(small, records[:11], ids[:11], profiles[:11])
+        check(False, "the radio's profile capacity is checked")
+    except tle.SatelliteTleError as exc:
+        check("keeps 10" in str(exc), "the radio's profile capacity is checked")
+    catalog = sorted(tle.SUPPORTED_PROFILE_IDS)[:17]
+    radio = FakeRadio(capacity=18)
+    check(tle.set_radio_profile_ids(radio, catalog) == catalog, "protocol v9 selects 17 catalog profiles")
+    set_chunks = [payload for _, payload in radio.calls if payload[0] == tle.OP_PROFILE_SET_CHUNK]
+    check([len(payload) for payload in set_chunks] == [64, 12], "the list goes in two requests within 64 bytes")
+    old = FakeRadio(capacity=10, protocol_version=8)
+    try:
+        tle.set_radio_profile_ids(old, catalog)
+        check(False, "a protocol-v8 radio is not sent a list longer than one request")
+    except tle.SatelliteTleError:
+        check(True, "a protocol-v8 radio is not sent a list longer than one request")
+
+
 def main():
     test_tle_validation()
     test_provider_selection()
@@ -551,6 +618,7 @@ def main():
     test_bundle_round_trip()
     test_install_transaction()
     test_protocol_versions()
+    test_eighteen()
     print(f"# satelliteTleTest {'FAILED' if failures else 'PASSED'} ({checks} checks, {failures} failures)")
     return 1 if failures else 0
 

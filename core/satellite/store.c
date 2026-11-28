@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // Persisted satellite TLE inventory (docs/spec/satellite.md 6). Three erase sectors keep the active inventory intact
 // while a transfer is validated and the next complete generation is written.
 #include <string.h>
@@ -16,15 +17,22 @@
 #define SAT_TLE_LINE		69u
 #define SAT_MAX_RECORD_BYTES	(4u + 1u + SAT_MAX_NAME + 2u * SAT_TLE_LINE)
 #define SAT_MAX_DATA		(SAT_MAX_RECORDS * SAT_MAX_RECORD_BYTES)
-#define SAT_HEADER_SIZE		172u
+// The header: magic, version, count, length, generation, CRC, a spare word, the commit marker (24 bytes), then the
+// profile table (a count and up to SATELLITE_PROFILE_MAX 14-byte records), its CRC-32 and padding to a word. Version 5
+// holds 18 profiles; a version-4 bank (10 profiles, 172-byte header) is still read, and the next commit writes v5
 #define SAT_PROFILE_OFFSET	24u
-#define SAT_PROFILE_BYTES	141u
-#define SAT_PROFILE_CRC_OFFSET	165u
+#define SAT_PROFILE_BYTES	(1u + SATELLITE_PROFILE_MAX * 14u)
+#define SAT_PROFILE_CRC_OFFSET	(SAT_PROFILE_OFFSET + SAT_PROFILE_BYTES)
+#define SAT_HEADER_SIZE		((SAT_PROFILE_CRC_OFFSET + 4u + 3u) & ~3u)
+#define SAT_V4_HEADER_SIZE	172u
+#define SAT_V4_PROFILE_MAX	10u
+#define SAT_V4_PROFILE_BYTES	(1u + SAT_V4_PROFILE_MAX * 14u)
+#define SAT_V4_VERSION		4u
 #define SAT_MAGIC		0x31544653u
 #define SAT_COMMIT		0x54494D43u
 #define SAT_PENDING		(SAT_COMMIT | 0x80000000u)
 #define SAT_STAGE_MAGIC		0x31475453u
-#define SAT_VERSION		4u
+#define SAT_VERSION		5u
 #define SAT_ENTRY_ID_MASK	0x7FFFFu	// 19 bits: catalog numbers up to SATELLITE_CATALOG_ID_MAX
 #define SAT_ENTRY_OFFSET_SHIFT	19u
 #define SAT_ENTRY_OFFSET_MASK	0xFFFu
@@ -32,6 +40,10 @@
 #if SATELLITE_CATALOG_ID_MAX > SAT_ENTRY_ID_MASK || SAT_MAX_DATA > (SAT_ENTRY_OFFSET_MASK + 1u)
 #error "Satellite store offsets exceed the compact entry format"
 #endif
+#if SAT_HEADER_SIZE + SAT_MAX_DATA > STORAGE_SECTOR
+#error "A full satellite inventory must fit one erase sector with its header"
+#endif
+#define SAT_IO_BYTES		(SAT_MAX_RECORD_BYTES > SAT_PROFILE_BYTES ? SAT_MAX_RECORD_BYTES : SAT_PROFILE_BYTES)
 typedef struct {
 	uint32_t catalog_offset;
 	uint32_t epoch;
@@ -41,7 +53,7 @@ typedef struct {
 	uint32_t generation;
 	uint32_t crc;
 	uint16_t length;
-	uint8_t header_size;
+	uint16_t header_size;	// SAT_HEADER_SIZE, or SAT_V4_HEADER_SIZE for a bank written by version 4
 	uint8_t count;
 	uint8_t profile_count;
 } sat_bank_t;
@@ -63,7 +75,7 @@ static uint8_t transaction_profile_count;
 static uint8_t transaction_profile_staged_count;
 static sat_entry_t active_entries[SAT_MAX_RECORDS];
 static sat_bank_t current;
-static uint8_t io_buf[SAT_MAX_RECORD_BYTES];
+static uint8_t io_buf[SAT_IO_BYTES];
 
 static bool satellite_store_frequency_profiles_get_locked(uint8_t *count,
 							   satellite_frequency_profile_t profiles[SATELLITE_PROFILE_MAX]);
@@ -392,6 +404,21 @@ static bool write_default_profile_data(const hal_flash_map_t *m, uint8_t bank)
 	return flash_write(bank_addr(m, bank) + SAT_PROFILE_OFFSET, io_buf, SAT_PROFILE_BYTES);
 }
 
+// The profile table's stored size in a bank of this header size
+static uint16_t profile_bytes(uint16_t header_size)
+{
+	return header_size == SAT_V4_HEADER_SIZE ? (uint16_t)SAT_V4_PROFILE_BYTES : (uint16_t)SAT_PROFILE_BYTES;
+}
+
+// Read a bank's profile table into data (SAT_PROFILE_BYTES), zero past a version-4 bank's shorter table, so the
+// records past its count read as unused
+static bool read_profile_data(uint32_t base, uint16_t header_size, uint8_t *data)
+{
+	uint16_t n = profile_bytes(header_size);
+	memset(data + n, 0, SAT_PROFILE_BYTES - n);
+	return flash_read(base + SAT_PROFILE_OFFSET, data, n);
+}
+
 static bool read_record(uint32_t base, uint16_t header_size, uint16_t offset, uint16_t total,
 			uint8_t *buf, uint16_t *length)
 {
@@ -412,13 +439,14 @@ static bool read_record(uint32_t base, uint16_t header_size, uint16_t offset, ui
 
 static bool check_bank(const hal_flash_map_t *m, uint8_t bank, sat_bank_t *info, sat_entry_t *entries, bool *valid)
 {
-	uint8_t h[SAT_HEADER_SIZE];
+	uint8_t h[SAT_PROFILE_OFFSET];
 	uint32_t base = bank_addr(m, bank);
 	*valid = false;
 	if (!flash_read(base, h, sizeof(h))) {
 		return false;
 	}
-	uint8_t header_size = h[4] == SAT_VERSION ? SAT_HEADER_SIZE : 0u;
+	uint16_t header_size = h[4] == SAT_VERSION ? (uint16_t)SAT_HEADER_SIZE :
+			       h[4] == SAT_V4_VERSION ? (uint16_t)SAT_V4_HEADER_SIZE : 0u;
 	if (get32(h) != SAT_MAGIC || header_size == 0u || get32(h + 20u) != SAT_COMMIT) {
 		return true;
 	}
@@ -462,12 +490,15 @@ static bool check_bank(const hal_flash_map_t *m, uint8_t bank, sat_bank_t *info,
 	info->length = length;
 	info->header_size = header_size;
 	info->count = count;
-	if (storage_crc32(0u, h + SAT_PROFILE_OFFSET, SAT_PROFILE_BYTES) != get32(h + SAT_PROFILE_CRC_OFFSET))
+	uint16_t table = profile_bytes(header_size);
+	uint8_t crc_bytes[4];
+	if (!read_profile_data(base, header_size, io_buf) ||
+	    !flash_read(base + SAT_PROFILE_OFFSET + table, crc_bytes, sizeof(crc_bytes)))
+		return false;
+	if (storage_crc32(0u, io_buf, table) != get32(crc_bytes))
 		return true;
-	info->profile_count = h[SAT_PROFILE_OFFSET];
-	if (info->profile_count > SATELLITE_PROFILE_MAX)
-		return true;
-	if (!valid_profile_data(h + SAT_PROFILE_OFFSET))
+	info->profile_count = io_buf[0];
+	if (info->profile_count > (table - 1u) / 14u || !valid_profile_data(io_buf))
 		return true;
 	*valid = true;
 	return true;
@@ -630,7 +661,9 @@ static bool commit_transaction(const hal_flash_map_t *m, int active, const sat_b
 	put32(h + 8, active >= 0 ? old_info->generation + 1u : 1u);
 	put32(h + 12, out_crc);
 	put32(h + 16, 0u);
-	if (!flash_read(bank_addr(m, profile_bank) + SAT_PROFILE_OFFSET, io_buf, SAT_PROFILE_BYTES) ||
+	uint16_t profile_header = active >= 0 && profile_bank == (uint8_t)active ? old_info->header_size :
+				  (uint16_t)SAT_HEADER_SIZE;
+	if (!read_profile_data(bank_addr(m, profile_bank), profile_header, io_buf) ||
 	    !valid_profile_data(io_buf) || io_buf[0] != profile_count) {
 		return false;
 	}
@@ -745,7 +778,7 @@ static bool satellite_store_profiles_get_locked(uint8_t *count, uint32_t ids[SAT
 		memcpy(ids, default_profile_ids, sizeof(default_profile_ids));
 		return true;
 	}
-	if (!flash_read(bank_addr(m, (uint8_t)active) + SAT_PROFILE_OFFSET, io_buf, SAT_PROFILE_BYTES) ||
+	if (!read_profile_data(bank_addr(m, (uint8_t)active), current.header_size, io_buf) ||
 	    !valid_profile_data(io_buf))
 		return false;
 	*count = io_buf[0];
@@ -775,7 +808,7 @@ static bool satellite_store_frequency_profiles_get_locked(uint8_t *count,
 		*count = (uint8_t)(sizeof(default_profile_ids) / sizeof(default_profile_ids[0]));
 		return default_frequency_profiles(profiles);
 	}
-	if (!flash_read(bank_addr(m, (uint8_t)active) + SAT_PROFILE_OFFSET, io_buf, SAT_PROFILE_BYTES))
+	if (!read_profile_data(bank_addr(m, (uint8_t)active), current.header_size, io_buf))
 		return false;
 	return profiles_from_data(io_buf, count, profiles);
 #else
@@ -1319,8 +1352,8 @@ satellite_store_transfer_status_t satellite_store_transfer_profiles_chunk(
 		    !valid_profile_data(io_buf) || !transfer_profile_data_match_records(m, io_buf)) {
 			result = SATELLITE_STORE_TRANSFER_BAD_ARG;
 		} else {
-			uint8_t used = (uint8_t)(1u + (uint16_t)transaction_profile_count * 14u);
-			uint8_t padding = (uint8_t)(SAT_PROFILE_BYTES - used);
+			uint16_t used = (uint16_t)(1u + (uint16_t)transaction_profile_count * 14u);
+			uint16_t padding = (uint16_t)(SAT_PROFILE_BYTES - used);
 			memset(io_buf, 0, padding);
 			if (padding != 0u &&
 			    !flash_write(bank_addr(m, transaction_bank) + SAT_PROFILE_OFFSET + used, io_buf, padding)) {

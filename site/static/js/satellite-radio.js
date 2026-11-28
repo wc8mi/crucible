@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 
 import { CMD } from "./flasher/link.js";
-import { tleEpochMilliseconds } from "./satellite-tle.js";
+import { MAX_SELECTED_PROFILES, tleEpochMilliseconds } from "./satellite-tle.js";
 
 const COMMAND = 0x26;
 const OP = Object.freeze({ INFO: 0, LIST: 1, DATA: 3, COMMIT: 4, ABORT: 5,
@@ -107,10 +108,13 @@ async function checkProfileBands(link, profiles) {
 
 export async function pushSatelliteBundle(link, bundle, onProgress = () => {}) {
 	if (bundle?.schema_version !== 3 || !Array.isArray(bundle.records) || !Array.isArray(bundle.profiles) ||
-	    bundle.records.length < 1 || bundle.records.length > 10 || bundle.profiles.length !== bundle.records.length)
+	    bundle.records.length < 1 || bundle.records.length > MAX_SELECTED_PROFILES || bundle.profiles.length !== bundle.records.length)
 		throw new Error("Invalid satellite bundle");
 	const info = await link.request(COMMAND, new Uint8Array([OP.INFO]));
-	if (info.length !== 5 || info[0] < 5) throw new Error("Radio firmware needs satellite protocol version 5 or newer");
+	// INFO: version, record capacity u16, installed count u16; protocol v9 appends the profile capacity (else 10)
+	if (info.length < 5 || info[0] < 5) throw new Error("Radio firmware needs satellite protocol version 5 or newer");
+	if (info.length !== (info[0] >= 9 ? 6 : 5)) throw new Error("Radio returned malformed satellite capability data");
+	const profileMax = info[0] >= 9 ? info[5] : 10;
 	if (bundle.profiles.length > 4 && info[0] < 6)
 		throw Object.assign(new Error("Radio firmware needs satellite protocol version 6 or newer for more than four profiles"),
 			{ translationKey: "tools.satellite.status.profile_version" });
@@ -119,8 +123,10 @@ export async function pushSatelliteBundle(link, bundle, onProgress = () => {}) {
 	    bundle.profiles.some((profile) => profile.tx_hz === 0)))
 		throw Object.assign(new Error("Radio firmware needs satellite protocol version 8 or newer for these satellites"),
 			{ translationKey: "tools.satellite.status.wide_version" });
-	if (get16(new DataView(info.buffer, info.byteOffset, info.byteLength), 1) < bundle.records.length)
-		throw new Error("The radio cannot store this many satellites");
+	const radioMax = Math.min(profileMax, get16(new DataView(info.buffer, info.byteOffset, info.byteLength), 1));
+	if (radioMax < bundle.records.length)
+		throw Object.assign(new Error(`This radio keeps at most ${radioMax} satellites`),
+			{ translationKey: "tools.satellite.status.radio_limit", translationParams: { n: radioMax } });
 	await checkProfileBands(link, bundle.profiles);
 
 	const data = encodeSatelliteRecords(bundle.records);

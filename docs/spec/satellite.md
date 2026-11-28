@@ -200,7 +200,8 @@ redirects. Catalog browsing is separate from installation: the user selects cata
 never installed wholesale. For ID-based provider requests, the returned ID set must exactly match the selection.
 
 The site Tools page links to a standalone Satellite TLE page. It lists IDs in the curated FM frequency catalog and
-allows up to 10 profiles. Non-FM TLE objects are omitted. The Load
+allows up to 18 profiles; before a push it reads the radio's own limit from `INFO` and refuses a larger selection.
+Non-FM TLE objects are omitted. The Load
 latest TLEs button fetches two lists at once through same-origin site endpoints: the AMSAT daily bulletin
 (`/api/amsat-tle`) and PE0SAT's amateur list, `http://tle.pe0sat.nl/kepler/amateur.txt` (`/api/pe0sat-tle`; PE0SAT serves
 plain HTTP only). It merges them per catalog ID: the lines with the newest epoch win, AMSAT's on a tie, and the name
@@ -229,7 +230,7 @@ and installs only the selected IDs, and `read` queries the radio's installed inv
 sync requires `--id` values.
 
 An offline bundle is UTF-8 JSON with a provider URL, an ISO-8601 UTC `fetched_at`, and a `records` array. Schema v1
-contains records only and remains installable. Schema v2 also contains `profile_ids`, an ordered set of 1-10 IDs from
+contains records only and remains installable. Schema v2 also contains `profile_ids`, an ordered set of 1-18 IDs from
 the firmware's built-in frequency-profile catalog. Schema v3 contains `profile_ids` and a matching `profiles` array
 with `catalog_id`, `rx_hz`, `tx_hz` (0 for listen only), and `tx_tone_tenths`. Each record has `catalog_id` (integer,
 1 to 339999), `name`, `line1`, and
@@ -245,16 +246,18 @@ Every entry is validated before any install begins. Duplicate IDs, malformed ent
 omits or adds an ID reject the complete batch.
 
 Install uses debug-link command `0x26` (`SATELLITE`) and is available only when capability operation `INFO` succeeds.
-Protocol-v7 adds `SYNC_CHANNELS_STATUS=13` to the operations: `INFO=0`, `LIST=1`, `BEGIN=2`, `DATA=3`,
+Protocol v9 adds `PROFILE_SET_CHUNK=14` to the operations: `INFO=0`, `LIST=1`, `BEGIN=2`, `DATA=3`,
 `COMMIT=4`, `ABORT=5`, `SYNC_CHANNELS=6`, `PROFILE_GET=7`, `PROFILE_SET=8`, `REPLACE_BEGIN=9`,
-`PROFILE_STAGE=10`, `PROFILE_VALUES_GET=11`, `PROFILE_STAGE_CHUNK=12`, and `SYNC_CHANNELS_STATUS=13`. `INFO` reports
-protocol version, record capacity (`10`) and installed count as `u8, u16, u16`; it is unavailable when the feature is
+`PROFILE_STAGE=10`, `PROFILE_VALUES_GET=11`, `PROFILE_STAGE_CHUNK=12`, `SYNC_CHANNELS_STATUS=13` and
+`PROFILE_SET_CHUNK=14`. `INFO` reports protocol version, record capacity (`18`), installed count and profile capacity
+(`18`) as `u8, u16, u16, u8`. Protocol v8 and older send the first three fields only and keep 10 profiles; a host
+checks a selection against both capacities before it starts a transfer. `INFO` is unavailable when the feature is
 off or the board has no valid dedicated satellite-data flash area. `LIST` takes a start index `u16` and returns
 a count `u8`, then that many `(catalog ID u32, epoch Unix seconds u32)` pairs. The radio advertises a capacity of
-10 records. `BEGIN` takes record count `u16`,
+18 records. `BEGIN` takes record count `u16`,
 serialized byte count `u16`, and CRC-32 `u32`; it returns a transaction ID `u16`. Records are serialized in ascending
 catalog-ID order as catalog ID `u32`, UTF-8 name length `u8`, name bytes (1-48 bytes), and the two exact 69-byte TLE
-lines. The maximum serialized set is 1,910 bytes. `REPLACE_BEGIN` has the same payload and reply as `BEGIN`; its
+lines. The maximum serialized set is 3,438 bytes. `REPLACE_BEGIN` has the same payload and reply as `BEGIN`; its
 committed records become the complete TLE inventory instead of being merged with the old inventory. `DATA` takes transaction ID `u16`, byte offset `u16`, then up to 59 data bytes; the reply is the next expected
 offset `u16`. `COMMIT` takes transaction ID `u16` and expected CRC-32 `u32`. These requests fit the debug link's
 64-byte request payload limit. `PROFILE_STAGE=10` takes a transaction ID `u16`, profile count `u8`, then up to four
@@ -279,9 +282,12 @@ guessed names.
 `ABORT` takes a transaction ID `u16` and discards an uncommitted batch. Firmware continues to support protocol-v2
 additive TLE transfers for older clients. Schema-v2 replacement bundles require protocol v4. Schema-v3 bundles require protocol v5 and
 stage TLEs and frequency values before one commit; protocol v5 supports up to four selected profiles, while protocol
-v6 and later support the full ten. The host reads both back before reporting success. The standalone
-`profiles` command requires protocol v3 or newer. `PROFILE_GET` returns up to 10 catalog IDs and `PROFILE_SET` accepts
-IDs from the built-in catalog for the legacy profile-only workflow. The PC utility uses replacement for every install
+v6 to v8 support ten and protocol v9 eighteen. The host reads both back before reporting success. The standalone
+`profiles` command requires protocol v3 or newer. `PROFILE_GET` returns up to 18 catalog IDs and `PROFILE_SET` accepts
+up to 15 IDs from the built-in catalog for the legacy profile-only workflow, the most one 64-byte request holds.
+`PROFILE_SET_CHUNK=14` (protocol v9) sends a longer list: total count `u8`, starting index `u8`, chunk count `u8`,
+then up to 15 IDs `u32`. Chunks start at index 0 and follow each other with no gap; a gap is refused and drops the
+partial list. The radio applies the list only with its last chunk, and keeps the old list if the new one is refused. The PC utility uses replacement for every install
 and sync, including schema-v1 bundles, and requires protocol v4 or later. PC TLE synchronization does not invoke
 `SYNC_CHANNELS` and does not create, modify, or remove codeplug zones or channels. The separate `SYNC_CHANNELS`
 operation remains explicit and is not part of PC install. Removing a TLE from the satellite inventory removes it from
@@ -304,8 +310,17 @@ is 67.0 Hz.
 The radio's dedicated `hal_flash_map_t.satellite_*` area is separate from the codeplug and reserved from update
 staging. It uses three
 4 KiB sectors: the active snapshot, the incoming transfer and the next committed snapshot. Each committed snapshot
-contains a versioned header, generation, record count, serialized length and CRC-32. The maximum inventory is 10
-records (1,910 serialized bytes at the 48-byte name limit). Firmware validates serialized lengths, catalog identity,
+contains a versioned header, generation, record count, serialized length and CRC-32. The maximum inventory is 18
+records (3,438 serialized bytes at the 48-byte name limit).
+
+| Snapshot | Header | Profile table | Profiles |
+|---|---|---|---|
+| v5 (written) | 284 bytes | count `u8` and 18 records of 14 bytes at offset 24, CRC-32 after it | 18 |
+| v4 (read only) | 172 bytes | count `u8` and 10 records at offset 24, CRC-32 after it | 10 |
+
+The header size follows from the version: the records start right after the header. Firmware writes v5 only. It
+still reads a v4 snapshot, so an update keeps the installed satellites and profiles; the next commit, a replacement or
+an additive install merged with the v4 records, writes v5. Firmware validates serialized lengths, catalog identity,
 line checksums, epochs, uniqueness and ordering, then validates the merged inventory before writing the next
 generation; its commit marker is programmed last. The PC validates the additional propagator input ranges before
 transfer. At boot the radio selects the newest valid

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 David Behnke
 """Host tests for the satellite TLE catalog and remembered radio inventory. No network or radio."""
 import datetime as dt
 import json
@@ -124,7 +125,8 @@ class SatelliteTleTest(unittest.TestCase):
                 self.assert_satellite_command(command)
                 operation = payload[0]
                 if operation == satellite_tle.OP_INFO:
-                    return 0, struct.pack("<BHH", satellite_tle.SATELLITE_PROTOCOL_VERSION, 8, len(self.rows))
+                    return 0, struct.pack("<BHHB", satellite_tle.SATELLITE_PROTOCOL_VERSION, 8, len(self.rows),
+                                          satellite_tle.MAX_PROFILES)
                 if operation == satellite_tle.OP_LIST:
                     (start,) = struct.unpack("<H", payload[1:])
                     page = self.rows[start:start + 1]
@@ -150,7 +152,8 @@ class SatelliteTleTest(unittest.TestCase):
             calls.append(operation)
             if operation == satellite_tle.OP_INFO:
                 count = 1 if calls.count(satellite_tle.OP_INFO) == 1 else 3
-                return struct.pack("<BHH", satellite_tle.SATELLITE_PROTOCOL_VERSION, 8, count)
+                return struct.pack("<BHHB", satellite_tle.SATELLITE_PROTOCOL_VERSION, 8, count,
+                                   satellite_tle.MAX_PROFILES)
             if operation == satellite_tle.OP_LIST:
                 (start,) = struct.unpack("<H", payload)
                 rows = [old] if calls.count(satellite_tle.OP_INFO) == 1 else [old, (25544, int(record["epoch"].timestamp())), unexpected]
@@ -185,7 +188,7 @@ class SatelliteTleTest(unittest.TestCase):
         def request(_link, operation, _payload=b""):
             calls.append(operation)
             if operation == satellite_tle.OP_INFO:
-                return struct.pack("<BHH", satellite_tle.SATELLITE_PROTOCOL_VERSION, 8, 0)
+                return struct.pack("<BHHB", satellite_tle.SATELLITE_PROTOCOL_VERSION, 8, 0, satellite_tle.MAX_PROFILES)
             raise AssertionError(f"unexpected operation {operation}")
 
         with mock.patch.object(satellite_tle, "_utc_now", return_value=self.now), \

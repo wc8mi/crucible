@@ -16,7 +16,7 @@ python tools/satellite_tle.py catalog --source amsat
 ```
 
 For a browser workflow, open **Tools > Satellite TLE Update** on the RadioFoundry site. Click **Load latest
-TLEs** or browse for a TLE file, then choose up to 10 FM satellites by name. The button reads the AMSAT daily bulletin
+TLEs** or browse for a TLE file, then choose up to 18 FM satellites by name. The button reads the AMSAT daily bulletin
 and PE0SAT's amateur list and keeps the newest TLE for each satellite; each satellite shows its TLE's age and source.
 Non-FM objects are not shown. ISS, SO-50 and AO-91 start selected when present, and the page remembers your choices
 for the next visit. Search does not clear checked selections. The page fetches both lists again before each push or
@@ -55,7 +55,8 @@ Frequency profiles are separate from orbital elements. The daily TLE bulletin co
 the radio's built-in table: the FM voice satellites on AMSAT's live FM page, plus satellites you can only listen to
 (SSTV and telemetry downlinks, or an uplink outside the radio's bands). The page marks those "listen only, no TX".
 Non-FM objects are omitted. TLEs with six-digit catalog numbers (Alpha-5, such as `A1101` for 101101) are read too.
-A profile list has a maximum of 10 entries. A website push replaces the radio's satellite TLE and frequency tables with
+A profile list has a maximum of 18 entries (10 on firmware with satellite protocol 8 or older). The page and the
+PC utility check the radio's limit before they write anything. A website push replaces the radio's satellite TLE and frequency tables with
 the selected satellites, so unselected satellites disappear from the tracking list. The codeplug is left unchanged.
 The PC utility also reads or changes the built-in profile ID list directly:
 
@@ -66,7 +67,7 @@ python tools/satellite_tle.py profiles --id 25544,27607,43017
 
 The PC utility requires protocol v4 or later for replacement. Schema-v3 frequency bundles require protocol v5.
 Protocol v5 supports up to four selected frequency profiles;
-protocol v6 supports the full ten. Listen-only satellites and six-digit catalog numbers require protocol v8: update
+protocol v6 to v8 ten, and protocol v9 eighteen. Listen-only satellites and six-digit catalog numbers require protocol v8: update
 the radio firmware if the page or utility asks for it. Profile-only ID changes require protocol v3 or newer.
 
 ## Enter a TLE on the radio

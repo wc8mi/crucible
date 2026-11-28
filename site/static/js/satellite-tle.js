@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 
 // The firmware's built-in profiles, in its order (core/satellite/frequency.c). txHz 0 is listen only: SSTV and
 // telemetry downlinks, and satellites whose uplink the radio can't use; the radio refuses PTT while tracking one.
@@ -39,7 +40,8 @@ export const DEFAULT_SELECTED_IDS = Object.freeze([25544, 27607, 43017]);
 export const AMSAT_BULLETIN = "https://www.amsat.org/tle/daily-bulletin.txt";
 // PE0SAT's amateur list serves plain HTTP only; the page reads it through PE0SAT_API, over this site's HTTPS
 export const PE0SAT_CATALOG = "http://tle.pe0sat.nl/kepler/amateur.txt";
-export const MAX_SELECTED_PROFILES = 10;
+// The most a protocol-v9 radio keeps; the push checks the connected radio's own limit from INFO
+export const MAX_SELECTED_PROFILES = 18;
 // The same-origin proxies for AMSAT_BULLETIN and PE0SAT_CATALOG (functions/api/*-tle.js). A page served from another
 // path names its own in data-amsat-api and data-pe0sat-api; only a same-origin path is taken, so a page cannot point a
 // button at another site.
