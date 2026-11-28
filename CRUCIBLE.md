@@ -104,8 +104,8 @@ crucible.toml `upstream`, else `origin`) and requires that commit to be an ances
 radio in crucible.toml `[radios]` with every band/power option (`--board` narrows that), runs each image's stack
 check, rejects build warnings, and packages codec-free images with flasher manifests and license notices.
 
-Every image, manifest and ZIP in one batch is named by its version (see [Versions](#versions)): `v0.1.0-beta.3`
-for a test build, `v0.1.0` for a release (`--final`). The ZIP is `crucible-<version>.zip`; its README says the build
+Every image, manifest and ZIP in one batch is named by its version (see [Versions](#versions)), for example
+`v0.1.0`. The ZIP is `crucible-<version>.zip`; its README says the build
 is Crucible's and sends help to Crucible's issues. The version is the release field the radio shows (splash, About,
 the debug link's `release=`); the Git commit, build-source metadata and crash ID keep their normal meaning, and
 `build.json` records the upstream and Crucible commits. The old `kf8sfork` and `kf8sforkysf` branches still build every
@@ -119,24 +119,26 @@ Host tests and firmware checks do not replace listening tests on the radios. No 
 
 ## Versions
 
-Crucible's versions follow [semantic versioning](https://semver.org), starting at 0.1.0. crucible.toml `[release]
-version` is the release the next builds lead to; it changes only by a commit.
+Crucible's versions follow [semantic versioning](https://semver.org), starting at 0.1.0. A version is plain
+`vMAJOR.MINOR.PATCH`: no `-beta` or other suffix. crucible.toml `[release]` holds the next one; it changes only by a
+commit.
 
-| Build | Tag | GitHub | Flasher |
-|---|---|---|---|
-| `tools/kf8s_build.py` | `v0.1.0-beta.N` | pre-release | under "Show test versions"; listed anyway while a radio has no release |
-| `tools/kf8s_build.py --final` | `v0.1.0` | release, marked latest | listed first |
+| Key | What |
+|---|---|
+| `version` | The next release. `tools/kf8s_build.py` names the build `v<version>` and refuses a version already tagged here or on origin. |
+| `prerelease` | `true` marks every release a GitHub pre-release, a test release: the flasher lists it under "Show test builds", and anyway while a radio has no full release. Set it `false` once a build is stable (YSF is still incomplete). |
 
-- N counts build attempts for that version, failed ones included, so a tag is never reused. It is kept in local Git
-  metadata shared by worktrees (`crucible-release-sequence.json` in the common Git directory) and always starts above
-  the highest beta tagged here or on origin.
-- After `v0.1.0` is published, raise `[release] version` before the next build (the wrapper refuses a released one):
-  the patch (0.1.1) for fixes only, the minor (0.2.0) for new features or an upstream merge that adds them. Before
-  1.0.0 a minor may also change settings or codeplugs; say so in the notes.
+- After each release, raise the patch in its own commit (0.1.0 to 0.1.1): the resting value assumes fixes only.
+- The pull request that merges the first new feature since the last release raises the minor in the same commit
+  (0.1.1 to 0.2.0), so `version` always matches what is queued. An upstream merge that adds features counts. 1.0.0 and
+  later majors are for changes that break settings or codeplugs; before 1.0.0 a minor may also change them, so say so
+  in the notes.
+- A failed build reuses its version: remove `build/kf8s/<version>/` and build again. Once a version is tagged it is
+  never rebuilt.
 - Tags are `v` and the version, nothing else: no build metadata (`+...`), because the radio shows the name.
   Upstream's calendar tags (`v26.11`) never look like ours, and `tools/crucible.py tag` checks one.
-- The dated test releases from before 0.1.0 (`crucible-<hash>-<hash>-<yymmdd>-<n>`) were deleted once
-  `v0.1.0-beta.1` was out; their tags stay, so a report from one of those builds still finds its source.
+- Older names stay as tags only, so a report from one of those builds still finds its source: the dated test releases
+  (`crucible-<hash>-<hash>-<yymmdd>-<n>`) and `v0.1.0-beta.1`, rebuilt as `v0.1.0`.
 
 ## Publishing a release
 
@@ -152,9 +154,8 @@ Read and edit the draft first: the flasher shows the notes next to the version. 
 ZIP doesn't match its sidecar, whose commit is not on `origin/main`, or whose release already exists. It makes the
 annotated tag on the commit in `build.json`, pushes the tag, and creates the release in
 [wc8mi/crucible releases](https://github.com/wc8mi/crucible/releases) with the ZIP and its `.zip.sha256` attached: a
-beta as a pre-release, a final version as the latest release. Keep all license notices and the link to the
-[usage guide](docs/kf8sfork/README.md) in the notes. Release `v0.1.0` (`--final`) only once a build is stable; until
-then every build is a beta (YSF is still incomplete). The
+pre-release while `[release] prerelease` was true for the build, else the latest release. Keep all license notices
+and the link to the [usage guide](docs/kf8sfork/README.md) in the notes. Then raise `[release] version`. The
 [Crucible flasher](https://tinker.wc8mi.net/crucible/) lists a release once its site is rebuilt.
 
 ## Flasher page
@@ -181,7 +182,9 @@ The result is `build/crucible-site/`. Copy it to `/crucible/` on the tinker host
 - builds the shared Satellite TLE page at `tools/satellite/index.html` in the same shell. The front page links it, and
   the flasher offers it after an update, so a radio with the satellite feature gets new satellite data without new
   firmware. Its AMSAT button reads the daily bulletin from `../../api/amsat-tle` (`data-amsat-api`), which is
-  `/crucible/api/amsat-tle` on the tinker host: a GET-only proxy in Caddy that sends no visitor headers. The page
+  `/crucible/api/amsat-tle` on the tinker host: a GET-only proxy in Caddy that sends no visitor headers. Its PE0SAT
+  button reads PE0SAT's amateur list the same way, from `../../api/pe0sat-tle` (`data-pe0sat-api`), proxied to
+  `http://tle.pe0sat.nl/kepler/amateur.txt`. PE0SAT serves HTTP only; the proxy gives the page HTTPS. The page
   allows requests to this site only. The satellite frequencies are the page's own table, not a download
 - fails the build if a page links to a local file that is not there
 
