@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 David Behnke
 """Gather, validate, bundle, and install selected satellite TLEs (docs/spec/satellite.md 6)."""
 import argparse
 import datetime as dt
@@ -28,7 +29,9 @@ SCHEMA_VERSION = 3
 SUPPORTED_SCHEMA_VERSIONS = (1, 2, 3)
 PROFILE_VALUES_PROTOCOL_VERSION = 5
 PROFILE_CHUNK_PROTOCOL_VERSION = 6
-SATELLITE_PROTOCOL_VERSION = 7
+PROFILE_SET_CHUNK_PROTOCOL_VERSION = 8
+SATELLITE_PROTOCOL_VERSION = 8
+SUPPORTED_PROTOCOL_VERSIONS = (2, 3, 4, 5, 6, 7, 8)
 REPLACE_PROTOCOL_MIN_VERSION = 4
 PROFILE_PROTOCOL_MIN_VERSION = 3
 LEGACY_SATELLITE_PROTOCOL_VERSION = 2
@@ -37,6 +40,7 @@ OP_INFO, OP_LIST, OP_BEGIN, OP_DATA, OP_COMMIT, OP_ABORT, OP_SYNC_CHANNELS = ran
 OP_PROFILE_GET, OP_PROFILE_SET = 7, 8
 OP_REPLACE_BEGIN = 9
 OP_PROFILE_STAGE, OP_PROFILE_VALUES_GET, OP_PROFILE_STAGE_CHUNK = 10, 11, 12
+OP_SYNC_CHANNELS_STATUS, OP_PROFILE_SET_CHUNK = 13, 14
 DEFAULT_PROFILE_IDS = (25544, 27607, 43017)
 PROFILE_FREQUENCIES = {
     25544: (437800000, 145990000), 27607: (436795000, 145850000),
@@ -50,7 +54,11 @@ PROFILE_FREQUENCIES = {
     67291: (436950000, 145920000),
 }
 SUPPORTED_PROFILE_IDS = frozenset(PROFILE_FREQUENCIES)
-MAX_PROFILES = 10
+# The most frequency profiles (and TLE records) a bundle may hold: what a protocol-v8 radio keeps. A radio reports its
+# own maximum in INFO (v8); older ones keep LEGACY_MAX_PROFILES
+MAX_PROFILES = 18
+LEGACY_MAX_PROFILES = 10
+PROFILE_SET_IDS_MAX = 15        # catalog IDs in one PROFILE_SET or PROFILE_SET_CHUNK request (64-byte payload)
 MAX_NAME_BYTES = 48
 MAX_BUNDLE_BYTES = 1_000_000
 MAX_TLE_RESPONSE_BYTES = 1_000_000
@@ -450,16 +458,28 @@ def remember_inventory(path, key, entries, records=()):
     return saved
 
 
-def radio_inventory(link):
-    info = _request(link, OP_INFO)
-    if len(info) != 5:
+def parse_info(info):
+    """INFO's reply: (protocol version, record capacity, installed count, profile capacity). Protocol v8 appends the
+    profile capacity; an older radio keeps LEGACY_MAX_PROFILES."""
+    if len(info) == 5:
+        version, capacity, installed_count = struct.unpack("<BHH", info)
+        profile_max = LEGACY_MAX_PROFILES
+        if version >= PROFILE_SET_CHUNK_PROTOCOL_VERSION:
+            raise SatelliteTleError("radio returned malformed satellite capability data")
+    elif len(info) == 6:
+        version, capacity, installed_count, profile_max = struct.unpack("<BHHB", info)
+        if version < PROFILE_SET_CHUNK_PROTOCOL_VERSION:
+            raise SatelliteTleError("radio returned malformed satellite capability data")
+    else:
         raise SatelliteTleError("radio returned malformed satellite capability data")
-    version, capacity, installed_count = struct.unpack("<BHH", info)
-    if version not in (LEGACY_SATELLITE_PROTOCOL_VERSION, PROFILE_PROTOCOL_MIN_VERSION,
-                       REPLACE_PROTOCOL_MIN_VERSION, PROFILE_VALUES_PROTOCOL_VERSION,
-                       PROFILE_CHUNK_PROTOCOL_VERSION, SATELLITE_PROTOCOL_VERSION) or \
-            capacity == 0 or installed_count > capacity:
+    if version not in SUPPORTED_PROTOCOL_VERSIONS or capacity == 0 or installed_count > capacity or \
+            profile_max == 0:
         raise SatelliteTleError("radio satellite capability is unsupported or invalid")
+    return version, capacity, installed_count, profile_max
+
+
+def radio_inventory(link):
+    _, capacity, installed_count, _ = parse_info(_request(link, OP_INFO))
     entries = list_installed(link, capacity, installed_count)
     if len(entries) != installed_count or len({row[0] for row in entries}) != installed_count:
         raise SatelliteTleError("radio satellite inventory does not match its capability report")
@@ -598,10 +618,7 @@ def _request(link, operation, payload=b""):
 
 def radio_profile_ids(link, protocol_version=None):
     if protocol_version is None:
-        info = _request(link, OP_INFO)
-        if len(info) != 5:
-            raise SatelliteTleError("radio returned malformed satellite capability data")
-        protocol_version = struct.unpack("<BHH", info)[0]
+        protocol_version = parse_info(_request(link, OP_INFO))[0]
     if protocol_version < PROFILE_PROTOCOL_MIN_VERSION:
         raise SatelliteTleError("radio profile updates require satellite protocol version 3 or newer")
     reply = _request(link, OP_PROFILE_GET)
@@ -614,15 +631,21 @@ def radio_profile_ids(link, protocol_version=None):
 def set_radio_profile_ids(link, profile_ids, protocol_version=None):
     profile_ids = validate_profile_ids(profile_ids)
     if protocol_version is None:
-        info = _request(link, OP_INFO)
-        if len(info) != 5:
-            raise SatelliteTleError("radio returned malformed satellite capability data")
-        protocol_version = struct.unpack("<BHH", info)[0]
+        protocol_version = parse_info(_request(link, OP_INFO))[0]
     if protocol_version < PROFILE_PROTOCOL_MIN_VERSION:
         raise SatelliteTleError("radio profile updates require satellite protocol version 3 or newer")
-    payload = bytes([len(profile_ids)]) + struct.pack(f"<{len(profile_ids)}I", *profile_ids)
-    if _request(link, OP_PROFILE_SET, payload):
-        raise SatelliteTleError("radio returned unexpected data after profile update")
+    if len(profile_ids) <= PROFILE_SET_IDS_MAX:
+        payload = bytes([len(profile_ids)]) + struct.pack(f"<{len(profile_ids)}I", *profile_ids)
+        if _request(link, OP_PROFILE_SET, payload):
+            raise SatelliteTleError("radio returned unexpected data after profile update")
+    else:
+        if protocol_version < PROFILE_SET_CHUNK_PROTOCOL_VERSION:
+            raise SatelliteTleError(f"more than {PROFILE_SET_IDS_MAX} profiles require satellite protocol version 8")
+        for start in range(0, len(profile_ids), PROFILE_SET_IDS_MAX):
+            chunk = profile_ids[start:start + PROFILE_SET_IDS_MAX]
+            payload = bytes([len(profile_ids), start, len(chunk)]) + struct.pack(f"<{len(chunk)}I", *chunk)
+            if _request(link, OP_PROFILE_SET_CHUNK, payload):
+                raise SatelliteTleError("radio returned unexpected data after profile update")
     actual = radio_profile_ids(link, protocol_version)
     if actual != profile_ids:
         raise SatelliteTleError("radio frequency profile list did not match the requested selection")
@@ -715,20 +738,19 @@ def install_records(link, records, profile_ids=None, profiles=None):
         if exc.status in (1, 4):
             raise SatelliteTleError("radio does not advertise satellite-data support; no raw flash fallback is used") from exc
         raise
-    if len(info) != 5:
-        raise SatelliteTleError("radio returned malformed satellite capability data")
-    version, capacity, installed_count = struct.unpack("<BHH", info)
-    if version not in (LEGACY_SATELLITE_PROTOCOL_VERSION, PROFILE_PROTOCOL_MIN_VERSION,
-                       REPLACE_PROTOCOL_MIN_VERSION, PROFILE_VALUES_PROTOCOL_VERSION,
-                       PROFILE_CHUNK_PROTOCOL_VERSION, SATELLITE_PROTOCOL_VERSION) or \
-            capacity == 0 or installed_count > capacity:
-        raise SatelliteTleError("radio satellite capability is unsupported or invalid")
+    version, capacity, installed_count, profile_max = parse_info(info)
     if version < REPLACE_PROTOCOL_MIN_VERSION:
         raise SatelliteTleError("replacing the selected TLE set requires satellite protocol version 4")
     if full_profiles is not None and version < PROFILE_VALUES_PROTOCOL_VERSION:
         raise SatelliteTleError("frequency-valued bundles require satellite protocol version 5")
     if full_profiles is not None and len(full_profiles) > 4 and version < PROFILE_CHUNK_PROTOCOL_VERSION:
         raise SatelliteTleError("more than four frequency profiles require satellite protocol version 6")
+    if len(validated) > capacity:
+        raise SatelliteTleError(f"this radio holds {capacity} satellites; {len(validated)} are selected")
+    selected_count = len(full_profiles) if full_profiles is not None else \
+        len(selected_ids) if selected_ids is not None else 0
+    if selected_count > profile_max:
+        raise SatelliteTleError(f"this radio keeps {profile_max} frequency profiles; {selected_count} are selected")
     if full_profiles is not None:
         _check_radio_profile_bands(link, full_profiles)
     elif selected_ids is not None:
@@ -871,7 +893,7 @@ def main(argv=None):
 
     profiles = commands.add_parser("profiles", help="read or update built-in satellite frequency profiles")
     profiles.add_argument("--id", dest="profile_ids", action="append",
-                          help="profile ID to select; repeat or comma-separate (up to 10)")
+                          help=f"profile ID to select; repeat or comma-separate (up to {MAX_PROFILES})")
     profiles.add_argument("--yes", action="store_true", help="confirm profile changes without a prompt")
 
     catalog = commands.add_parser("catalog", help="browse the current AMSAT or ARISS catalog")
@@ -935,12 +957,11 @@ def main(argv=None):
 
         if args.command == "profiles":
             with DebugLink(args.port, args.timeout) as link:
-                info = _request(link, OP_INFO)
-                if len(info) != 5:
-                    raise SatelliteTleError("radio returned malformed satellite capability data")
-                version = struct.unpack("<BHH", info)[0]
+                version, _, _, profile_max = parse_info(_request(link, OP_INFO))
                 if args.profile_ids:
                     selected = parse_profile_ids(args.profile_ids)
+                    if len(selected) > profile_max:
+                        raise SatelliteTleError(f"this radio keeps {profile_max} frequency profiles")
                     _confirm_install(args.yes)
                     actual = set_radio_profile_ids(link, selected, version)
                 else:
@@ -952,7 +973,7 @@ def main(argv=None):
                      63238: "TEVEL2-7", 63239: "TEVEL2-8", 67291: "RS95S"}
             for catalog_id in actual:
                 print(f"{names[catalog_id]} ({catalog_id})")
-            print(f"frequency profiles: {len(actual)}/{MAX_PROFILES}; read-back verified")
+            print(f"frequency profiles: {len(actual)}/{profile_max}; read-back verified")
             return 0
 
         bundle = load_bundle(args.bundle)
