@@ -1,5 +1,6 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 The RadioFoundry Authors -->
+<!-- Copyright (c) 2026 David Behnke -->
 
 # Channels, Zones and the VFO
 
@@ -455,6 +456,10 @@ and room nodes hear it as they hear a commercial portable.
   Up/Down, **OK** sets it for receive and transmit (00 hears every DG-ID). In the VFO it stays until the radio is
   switched off; on a stored channel it lasts until you change channel. To keep a channel's DG-ID, set it in the
   channel editor.
+- **Voice mode** and **Deviation**: **Settings > Talk & listen > YSF**. The voice mode is what PTT sends: DN (the
+  default), VW where the radio has it, or V/D mode 1. Deviation is Wide (the default) or Narrow; use Narrow only where
+  the repeater or the other radios are set to it. Both are kept when the radio is switched off, and apply to the VFO and
+  to channels in YSF for now. A stored YSF channel keeps its own.
 
 Not in this first version: VW (full-rate voice, which the radio's voice chip doesn't run), Group Monitor, sending
 your position, and a repeater's news (voice messages, pictures). They are planned for later.
@@ -467,6 +472,8 @@ channel: press **OK** on its Mode until it says YSF, set the DG-ID, and save. A 
 
 - **DG-ID** (0-99) is in the channel's settings: the radio sends it and hears only calls with it. 00 sends 0 and hears
   every DG-ID. (The codeplug can hold different DG-IDs for sending and hearing; the Codeplug Editor sets them apart.)
+- **Deviation** (Wide or Narrow) and **Voice mode** (DN, VW where the radio has it, V/D mode 1) are under the DG-ID:
+  **OK** steps each. A new YSF channel starts DN Wide. A channel set to VW on a radio without VW shows VW and sends DN.
 - A YSF channel has no TX contact and no Own ID: YSF names you by your callsign and radio ID.
 - **OK** on Mode steps on to FM, then back round to YSF with its settings as they were. Saving the channel as another
   mode removes its YSF settings: the radio asks first.
