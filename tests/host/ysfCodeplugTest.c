@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // YSF in the codeplug (core/ysf/ysf_codeplug.c, docs/spec/ysf-codeplug.md) on a simulated NOR flash: the
 // shared vectors (tests/vectors/channel-modes.txt, also read by the Codeplug Editor's tests), a channel's DG-IDs from
 // its tag, the radio-wide record (the callsign; never a radio ID), and a channel written from the radio
@@ -60,6 +61,12 @@ static int unhex(const char *s, uint8_t *out, int max)
 
 static uint32_t h(const char *s) { return (uint32_t)strtoul(s, NULL, 16); }
 
+// A vector's voice word (DN, VW, VD1) as ysf_cp_voice_t
+static uint8_t voice(const char *s)
+{
+	return strcmp(s, "VW") == 0 ? YSF_CP_VOICE_VW : strcmp(s, "VD1") == 0 ? YSF_CP_VOICE_VD1 : YSF_CP_VOICE_DN;
+}
+
 static void test_vectors(void)
 {
 	FILE *f = fopen("../vectors/channel-modes.txt", "r");
@@ -82,12 +89,13 @@ static void test_vectors(void)
 		if (strcmp(w[0], "ysfchan") == 0) {
 			ysf_chan_t c;
 			ysf_chan_decode(b, unhex(w[1], b, sizeof b), &c);
-			CHECK(c.tx_dgid == h(w[2]) && c.rx_dgid == h(w[3]));
+			CHECK(c.tx_dgid == h(w[2]) && c.rx_dgid == h(w[3]) && c.voice == voice(w[4]) && c.narrow == (w[5][0] == '1'));
 		} else if (strcmp(w[0], "ysfenc") == 0) {
-			ysf_chan_t c = { (uint8_t)h(w[1]), (uint8_t)h(w[2]) };
+			ysf_chan_t c = { .tx_dgid = (uint8_t)h(w[1]), .rx_dgid = (uint8_t)h(w[2]), .voice = voice(w[3]),
+					 .narrow = w[4][0] == '1' };
 			uint8_t e[YSF_CP_CHAN_LEN];
 			ysf_chan_encode(&c, e);
-			CHECK(unhex(w[3], b, sizeof b) == YSF_CP_CHAN_LEN && memcmp(e, b, YSF_CP_CHAN_LEN) == 0);
+			CHECK(unhex(w[5], b, sizeof b) == YSF_CP_CHAN_LEN && memcmp(e, b, YSF_CP_CHAN_LEN) == 0);
 		} else if (strcmp(w[0], "ysfcall") == 0) {
 			ysf_radio_t r;
 			int len = unhex(w[1], b, sizeof b);
@@ -205,6 +213,24 @@ static void test_save(void)
 	yc.tx_dgid = yc.rx_dgid = 42;
 	CHECK(ysf_chan_save(20, &r, &yc) && codeplug_channel(20, &r) && ysf_chan_load(20, &r, &back) && back.tx_dgid == 42 &&
 	      back.rx_dgid == 42);
+	// Byte 2: the voice mode and deviation are saved and read back; a DG-ID change keeps them
+	yc.voice = YSF_CP_VOICE_VW;
+	yc.narrow = true;
+	CHECK(ysf_chan_save(20, &r, &yc) && codeplug_channel(20, &r) && ysf_chan_load(20, &r, &back) &&
+	      back.voice == YSF_CP_VOICE_VW && back.narrow);
+	back.tx_dgid = 7;
+	CHECK(ysf_chan_save(20, &r, &back) && codeplug_channel(20, &r) && ysf_chan_load(20, &r, &back) && back.tx_dgid == 7 &&
+	      back.voice == YSF_CP_VOICE_VW && back.narrow);
+	// A channel an older firmware wrote (two bytes) is DN Wide
+	{
+		uint8_t old[2] = { 3, 4 };
+		codeplug_tag_t t = { .kind = CODEPLUG_KIND_YSF, .system = CODEPLUG_SYSTEM_NONE, .flags = CODEPLUG_TAG_TX };
+
+		codeplug_tag_remove(20);
+		CHECK(codeplug_channel(20, &r) && codeplug_tag_write(20, r.name, &t, old, sizeof old) && codeplug_channel(20, &r));
+		CHECK(ysf_chan_load(20, &r, &back) && back.tx_dgid == 3 && back.rx_dgid == 4 && back.voice == YSF_CP_VOICE_DN &&
+		      !back.narrow);
+	}
 }
 
 int main(void)
