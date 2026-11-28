@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // YSF (core/ysf): the frame's channels against reference frames from another implementation of the
 // format, the FEC under bit errors and soft values, the transmit builder through the framer into the call layer, and
 // two engines on two made-up providers whose transmit queues feed each other's receivers: a call heard with its
@@ -10,6 +11,7 @@
 
 #include "ysf/ysf_engine.h"
 #include "ysf/ysf_id.h"
+#include "ysf/ysf_vw.h"
 #include "dmr/ambe/ambeFec.h"
 #include "air/air_syms.h"
 #include "fec/crc16.h"
@@ -851,11 +853,146 @@ static void testRooms(void)
 	      "a list from another node: '%s' name '%s' connected %d", wx_got.node_call, wx_got.node_name, wx_got.connected);
 }
 
+// ── VW and V/D mode 1 (ysf.md 3.5) ──
+// Against MMDVMHost's fields (tests/vectors/ysf-vw-vd1.txt): each "out" is what its decoder and encoder make of "in",
+// so ours must make the same of it, and read "out" back with nothing to correct
+static void testVwVd1Vectors(void)
+{
+	FILE *f = fopen("../vectors/ysf-vw-vd1.txt", "r");
+	char line[256], kind[8], a[96], b[96];
+	unsigned n_vw = 0, n_vd1 = 0, n_sub = 0, e;
+
+	CHECK(f != NULL, "the VW and V/D mode 1 vectors open");
+	if (!f)
+		return;
+	while (fgets(line, sizeof line, f)) {
+		uint8_t in[YSF_VW_VCH_BYTES], out[YSF_VW_VCH_BYTES], got[YSF_VW_VCH_BYTES], imbe[YSF_VW_BYTES];
+
+		if (line[0] == '#' || sscanf(line, "%7s %95s %95s", kind, a, b) < 3)
+			continue;
+		if (!strcmp(kind, "vw") && sscanf(line, "%*s %*s %*s %u", &e) == 1) {
+			uint8_t errs;
+
+			hex(a, in, sizeof in);
+			hex(b, out, sizeof out);
+			errs = ysf_vw_decode(in, imbe);
+			ysf_vw_encode(imbe, got);
+			CHECK(!memcmp(got, out, sizeof got), "vw vector %u: corrected as MMDVMHost", n_vw);
+			CHECK(e > 3 || (errs & 15) == e, "vw vector %u: %u bits corrected, MMDVMHost %u", n_vw, errs & 15, e);
+			CHECK(ysf_vw_decode(out, imbe) == 0, "vw vector %u: MMDVMHost's field reads clean", n_vw);
+			n_vw++;
+		} else if (!strcmp(kind, "vd1") && sscanf(line, "%*s %*s %*s %u", &e) == 1) {
+			uint8_t bits[AMBE_PARAM_BITS];
+
+			hex(a, in, AMBE_FRAME_BYTES);
+			hex(b, out, AMBE_FRAME_BYTES);
+			ambeFecDecode(in, bits, NULL);
+			ambeFecEncode(bits, got);
+			CHECK(!memcmp(got, out, AMBE_FRAME_BYTES), "vd1 vector %u: corrected as MMDVMHost", n_vd1);
+			n_vd1++;
+		} else if (!strcmp(kind, "vwsub")) {
+			uint8_t frame[YSF_FRAME_BYTES], content[YSF_CSD_BYTES], air[45], back[YSF_CSD_BYTES];
+			ysf_fec_work_t w;
+
+			hex(a, content, sizeof content);
+			hex(b, air, sizeof air);
+			memset(frame, 0xA5, sizeof frame);
+			ysf_vw_dch_put(frame, content);
+			CHECK(!memcmp(frame + YSF_BLOCK_SYM(0) / 4, air, sizeof air), "vw sub-header %u: DCH as MMDVMHost", n_sub);
+			CHECK(frame[YSF_BLOCK_SYM(0) / 4 + 45] == 0 && frame[YSF_BLOCK_SYM(0) / 4 + 53] == 0, "vw sub-header %u: the gap is zero", n_sub);
+			CHECK(ysf_vw_dch_get(frame, NULL, &w, back) == 0 && !memcmp(back, content, sizeof back), "vw sub-header %u read back", n_sub);
+			n_sub++;
+		}
+	}
+	fclose(f);
+	CHECK(n_vw == 48 && n_vd1 == 32 && n_sub == 3, "vectors read: vw %u, vd1 %u, vwsub %u", n_vw, n_vd1, n_sub);
+}
+
+// The channels in a frame: where each sits (MMDVMHost's byte offsets: block n at payload byte 18 n, a V/D mode 1 VCH 9
+// bytes into it), that they leave each other alone, and the DCH under bit errors
+static void testVwVd1Frames(void)
+{
+	uint8_t frame[YSF_FRAME_BYTES], v[YSF_VCH_PER_FRAME][AMBE_FRAME_BYTES], got[AMBE_FRAME_BYTES], back[YSF_CSD_BYTES];
+	uint8_t imbe[YSF_VCH_PER_FRAME][YSF_VW_BYTES], ib[YSF_VW_BYTES], field[YSF_VW_VCH_BYTES];
+	const uint8_t *payload = frame + YSF_BLOCK_SYM(0) / 4;
+	static const uint8_t dch[YSF_CSD_BYTES] = { 'K', 'F', '8', 'S', ' ', ' ', ' ', ' ', ' ', ' ', 'A', 'L', 'L', ' ', ' ', ' ', ' ', ' ', ' ', ' ' };
+	ysf_fec_work_t w;
+	unsigned ok = 0;
+
+	for (uint8_t n = 0; n < YSF_VCH_PER_FRAME; n++) {
+		uint8_t bits[AMBE_PARAM_BITS];
+
+		for (uint8_t i = 0; i < AMBE_PARAM_BITS; i++)
+			bits[i] = (uint8_t)(rng() & 1);
+		ambeFecEncode(bits, v[n]);
+		for (uint8_t i = 0; i < YSF_VW_BYTES; i++)
+			imbe[n][i] = (uint8_t)rng();
+		imbe[n][YSF_VW_BYTES - 1] &= 0xFE;	// 88 bits: the last byte's low bit is not sent
+	}
+
+	// V/D mode 1
+	memset(frame, 0, sizeof frame);
+	ysf_vd1_dch_put(frame, dch);
+	for (uint8_t n = 0; n < YSF_VCH_PER_FRAME; n++)
+		ysf_vd1_vch_put(frame, n, v[n]);
+	for (uint8_t n = 0; n < YSF_VCH_PER_FRAME; n++) {
+		ysf_vd1_vch_get(frame, n, got);
+		CHECK(!memcmp(got, v[n], sizeof got) && !memcmp(payload + 18 * n + 9, v[n], sizeof got), "vd1 VCH %u in place", n);
+	}
+	CHECK(ysf_vd1_dch_get(frame, NULL, &w, back) == 0 && !memcmp(back, dch, sizeof back), "vd1 DCH read back");
+	for (unsigned t = 0; t < 200; t++) {
+		uint8_t g[YSF_FRAME_BYTES];
+
+		memcpy(g, frame, sizeof g);
+		for (uint8_t k = 0; k < 4; k++) {
+			uint8_t n = (uint8_t)(rng() % YSF_BLOCKS);
+
+			flip(g, (uint16_t)(2 * YSF_BLOCK_SYM(n)), (uint16_t)(2 * YSF_BLOCK_SYM(n) + 72), 1);
+		}
+		ok += ysf_vd1_dch_get(g, NULL, &w, back) > 0 && !memcmp(back, dch, sizeof back);
+	}
+	CHECK(ok >= 195, "vd1 DCH with 4 bit errors: %u of 200", ok);
+
+	// VW: five VCH, then a sub-header's DCH with VCH 3 and 4
+	memset(frame, 0, sizeof frame);
+	for (uint8_t n = 0; n < YSF_VCH_PER_FRAME; n++)
+		ysf_vw_put(frame, n, imbe[n]);
+	for (uint8_t n = 0; n < YSF_VCH_PER_FRAME; n++) {
+		ysf_vw_encode(imbe[n], field);
+		CHECK(ysf_vw_get(frame, n, ib) == 0 && !memcmp(ib, imbe[n], sizeof ib) &&
+		      !memcmp(payload + 18 * n, field, sizeof field), "vw VCH %u in place", n);
+	}
+	memset(frame, 0xFF, sizeof frame);
+	ysf_vw_dch_put(frame, dch);
+	for (uint8_t n = YSF_VW_SUB_VCH; n < YSF_VCH_PER_FRAME; n++)
+		ysf_vw_put(frame, n, imbe[n]);
+	CHECK(ysf_vw_dch_get(frame, NULL, &w, back) == 0 && !memcmp(back, dch, sizeof back), "vw sub-header DCH beside its VCH");
+	for (uint8_t n = YSF_VW_SUB_VCH; n < YSF_VCH_PER_FRAME; n++)
+		CHECK(ysf_vw_get(frame, n, ib) == 0 && !memcmp(ib, imbe[n], sizeof ib), "vw sub-header VCH %u", n);
+
+	// A VW VCH corrects up to three bits in each Golay word and one in each Hamming word; the last seven bits are bare
+	ok = 0;
+	for (unsigned t = 0; t < 300; t++) {
+		uint8_t g[YSF_FRAME_BYTES], e;
+
+		memcpy(g, frame, sizeof g);
+		ysf_vw_encode(imbe[4], field);
+		// Air bit 0 is c0's first bit; air bits 12-15 are in c0, c1, c2 and c3 (vw_interleave): two words hit
+		g[YSF_BLOCK_SYM(4) / 4] ^= 0x80;
+		g[YSF_BLOCK_SYM(4) / 4 + 1] ^= (uint8_t)(0x01 << (rng() % 4));
+		e = ysf_vw_get(g, 4, ib);
+		ok += !memcmp(ib, imbe[4], sizeof ib) && (e & 15) == 2;
+	}
+	CHECK(ok == 300, "vw VCH with two bit errors: %u of 300", ok);
+}
+
 int main(void)
 {
 	testRid();
 	testReference();
 	testFec();
+	testVwVd1Vectors();
+	testVwVd1Frames();
 	testCallThroughFramer();
 	testEngines();
 	testRooms();

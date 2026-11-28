@@ -1,5 +1,6 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 The RadioFoundry Authors -->
+<!-- Copyright (c) 2026 David Behnke -->
 
 # YSF (C4FM)
 
@@ -132,6 +133,33 @@ protection around them differs.
 Received, each of the 27 repeated bits is the sign of the sum of its three copies' soft values (the whitening
 undone by turning a copy's sign); bits 27-48 have no protection. The 49 bits then go to the DMR side's voice path in
 its 72-bit frame (`ambeFecEncode`), which carries them without loss either way.
+
+### 3.5 V/D mode 1 and VW channels
+
+Channel codecs only so far: calls in these data types are not yet played or sent (8). Their layout per payload block
+(72 symbols, 144 bits; block n starts at payload bit 144 n):
+
+| Data type | Block layout |
+|---|---|
+| V/D mode 1 (DT 0) | DCH, 36 symbols, then VCH, 36 symbols |
+| VW (DT 3) | VCH, all 72 symbols |
+| VW sub-header (DT 3, FN 0, FT 1) | DCH in payload symbols 0-179 without gaps, symbols 180-215 zero, VCH in blocks 3 and 4 |
+
+**V/D mode 1 DCH.** 20 bytes, coded as a header's CSD1 (3.2: whitened, CRC, K = 5, 9 columns) and in the same place.
+FN 0 carries destination and source, FN 1 downlink and uplink, FN 2 remarks.
+
+**V/D mode 1 VCH.** The DMR side's 72-bit AMBE+2 frame as it is: the same code words and interleave, no whitening.
+`ambeFecDecode` reads it.
+
+**VW sub-header DCH.** 20 bytes (CSD3), coded as CSD1 but its 180 coded dibits run through the payload in order, not
+36 to a block.
+
+**VW VCH.** One 20 ms IMBE frame, 88 bits, in the P25 voice code words (`core/fec/imbe88.h`): u0-u3 Golay(23,12),
+u4-u6 Hamming(15,11), u7 raw, c1-c6 scrambled by masks from u0. The 144 code word bits go on air through VW's own
+interleave (`core/ysf/ysf_vw.c`), not P25's.
+
+Checked against vectors made with MMDVMHost's YSF code (`tests/vectors/ysf-vw-vd1.txt`). MMDVMHost's `regenerateIMBE`
+clears the first bit of c1-c4 before decoding them, so the vectors hold only fields the codes can correct.
 
 ## 4. A DN call
 

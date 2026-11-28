@@ -12,6 +12,7 @@ docs/spec/* a radio's own pages cite the radio a fact was compared with; to link
 docs/ux/* the UX research and wireframes name the radio each screen size was drawn for
 docs/testing/* test plans and bring-up pages compare with the radio a case was first run on
 crucible.toml Crucible's one list of the radios it ships (CRUCIBLE.md rule 4)
+CREDITS.md the credits name each project as it names itself (a fork may carry a radio in its name)
 README.zh.md the Chinese front page lists Crucible's radios (crucible.toml)
 boot/README.md the first-stage index describes the one board with a first stage (to generate from boot/<id>/)
 stub/README.md the stub guide's per-radio entry steps (to move into each radio's hardware page)

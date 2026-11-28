@@ -9,3 +9,11 @@ CONFIG_DMR_TRUNK ?= n
 CONFIG_P25_TRUNK ?= n
 # ... and out of the maximal configuration, which CI builds with every switch on that the board supports
 MAXIMAL_SKIP += DMR_TRUNK P25_TRUNK
+
+# Not shipped either, to leave flash for YSF VW and M17 (flash saved, an ARM radio's default build): the MMDVM hotspot
+# with split duplex (32 KB), the single frequency repeater, standalone and the hotspot's mode (10 KB), and zone sharing
+# over DMR data (15 KB). CONFIG_<switch>=y on the command line builds one back
+CONFIG_HOTSPOT ?= n
+CONFIG_SFR ?= n
+CONFIG_ZONE_SHARE ?= n
+MAXIMAL_SKIP += HOTSPOT SFR ZONE_SHARE

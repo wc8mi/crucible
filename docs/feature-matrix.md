@@ -105,9 +105,9 @@ is `tools/bringup.py list --radio <id>`.
 | `dmr_lrrp` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | off |
 | `dmr_udp_compress` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | partial, needs re-run |
 | `dmr_confirmed` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass | partial |
-| `sfr` | not recorded | pass (seed) | pass (seed) | not recorded | ✕ | not recorded | ✕ | partial |
-| `sfr_dualpath_rx` | not recorded | not recorded | not recorded | not recorded | ✕ | not recorded | not recorded | not recorded |
-| `sfr_cwid` | not recorded | not recorded | not recorded | not recorded | ✕ | not recorded | pass, needs re-run | pass, needs re-run |
+| `sfr` | off | off | off | off | ✕ | off | ✕ | off |
+| `sfr_dualpath_rx` | off | off | off | off | ✕ | off | off | off |
+| `sfr_cwid` | off | off | off | off | ✕ | off | off | off |
 | `aprs` | pass (seed) | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | partial, needs re-run |
 | `aprs_afsk` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | partial, needs re-run |
 | `aprs_dmr` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | partial, needs re-run |
@@ -117,8 +117,8 @@ is `tools/bringup.py list --radio <id>`.
 | `gps_sky` | not recorded | not recorded | ✕ | not recorded | not recorded | not recorded | not recorded | ✕ |
 | `usb` | ✕ | pass (seed) | ✕ | ✕ | not recorded | not recorded | not recorded | ✕ |
 | `hostlink` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded |
-| `hotspot` | pass (seed) | pass (seed) | pass (seed) | pass (seed) | not recorded | not recorded | pass, needs re-run | off |
-| `split_duplex` | pass (seed) | pass (seed) | pass (seed) | not written | not written | not recorded | partial, needs re-run | not written |
+| `hotspot` | off | off | off | off | off | off | off | off |
+| `split_duplex` | off | off | off | not written | not written | off | off | not written |
 | `debuglink` | pass (seed) | pass (seed) | pass (seed) | pass (seed) | pass (seed) | not recorded | pass, needs re-run | partial, needs re-run |
 | `task_stacks` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass | pass |
 | `cps_openfw` | not recorded | pass (seed) | not recorded | pass (seed) | pass (seed) | not recorded | pass, needs re-run | pass, needs re-run |
@@ -134,7 +134,7 @@ is `tools/bringup.py list --radio <id>`.
 | `usb_serial_request` | off | not recorded | off | off | not recorded | not recorded | not recorded | off |
 | `dmr_ip_gateway` | not recorded | not recorded | pass (seed) | not recorded | not recorded | not recorded | pass, needs re-run | off |
 | `dmr_tx_spacing` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | partial, needs re-run |
-| `zone_share` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | partial, needs re-run | ✕ |
+| `zone_share` | off | off | off | off | off | off | off | ✕ |
 | `dmr_control_station` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | off |
 | `net_tcp` | not recorded | not recorded | pass (seed) | pass (seed) | not recorded | not recorded | pass, needs re-run | off |
 | `net_kiss` | not recorded | not recorded | not recorded | not recorded | not recorded | not recorded | pass, needs re-run | off |
@@ -233,7 +233,7 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | `DMR_TRUNK_GW` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | `VOICE_CAPTURE` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | `DMR_IP_GATEWAY` | ● | ● | ● | ● | ● | ● | ● | ○ |
-| `ZONE_SHARE` | ● | ● | ● | ● | ● | ● | ● | ✕ |
+| `ZONE_SHARE` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ✕ |
 | `DMR_UDP_COMPRESS` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `NET_TCP` | ● | ● | ● | ● | ● | ● | ● | ○ |
 | `NET_KISS` | ● | ● | ● | ● | ● | ● | ● | ○ |
@@ -249,16 +249,16 @@ clock`; ? = not known yet). No driver reads the clock yet ([radio-features.md](s
 | `IDDB_COMPACT` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `DMR_CONTROL_STATION` | ● | ● | ● | ● | ● | ● | ● | ○ |
 | `SNMP` | ● | ● | ● | ● | ● | ● | ● | ○ |
-| `SFR` | ● | ● | ● | ● | ✕ | ● | ● | ● |
-| `SFR_DUALPATH_RX` | ● | ● | ● | ● | ✕ | ● | ● | ● |
-| `SFR_CWID` | ● | ● | ● | ● | ✕ | ● | ● | ● |
+| `SFR` | ○ | ○ | ○ | ○ | ✕ | ○ | ○ | ○ |
+| `SFR_DUALPATH_RX` | ○ | ○ | ○ | ○ | ✕ | ○ | ○ | ○ |
+| `SFR_CWID` | ○ | ○ | ○ | ○ | ✕ | ○ | ○ | ○ |
 | `TASK_STACKS` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `USB` | ✕ | ● | ✕ | ✕ | ● | ● | ● | ✕ |
 | `HOSTLINK` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `USB_NETWORK` | ✕ | ● | ✕ | ✕ | ● | ● | ● | ✕ |
 | `NET_PPP` | ● | ○ | ● | ● | ○ | ○ | ○ | ○ |
-| `HOTSPOT` | ● | ● | ● | ● | ● | ● | ● | ○ |
-| `HOTSPOT_SPLIT` | ● | ● | ● | … | … | ● | ● | … |
+| `HOTSPOT` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
+| `HOTSPOT_SPLIT` | ○ | ○ | ○ | … | … | ○ | ○ | … |
 | `DEBUGLINK` | ● | ● | ● | ● | ● | ● | ● | ● |
 | `DEBUGLINK_DMRIP` | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
 | `CPS_OPENFW` | ● | ● | ● | ● | ● | ● | ● | ● |

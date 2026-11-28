@@ -35,8 +35,10 @@ use and tuned the way we like them.
 | [TYT MD-9600](docs/spec/hardware-md9600.md), Retevis RT90 (mobile) | ● | ● | ● | One image serves every board revision. On a V1-V3 radio, FM and DMR on both bands, DMR voice and data, text messages, roaming, scan, dual watch, APRS, the hotspot, each split duplex half and the USB network services work on air, with every power level checked on a wattmeter on both bands. V4A/V5 boards are detected; on older boards the radio asks for the revision once. Open: V4 boards have not run on a radio, one V4A/V5 report has DMR transmit dropping out (#750), and SFR loses inbound voice frames. |
 <!-- end generated -->
 
-The table is RadioFoundry's status. Crucible's own features have not run on every radio yet: the
-[usage guide](docs/kf8sfork/README.md#dmr-and-ysf-tx-levels) says which.
+The table is RadioFoundry's status: what was checked on air with RadioFoundry's firmware. Crucible's builds leave out
+the hotspot with its split duplex halves, single frequency repeating and zone sharing, to make room for YSF VW and M17
+([Features and defaults](CRUCIBLE.md#features-and-defaults)), so a Crucible image doesn't have them. Crucible's own
+features have not run on every radio yet: the [usage guide](docs/kf8sfork/README.md#dmr-and-ysf-tx-levels) says which.
 
 ## Install and update
 
