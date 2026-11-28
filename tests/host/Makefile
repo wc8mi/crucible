@@ -151,7 +151,7 @@ nxdnEngineTest: nxdnEngineTest.c $(CORE)/nxdn/nxdn_engine.c $(CORE)/air/air_voic
 YSF     := $(CORE)/ysf/ysf_frame.c $(CORE)/ysf/ysf_vw.c $(CORE)/ysf/ysf_rx.c $(CORE)/ysf/ysf_call.c $(CORE)/ysf/ysf_id.c $(CORE)/ysf/ysf_wx.c
 TESTS   += ysfTest
 ysfTest: ysfTest.c ../vectors/ysf-vw-vd1.txt $(YSF) $(CORE)/ysf/ysf_engine.c $(CORE)/air/air_voice.c $(wildcard $(CORE)/ysf/*.h) $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
-	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ ysfTest.c $(YSF) $(CORE)/ysf/ysf_engine.c $(CORE)/air/air_voice.c $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -DCONFIG_YSF_VW=1 -o $@ ysfTest.c $(YSF) $(CORE)/ysf/ysf_engine.c $(CORE)/air/air_voice.c $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
 
 # The MBE synthesis core and the full-rate voice decoder on it (core/mbe), against golden vectors
 MBE2400 := $(wildcard $(CORE)/mbe/mbe2400*.c)
@@ -431,7 +431,7 @@ radioCoreTestAir: $(RCAIR) $(wildcard $(CORE)/radio/*.h) $(wildcard $(CORE)/dmr/
                   $(CORE)/ui/ui_svc.h $(wildcard $(CORE)/nxdn/*.h) $(wildcard $(CORE)/p25/*.h) $(wildcard $(CORE)/ysf/*.h) \
                   $(wildcard $(CORE)/air/*.h) $(wildcard $(CORE)/dmr/ambe/*.h)
 	$(CC) $(CFLAGS) $(CORE_HAL) -I. -DDMR_RX_TRACE=0 -DCONFIG_DMR_IP_GATEWAY=0 -DCONFIG_SFR=1 -DCONFIG_APRS=0 \
-		-DCONFIG_P25=1 -DCONFIG_NXDN=1 -DCONFIG_NXDN_SCRAMBLER=1 -DCONFIG_YSF=1 -DCONFIG_AIR_RAW=1 -o $@ $(RCAIR) -lm
+		-DCONFIG_P25=1 -DCONFIG_NXDN=1 -DCONFIG_NXDN_SCRAMBLER=1 -DCONFIG_YSF=1 -DCONFIG_YSF_VW=1 -DCONFIG_AIR_RAW=1 -o $@ $(RCAIR) -lm
 
 # The same with APRS: what the data service hears goes into the station list (a DMR APRS position, docs/spec/aprs.md 8.2)
 TESTS   += radioCoreTestAprs

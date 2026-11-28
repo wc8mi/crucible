@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // YSF bench tool on the firmware's own code: the frame codec and call layer of core/ysf and the framer of core/air,
 // built for the host. tools/bench/ysftool.py is its front end; this program writes JSON lines on stdout. Voice is
 // opaque: the frames the call layer hands on, never speech.
@@ -79,7 +80,7 @@ static void on_voice(const uint8_t v[YSF_VOICE_BYTES], void *ctx)
 }
 static void on_end(void *ctx) { (void)ctx; printf("{\"ev\":\"call_end\"}\n"); }
 
-static const ysf_call_sink_t sink = { on_start, on_update, on_voice, on_end, NULL };
+static const ysf_call_sink_t sink = { on_start, on_update, on_voice, on_end, NULL, NULL };
 
 static int cmd_decode(const char *in, int unpacked)
 {

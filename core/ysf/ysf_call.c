@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // A YSF DN voice call (ysf.h, docs/spec/ysf.md 4): on receive, the frames of ysf_rx.c become a call with
 // its fields and its voice frames in order; on transmit, the frames are built and released symbol by symbol.
 #include "ysf.h"
 
 #include <string.h>
+
+#include "config.h"
 
 // ── Fields ──
 #define CM_RADIO_ID	1	// call mode a radio sends with a destination of "*****" and its radio ID (ysf.md 4.2)
@@ -156,21 +159,67 @@ static void on_dch(ysf_call_rx_t *c, uint8_t fn, const uint8_t d[YSF_DCH_BYTES])
 		changed(c);
 }
 
-static void voice(ysf_call_rx_t *c, const ysf_rx_frame_t *f)
+// The frame's VCH to the sink by the call's data type (ysf.md 3.4, 3.5). sub: a VW sub-header, whose VCH are only its
+// last blocks
+static void voice(ysf_call_rx_t *c, const ysf_rx_frame_t *f, bool sub)
 {
-	for (uint8_t n = 0; n < YSF_VCH_PER_FRAME; n++) {
-		uint8_t bits[AMBE_PARAM_BITS], v[YSF_VOICE_BYTES];
+	uint8_t n = 0;
 
-		if (c->call.dt != YSF_DT_VD2) {
-			c->stats.voice_held++;
-			continue;
+	switch (c->call.dt) {
+	case YSF_DT_VD2:
+		for (; n < YSF_VCH_PER_FRAME; n++) {
+			uint8_t bits[AMBE_PARAM_BITS], v[YSF_VOICE_BYTES];
+
+			c->stats.vch_fixed += (uint32_t)ysf_vch_get(f->hard, f->soft, n, bits);
+			ambeFecEncode(bits, v);
+			c->stats.voice++;
+			if (c->sink->voice)
+				c->sink->voice(v, c->ctx);
 		}
-		c->stats.vch_fixed += (uint32_t)ysf_vch_get(f->hard, f->soft, n, bits);
-		ambeFecEncode(bits, v);
-		c->stats.voice++;
-		if (c->sink->voice)
-			c->sink->voice(v, c->ctx);
+		return;
+	case YSF_DT_VD1:
+		// The DMR side's 72-bit frame as it is: its FEC is the voice path's (ambeFecDecode)
+		for (; n < YSF_VCH_PER_FRAME; n++) {
+			uint8_t v[YSF_VOICE_BYTES];
+
+			ysf_vd1_vch_get(f->hard, n, v);
+			c->stats.voice++;
+			c->stats.vd1_frames++;
+			if (c->sink->voice)
+				c->sink->voice(v, c->ctx);
+		}
+		return;
+#if CONFIG_YSF_VW
+	case YSF_DT_VW:
+		if (c->sink->vw == NULL)
+			break;
+		for (n = sub ? YSF_VW_SUB_VCH : 0; n < YSF_VCH_PER_FRAME; n++) {
+			uint8_t imbe[YSF_VW_BYTES], errs = ysf_vw_get(f->hard, n, imbe);
+
+			c->stats.voice++;
+			c->stats.vw_frames++;
+			c->stats.vw_fec_bits += errs & 15u;
+			c->sink->vw(imbe, errs, c->ctx);
+		}
+		return;
+#endif
+	default:
+		break;
 	}
+	(void)sub;
+	c->stats.voice_held += YSF_VCH_PER_FRAME;
+}
+
+// V/D mode 1's DCH (ysf.md 3.5): FN 0 is the destination and the source; downlink, uplink and remarks (FN 1, 2) are
+// not shown, and data units (FN 3-7) are not supported
+static void on_vd1_dch(ysf_call_rx_t *c, uint8_t fn, const uint8_t d[YSF_CSD_BYTES])
+{
+	if (fn != 0)
+		return;
+	bool dst = take_dst(c, d), src = field_get(c->call.src, d + YSF_CS_LEN);
+
+	if (dst || src)
+		changed(c);
 }
 
 static void on_data(ysf_call_rx_t *c, const ysf_rx_frame_t *f)
@@ -243,11 +292,12 @@ static void on_frame(const ysf_rx_frame_t *f, void *ctx)
 		c->wx.broken = true;
 		if (!c->active)
 			return;
-		errs = ysf_dch_get(f->hard, f->soft, w, buf);
-		if (errs >= 0 && c->call.dt == YSF_DT_VD2)
+		if (c->call.dt == YSF_DT_VD2 && ysf_dch_get(f->hard, f->soft, w, buf) >= 0)
 			on_dch(c, c->next_fn, buf);
+		else if (c->call.dt == YSF_DT_VD1 && ysf_vd1_dch_get(f->hard, f->soft, w, buf) >= 0)
+			on_vd1_dch(c, c->next_fn, buf);
 		c->next_fn = (uint8_t)(c->next_fn >= YSF_FT_DN ? 0 : c->next_fn + 1);
-		voice(c, f);
+		voice(c, f, false);	// (a VW sub-header is a call's first frame, not one placed by its order)
 		return;
 	}
 	c->stats.fec_bits += (uint32_t)f->fich_errs;
@@ -284,16 +334,21 @@ static void on_frame(const ysf_rx_frame_t *f, void *ctx)
 			changed(c);
 		}
 		c->next_fn = (uint8_t)(f->fich.fn >= f->fich.ft ? 0 : f->fich.fn + 1);
-		if (f->fich.dt == YSF_DT_VD2) {
-			errs = ysf_dch_get(f->hard, f->soft, w, buf);
+		if (f->fich.dt == YSF_DT_VD2 || f->fich.dt == YSF_DT_VD1) {
+			errs = f->fich.dt == YSF_DT_VD2 ? ysf_dch_get(f->hard, f->soft, w, buf) :
+							  ysf_vd1_dch_get(f->hard, f->soft, w, buf);
 			if (errs < 0) {
 				c->stats.dch_fail++;
 			} else {
 				c->stats.fec_bits += (uint32_t)errs;
-				on_dch(c, f->fich.fn, buf);
+				if (f->fich.dt == YSF_DT_VD2)
+					on_dch(c, f->fich.fn, buf);
+				else
+					on_vd1_dch(c, f->fich.fn, buf);
 			}
 		}
-		voice(c, f);
+		// A VW call's sub-header (FN 0, FT 1) carries CSD3 and two VCH; its content is not used (ysf.md 3.5)
+		voice(c, f, f->fich.dt == YSF_DT_VW && f->fich.fn == 0 && f->fich.ft == 1);
 		break;
 	case YSF_FI_TERM:
 		call_end(c);
