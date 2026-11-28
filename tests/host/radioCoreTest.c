@@ -10440,6 +10440,71 @@ static void test_ysf_wx(void)
 	run(50);
 }
 
+#if CONFIG_YSF_VW
+// The voice path (ysf.md 5.5): a VW call heard wants P25's IMBE path; the radio core switches to it while nothing is
+// transmitted, refuses PTT while it runs, and switches back when the call ends. The engine is driven by its want, as
+// a VW call sets it (ysfTest feeds the frames)
+static void test_ysf_vw_path(void)
+{
+	radio_ysf_stats_t s0, s1;
+	size_t len = 0;
+	ysf_engine_t *e;
+	int keyed0;
+
+	setup_codeplug();
+	add(3, "YSF rptr", 446100000, RADIO_MODE_DMR, false, 2);
+	chans[3].kind = CODEPLUG_KIND_YSF;
+	chans[3].system = 0xFF;
+	stored_ysf[3] = (ysf_chan_t){ .tx_dgid = 0, .rx_dgid = 0 };
+	air_nofit = false;
+	memset(fair, 0, sizeof(fair));
+	start();
+	req(RREQ_ZONE_POS, 2);
+	run(200);
+	CHECK(sm.view.ch.mode == RADIO_MODE_YSF && radio_ysf_running());
+	e = radio_air_ysf_mem(&len);
+	CHECK(e != NULL && len >= sizeof(ysf_engine_t) && sm.view.ysf.path == YSF_PATH_AMBE);
+	radio_ysf_stats(&s0);
+	e->want = YSF_PATH_IMBE;
+	run(50);
+	radio_ysf_stats(&s1);
+	CHECK(sm.view.ysf.path == YSF_PATH_IMBE && e->path == YSF_PATH_IMBE && s1.path_switches == s0.path_switches + 1 &&
+	      s1.path_fails == s0.path_fails);
+	keyed0 = hw.tx_calls;
+	req(RREQ_PTT, 1);
+	run(100);
+	CHECK(hw.tx_calls == keyed0 && !hw.keyed);
+	req(RREQ_PTT, 0);
+	run(50);
+	e->want = YSF_PATH_AMBE;	// the call ended
+	run(50);
+	radio_ysf_stats(&s1);
+	CHECK(sm.view.ysf.path == YSF_PATH_AMBE && s1.path_switches == s0.path_switches + 2);
+	yfar_begin(0);
+	req(RREQ_PTT, 1);
+	run(400);
+	CHECK(hw.tx_calls == keyed0 + 1);
+	req(RREQ_PTT, 0);
+	for (int i = 0; i < 200 && sm.view.state == RS_TX; i++)
+		run(10);
+	CHECK(yfar.rx.call.dt == YSF_DT_VD2 && yfar.rx.stats.voice > 0);
+	// Leaving the channel mid-call on IMBE stops P25's path; the next YSF start is on AMBE again
+	e->want = YSF_PATH_IMBE;
+	run(50);
+	CHECK(sm.view.ysf.path == YSF_PATH_IMBE);
+	req(RREQ_ZONE_POS, 0);
+	run(200);
+	CHECK(!radio_ysf_running());
+	req(RREQ_ZONE_POS, 2);
+	run(200);
+	CHECK(radio_ysf_running() && sm.view.ysf.path == YSF_PATH_AMBE);
+	yfar_stop();
+	setup_codeplug();
+	req(RREQ_RELOAD, 0);
+	run(50);
+}
+#endif
+
 #if CONFIG_SCAN && CONFIG_DUAL_WATCH
 // A watch of channels 3 (YSF) and other, nothing on the air, for ms: how many looks each got and that no two
 // engines (or an engine and the DMR stack) ever ran together
@@ -13138,6 +13203,9 @@ int main(void)
 #endif
 #if CONFIG_YSF
 	test_ysf_wx();
+#if CONFIG_YSF_VW
+	test_ysf_vw_path();
+#endif
 #if CONFIG_SCAN && CONFIG_DUAL_WATCH
 	test_ysf_dual();
 #endif
