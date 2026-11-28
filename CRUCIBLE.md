@@ -127,9 +127,11 @@ commit.
 | `version` | The next release. `tools/kf8s_build.py` names the build `v<version>` and refuses a version already tagged here or on origin. |
 | `prerelease` | `true` marks every release a GitHub pre-release, a test release: the flasher lists it under "Show test builds", and anyway while a radio has no full release. Set it `false` once a build is stable (YSF is still incomplete). |
 
-- After each release, raise `version` in its own commit: the patch (0.1.1) for fixes only, the minor (0.2.0) for new
-  features or an upstream merge that adds them. 1.0.0 and later majors are for changes that break settings or
-  codeplugs; before 1.0.0 a minor may also change them, so say so in the notes.
+- After each release, raise the patch in its own commit (0.1.0 to 0.1.1): the resting value assumes fixes only.
+- The pull request that merges the first new feature since the last release raises the minor in the same commit
+  (0.1.1 to 0.2.0), so `version` always matches what is queued. An upstream merge that adds features counts. 1.0.0 and
+  later majors are for changes that break settings or codeplugs; before 1.0.0 a minor may also change them, so say so
+  in the notes.
 - A failed build reuses its version: remove `build/kf8s/<version>/` and build again. Once a version is tagged it is
   never rebuilt.
 - Tags are `v` and the version, nothing else: no build metadata (`+...`), because the radio shows the name.
