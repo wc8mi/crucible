@@ -114,6 +114,12 @@ Frequency profiles are accepted only when their RX and TX frequencies are suppor
 TLE installers read the radio's reported bands before writing and explain when a single-band radio cannot use the
 selected profiles. `tools/satellite_tle.py sync` can install TLE data without frequency profiles for pass prediction.
 
+A profile with TX 0 is **listen only**: an SSTV or telemetry downlink, a satellite whose receiver failed, or one whose
+uplink is outside every band the radio transmits on. Its tone must be 0, and only its RX frequency is checked against
+the board's bands. Tracking it tunes the Doppler-corrected downlink and no transmit frequency, and PTT is refused as
+receive only (`TXDENY_RX_ONLY`) for the whole session, whatever the selected channel allows. The detail screen shows TX
+as "RX only".
+
 No valid TLE, expired TLE, invalid UTC, stale observer position, non-finite calculation or out-of-range target means no
 automatic retune. The user-visible state should distinguish unavailable tracking from a valid pass below the horizon.
 Reacquiring valid inputs may resume tracking only while the same satellite and frequency pair remain selected.
@@ -195,9 +201,19 @@ never installed wholesale. For ID-based provider requests, the returned ID set m
 
 The site Tools page links to a standalone Satellite TLE page. It lists IDs in the curated FM frequency catalog and
 allows up to 18 profiles; before a push it reads the radio's own limit from `INFO` and refuses a larger selection.
-Non-FM TLE objects are omitted. The AMSAT
-button loads the fixed daily bulletin through a same-origin site endpoint; Browse remains available for another local
-source. When AMSAT is selected, the page fetches the bulletin again without caching before each radio push or bundle
+Non-FM TLE objects are omitted. The Load
+latest TLEs button fetches two lists at once through same-origin site endpoints: the AMSAT daily bulletin
+(`/api/amsat-tle`) and PE0SAT's amateur list, `http://tle.pe0sat.nl/kepler/amateur.txt` (`/api/pe0sat-tle`; PE0SAT serves
+plain HTTP only). It merges them per catalog ID: the lines with the newest epoch win, AMSAT's on a tie, and the name
+comes from AMSAT when AMSAT has the ID. Each box shows the TLE's age and the list it came from. If one list fails, the
+other is used and the status says so; if both fail, the status gives both reasons. The bundle's provider is the page's
+own HTTPS URL, since the page assembled the data; a plain HTTP preview names the AMSAT bulletin. Checked boxes are
+kept in the browser's local storage for the next visit. In a loaded list, a catalog ID repeated
+with identical lines keeps the first record. An ID repeated with different lines is left out, and a selected one is
+then reported missing. An Alpha-5 record (a letter, then four digits) reads as its six-digit catalog number, 100000
+to 339999 (section 6). A listen-only profile's box says "listen only, no TX" in the warning color. A box shows the page's name for the satellite and adds the list's name when it is another one
+(PE0SAT uses launch names such as LAPAN-A2 for IO-86); search matches either name or the catalog ID. Browse remains available for another local
+source. After an online load, the page fetches both lists again without caching before each radio push or bundle
 download. A failed refresh stops the operation; a local file is used as supplied. Checked selections persist across
 searches. The daily TLE bulletin itself contains no frequency data. The page validates selected IDs, checksums, orbital
 fields and age, then creates a schema-v3 bundle or
@@ -216,22 +232,25 @@ sync requires `--id` values.
 An offline bundle is UTF-8 JSON with a provider URL, an ISO-8601 UTC `fetched_at`, and a `records` array. Schema v1
 contains records only and remains installable. Schema v2 also contains `profile_ids`, an ordered set of 1-18 IDs from
 the firmware's built-in frequency-profile catalog. Schema v3 contains `profile_ids` and a matching `profiles` array
-with `catalog_id`, `rx_hz`, `tx_hz`, and `tx_tone_tenths`. Each record has `catalog_id` (integer), `name`, `line1`, and
+with `catalog_id`, `rx_hz`, `tx_hz` (0 for listen only), and `tx_tone_tenths`. Each record has `catalog_id` (integer,
+1 to 339999), `name`, `line1`, and
 `line2`. The bundle contains no other radio mode settings. The default accepted TLE age is 30 days at the time of validation; the utility allows a
 caller-selected limit. Older elements are shown and require explicit acceptance (or the command is cancelled); a
 future epoch more than one day ahead of the PC's UTC clock is invalid.
 
-TLE text is exactly the two 69-character lines, without line endings. Validation checks the standard line number,
-catalog-ID columns, checksum column, epoch syntax and calendar day, and finite/ranged orbital fields used by propagation.
+TLE text is exactly the two 69-character lines, without line endings. The catalog-ID columns (3-7) hold five digits,
+or Alpha-5 past 99999: a letter for the leading two digits (A = 10 to Z = 33, skipping I and O), then four digits, so
+`A1101` is 101101 and `Z9999` is 339999. The TLE checksum counts the letter as 0. Validation checks the standard line
+number, catalog-ID columns, checksum column, epoch syntax and calendar day, and finite/ranged orbital fields used by propagation.
 Every entry is validated before any install begins. Duplicate IDs, malformed entries, or a provider response that
 omits or adds an ID reject the complete batch.
 
 Install uses debug-link command `0x26` (`SATELLITE`) and is available only when capability operation `INFO` succeeds.
-Protocol v8 adds `PROFILE_SET_CHUNK=14` to the operations: `INFO=0`, `LIST=1`, `BEGIN=2`, `DATA=3`,
+Protocol v9 adds `PROFILE_SET_CHUNK=14` to the operations: `INFO=0`, `LIST=1`, `BEGIN=2`, `DATA=3`,
 `COMMIT=4`, `ABORT=5`, `SYNC_CHANNELS=6`, `PROFILE_GET=7`, `PROFILE_SET=8`, `REPLACE_BEGIN=9`,
 `PROFILE_STAGE=10`, `PROFILE_VALUES_GET=11`, `PROFILE_STAGE_CHUNK=12`, `SYNC_CHANNELS_STATUS=13` and
 `PROFILE_SET_CHUNK=14`. `INFO` reports protocol version, record capacity (`18`), installed count and profile capacity
-(`18`) as `u8, u16, u16, u8`. Protocol v7 and older send the first three fields only and keep 10 profiles; a host
+(`18`) as `u8, u16, u16, u8`. Protocol v8 and older send the first three fields only and keep 10 profiles; a host
 checks a selection against both capacities before it starts a transfer. `INFO` is unavailable when the feature is
 off or the board has no valid dedicated satellite-data flash area. `LIST` takes a start index `u16` and returns
 a count `u8`, then that many `(catalog ID u32, epoch Unix seconds u32)` pairs. The radio advertises a capacity of
@@ -247,6 +266,9 @@ protocol-v5 operation remains supported. `PROFILE_VALUES_GET=11` returns the com
 Protocol v6 adds `PROFILE_STAGE_CHUNK=12`: transaction ID `u16`, total profile count `u8`, starting index `u8`, chunk
 count `u8`, then up to four profile records. Chunks must be consecutive and together contain exactly the replacement
 inventory's profiles. The profile IDs must exactly match the staged TLE IDs; commit refuses an incomplete set.
+Protocol v8 accepts six-digit catalog numbers (100000 to 339999, Alpha-5 TLEs) in records and profiles, listen-only
+profiles (TX 0, section 4), and the longer built-in profile table. Older firmware refuses all three, so the site and
+the PC utility check the version first and ask for a firmware update instead of starting a transfer.
 The radio stores the inventory and profiles in three 4 KB erase sectors (12 KB total): one active
 generation, one incoming transaction and one commit target. The satellite area is carved from the existing update
 scratch allocation only when `CONFIG_SATELLITE_TLE` is enabled; it reduces TFTP/CPS-fast staging by 12 KB. `BEGIN`
@@ -260,10 +282,10 @@ guessed names.
 `ABORT` takes a transaction ID `u16` and discards an uncommitted batch. Firmware continues to support protocol-v2
 additive TLE transfers for older clients. Schema-v2 replacement bundles require protocol v4. Schema-v3 bundles require protocol v5 and
 stage TLEs and frequency values before one commit; protocol v5 supports up to four selected profiles, while protocol
-v6 and v7 support ten and protocol v8 eighteen. The host reads both back before reporting success. The standalone
+v6 to v8 support ten and protocol v9 eighteen. The host reads both back before reporting success. The standalone
 `profiles` command requires protocol v3 or newer. `PROFILE_GET` returns up to 18 catalog IDs and `PROFILE_SET` accepts
 up to 15 IDs from the built-in catalog for the legacy profile-only workflow, the most one 64-byte request holds.
-`PROFILE_SET_CHUNK=14` (protocol v8) sends a longer list: total count `u8`, starting index `u8`, chunk count `u8`,
+`PROFILE_SET_CHUNK=14` (protocol v9) sends a longer list: total count `u8`, starting index `u8`, chunk count `u8`,
 then up to 15 IDs `u32`. Chunks start at index 0 and follow each other with no gap; a gap is refused and drops the
 partial list. The radio applies the list only with its last chunk, and keeps the old list if the new one is refused. The PC utility uses replacement for every install
 and sync, including schema-v1 bundles, and requires protocol v4 or later. PC TLE synchronization does not invoke
@@ -276,12 +298,13 @@ The separate `SYNC_CHANNELS` operation, when explicitly requested, queues work o
 `BUSY` if another storage job is active. Poll `SYNC_CHANNELS_STATUS` for `IDLE=0`, `RUNNING=1`, `COMPLETE=2`, or
 `FAILED=3`. It ensures a `Satellites` codeplug zone contains one channel for each installed TLE, reusing an existing
 same-name channel when possible. A missing channel is created from the current channel profile with its name set to the
-TLE name (truncated to the codeplug's 16-character limit), FM mode, and transmit enabled. For FM satellites in the
-radio's built-in AMSAT frequency table, the new channel uses the listed downlink for receive, uplink for transmit, and
-listed uplink CTCSS tone. Other new channels copy the current channel's frequencies. Existing channel frequencies,
-tones and other settings are not overwritten. PC installs do not request this operation. The frequency table is a
-snapshot of AMSAT's page updated October 31, 2026; operating status can change, so check the live page before
-transmitting. SO-50 requires a 2-second 74.4 Hz CTCSS transmission to arm its timer before use; its normal uplink tone
+TLE name (truncated to the codeplug's 16-character limit), FM mode, and transmit enabled. For satellites in the
+radio's built-in frequency table, the new channel uses the listed downlink for receive, uplink for transmit, and
+listed uplink CTCSS tone; a listen-only profile makes a receive-only channel with TX set to the downlink. Other new
+channels copy the current channel's frequencies. Existing channel frequencies, tones and other settings are not
+overwritten. PC installs do not request this operation. The frequency table (`core/satellite/frequency.c`) is a
+snapshot updated November 27, 2026: FM voice satellites from AMSAT's status page, plus listen-only SSTV and telemetry
+downlinks. Operating status can change, so check AMSAT's live page before transmitting. SO-50 requires a 2-second 74.4 Hz CTCSS transmission to arm its timer before use; its normal uplink tone
 is 67.0 Hz.
 
 The radio's dedicated `hal_flash_map_t.satellite_*` area is separate from the codeplug and reserved from update

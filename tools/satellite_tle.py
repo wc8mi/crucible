@@ -29,9 +29,11 @@ SCHEMA_VERSION = 3
 SUPPORTED_SCHEMA_VERSIONS = (1, 2, 3)
 PROFILE_VALUES_PROTOCOL_VERSION = 5
 PROFILE_CHUNK_PROTOCOL_VERSION = 6
-PROFILE_SET_CHUNK_PROTOCOL_VERSION = 8
-SATELLITE_PROTOCOL_VERSION = 8
-SUPPORTED_PROTOCOL_VERSIONS = (2, 3, 4, 5, 6, 7, 8)
+WIDE_PROFILE_PROTOCOL_VERSION = 7
+ALPHA5_PROTOCOL_VERSION = 8  # six-digit (Alpha-5) catalog numbers and listen-only (TX 0) profiles
+PROFILE_SET_CHUNK_PROTOCOL_VERSION = 9  # 18 records and profiles, INFO's profile capacity, PROFILE_SET_CHUNK
+SATELLITE_PROTOCOL_VERSION = 9
+SUPPORTED_PROTOCOL_VERSIONS = (2, 3, 4, 5, 6, 7, 8, 9)
 REPLACE_PROTOCOL_MIN_VERSION = 4
 PROFILE_PROTOCOL_MIN_VERSION = 3
 LEGACY_SATELLITE_PROTOCOL_VERSION = 2
@@ -42,20 +44,40 @@ OP_REPLACE_BEGIN = 9
 OP_PROFILE_STAGE, OP_PROFILE_VALUES_GET, OP_PROFILE_STAGE_CHUNK = 10, 11, 12
 OP_SYNC_CHANNELS_STATUS, OP_PROFILE_SET_CHUNK = 13, 14
 DEFAULT_PROFILE_IDS = (25544, 27607, 43017)
+# (RX, TX) in Hz; TX 0 is a listen-only profile, which radios before protocol 8 refuse
 PROFILE_FREQUENCIES = {
     25544: (437800000, 145990000), 27607: (436795000, 145850000),
-    40908: (437200000, 144350000), 40931: (435880000, 145880000),
-    43017: (145960000, 435250000), 43678: (145900000, 437500000),
-    61781: (435400000, 145850000), 63213: (436400000, 145970000),
-    63214: (436400000, 145970000), 63215: (436400000, 145970000),
-    63217: (436400000, 145970000), 63218: (436400000, 145970000),
-    63219: (436400000, 145970000), 63237: (436400000, 145970000),
-    63238: (436400000, 145970000), 63239: (436400000, 145970000),
-    67291: (436950000, 145920000),
+    39444: (145935000, 0), 40908: (437200000, 144350000),
+    40931: (435880000, 145880000), 43017: (145960000, 435250000),
+    43678: (145900000, 437500000), 43770: (145920000, 0),
+    48274: (436510000, 145875000), 57172: (437625000, 0),
+    57180: (435290000, 0), 57182: (436080000, 0),
+    57189: (437825000, 0), 57203: (436125000, 0),
+    59112: (145880000, 0), 61781: (435400000, 145850000),
+    63213: (436400000, 145970000), 63214: (436400000, 145970000),
+    63215: (436400000, 145970000), 63217: (436400000, 145970000),
+    63218: (436400000, 145970000), 63219: (436400000, 145970000),
+    63237: (436400000, 145970000), 63238: (436400000, 145970000),
+    63239: (436400000, 145970000), 67287: (437180000, 0),
+    67291: (436950000, 145920000), 101101: (436888000, 145925000),
+    101102: (436665000, 0),
 }
+PROFILE_NAMES = {
+    25544: "ISS", 27607: "SO-50", 39444: "AO-73", 40908: "LILACSAT-2", 40931: "IO-86", 43017: "AO-91",
+    43678: "PO-101", 43770: "AO-95", 48274: "CSS", 57172: "UMKA-1", 57180: "MONITOR-3", 57182: "MONITOR-4",
+    57189: "VIZARD-METEO", 57203: "UTMN-2", 59112: "SONATE-2", 61781: "AO-123", 63213: "TEVEL2-4",
+    63214: "TEVEL2-5", 63215: "TEVEL2-6", 63217: "TEVEL2-1", 63218: "TEVEL2-3", 63219: "TEVEL2-2",
+    63237: "TEVEL2-9", 63238: "TEVEL2-7", 63239: "TEVEL2-8", 67287: "LUCA-1", 67291: "RS95S",
+    101101: "SO-131", 101102: "SO-132",
+}
+# The built-in profiles of radios before protocol 8
+LEGACY_PROFILE_IDS = frozenset((25544, 27607, 40908, 40931, 43017, 43678, 61781, 63213, 63214, 63215, 63217,
+                                63218, 63219, 63237, 63238, 63239, 67291))
 SUPPORTED_PROFILE_IDS = frozenset(PROFILE_FREQUENCIES)
-# The most frequency profiles (and TLE records) a bundle may hold: what a protocol-v8 radio keeps. A radio reports its
-# own maximum in INFO (v8); older ones keep LEGACY_MAX_PROFILES
+CATALOG_ID_MAX = 339999  # Z9999 in Alpha-5
+ALPHA5_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"  # 10..33; Alpha-5 skips I and O
+# The most frequency profiles (and TLE records) a bundle may hold: what a protocol-v9 radio keeps. A radio reports its
+# own maximum in INFO (v9); older ones keep LEGACY_MAX_PROFILES
 MAX_PROFILES = 18
 LEGACY_MAX_PROFILES = 10
 PROFILE_SET_IDS_MAX = 15        # catalog IDs in one PROFILE_SET or PROFILE_SET_CHUNK request (64-byte payload)
@@ -70,6 +92,23 @@ class SatelliteTleError(Exception):
     """Invalid orbital input or an unsuccessful satellite operation."""
 
 
+def tle_catalog_id(field):
+    """Columns 3-7 of a TLE line: five digits, or Alpha-5 past 99999. None when malformed."""
+    if len(field) != 5 or not field[1:].isdigit() or not field[1:].isascii():
+        return None
+    if field[0].isdigit() and field[0].isascii():
+        return int(field)
+    if field[0] in ALPHA5_LETTERS:
+        return (10 + ALPHA5_LETTERS.index(field[0])) * 10000 + int(field[1:])
+    return None
+
+
+def needs_v8(catalog_ids, profiles=()):
+    """Whether a selection needs satellite protocol 8: a six-digit catalog number or a listen-only profile."""
+    return any(catalog_id > 99999 for catalog_id in catalog_ids) or \
+        any(profile["tx_hz"] == 0 for profile in profiles)
+
+
 def _utc_now():
     return dt.datetime.now(UTC)
 
@@ -82,8 +121,8 @@ def parse_catalog_ids(values):
                 catalog_id = int(item, 10)
             except ValueError as exc:
                 raise SatelliteTleError(f"invalid catalog ID {item!r}") from exc
-            if not 1 <= catalog_id <= 99999:
-                raise SatelliteTleError(f"catalog ID must be in 1..99999: {catalog_id}")
+            if not 1 <= catalog_id <= CATALOG_ID_MAX:
+                raise SatelliteTleError(f"catalog ID must be in 1..{CATALOG_ID_MAX}: {catalog_id}")
             if catalog_id in ids:
                 raise SatelliteTleError(f"duplicate catalog ID: {catalog_id}")
             ids.append(catalog_id)
@@ -161,8 +200,8 @@ def validate_record(record, now=None, max_age_days=DEFAULT_MAX_AGE_DAYS):
     if not isinstance(record, dict) or set(record) != {"catalog_id", "name", "line1", "line2"}:
         raise SatelliteTleError("each TLE record must contain catalog_id, name, line1, and line2 only")
     catalog_id = record["catalog_id"]
-    if isinstance(catalog_id, bool) or not isinstance(catalog_id, int) or not 1 <= catalog_id <= 99999:
-        raise SatelliteTleError("catalog_id must be an integer in 1..99999")
+    if isinstance(catalog_id, bool) or not isinstance(catalog_id, int) or not 1 <= catalog_id <= CATALOG_ID_MAX:
+        raise SatelliteTleError(f"catalog_id must be an integer in 1..{CATALOG_ID_MAX}")
     name = record["name"]
     if not isinstance(name, str) or not name or any(ord(ch) < 32 or ord(ch) == 127 for ch in name):
         raise SatelliteTleError(f"catalog {catalog_id}: name must be nonempty printable text")
@@ -185,8 +224,7 @@ def validate_record(record, now=None, max_age_days=DEFAULT_MAX_AGE_DAYS):
         raise SatelliteTleError(f"catalog {catalog_id}: expected two 69-character TLE lines numbered 1 and 2")
     if not _checksum(line1) or not _checksum(line2):
         raise SatelliteTleError(f"catalog {catalog_id}: TLE checksum mismatch")
-    if not line1[2:7].isdigit() or not line2[2:7].isdigit() or \
-            int(line1[2:7]) != catalog_id or int(line2[2:7]) != catalog_id:
+    if tle_catalog_id(line1[2:7]) != catalog_id or tle_catalog_id(line2[2:7]) != catalog_id:
         raise SatelliteTleError(f"catalog {catalog_id}: TLE catalog IDs do not match the record")
     if line1[7] not in "UCS" or line1[8] != " " or line1[17] != " " or line1[32] != " ":
         raise SatelliteTleError(f"catalog {catalog_id}: malformed line 1 fixed-format fields")
@@ -316,7 +354,7 @@ def validate_profile_ids(profile_ids):
 def validate_catalog_profile_ids(profile_ids):
     if not isinstance(profile_ids, list) or not profile_ids or len(profile_ids) > MAX_PROFILES:
         raise SatelliteTleError(f"profile_ids must contain 1..{MAX_PROFILES} catalog IDs")
-    if any(type(catalog_id) is not int or not 1 <= catalog_id <= 99999 for catalog_id in profile_ids):
+    if any(type(catalog_id) is not int or not 1 <= catalog_id <= CATALOG_ID_MAX for catalog_id in profile_ids):
         raise SatelliteTleError("profile_ids contains an invalid catalog ID")
     if len(set(profile_ids)) != len(profile_ids):
         raise SatelliteTleError("profile_ids contains duplicate IDs")
@@ -331,11 +369,12 @@ def validate_frequency_profiles(profiles):
     for profile in profiles:
         if not isinstance(profile, dict) or set(profile) != required:
             raise SatelliteTleError("each frequency profile must contain catalog_id, rx_hz, tx_hz, and tx_tone_tenths")
-        if type(profile["catalog_id"]) is not int or not 1 <= profile["catalog_id"] <= 99999 or \
+        if type(profile["catalog_id"]) is not int or not 1 <= profile["catalog_id"] <= CATALOG_ID_MAX or \
                 type(profile["rx_hz"]) is not int or not 0 < profile["rx_hz"] < 1_000_000_000 or \
-                type(profile["tx_hz"]) is not int or not 0 < profile["tx_hz"] < 1_000_000_000 or \
+                type(profile["tx_hz"]) is not int or not 0 <= profile["tx_hz"] < 1_000_000_000 or \
                 type(profile["tx_tone_tenths"]) is not int or \
-                not (profile["tx_tone_tenths"] == 0 or 600 <= profile["tx_tone_tenths"] <= 2600):
+                not (profile["tx_tone_tenths"] == 0 or
+                     (profile["tx_hz"] != 0 and 600 <= profile["tx_tone_tenths"] <= 2600)):
             raise SatelliteTleError("frequency profile contains an out-of-range value")
         validated.append(dict(profile))
     ids = [profile["catalog_id"] for profile in validated]
@@ -433,7 +472,7 @@ def _load_inventory_cache(path):
         for record in radio["records"]:
             if not isinstance(record, dict) or isinstance(record.get("catalog_id"), bool) or \
                     not isinstance(record.get("catalog_id"), int) or \
-                    not 1 <= record["catalog_id"] <= 99999 or isinstance(record.get("epoch"), bool) or \
+                    not 1 <= record["catalog_id"] <= CATALOG_ID_MAX or isinstance(record.get("epoch"), bool) or \
                     not isinstance(record.get("epoch"), int) or not isinstance(record.get("name"), str):
                 raise SatelliteTleError("local satellite inventory cache has a malformed record")
     return data
@@ -459,7 +498,7 @@ def remember_inventory(path, key, entries, records=()):
 
 
 def parse_info(info):
-    """INFO's reply: (protocol version, record capacity, installed count, profile capacity). Protocol v8 appends the
+    """INFO's reply: (protocol version, record capacity, installed count, profile capacity). Protocol v9 appends the
     profile capacity; an older radio keeps LEGACY_MAX_PROFILES."""
     if len(info) == 5:
         version, capacity, installed_count = struct.unpack("<BHH", info)
@@ -491,7 +530,7 @@ def _check_radio_profile_bands(link, profiles):
     bands_text = core.get("bands")
     if not isinstance(bands_text, str) or not bands_text:
         raise SatelliteTleError("radio did not report its supported frequency bands")
-    # The view includes RX-only ranges; no catalog satellite uplink currently falls in one.
+    # The view includes RX-only ranges; no catalog satellite uplink currently falls in one. TX 0 is listen only.
     bands = []
     for band in bands_text.split(","):
         match = re.fullmatch(r"([0-9]+)-([0-9]+)", band)
@@ -499,7 +538,7 @@ def _check_radio_profile_bands(link, profiles):
             raise SatelliteTleError("radio returned malformed supported-band data")
         bands.append((int(match.group(1)), int(match.group(2))))
     unsupported = any(not any(low <= frequency <= high for low, high in bands)
-                      for profile in profiles for frequency in (profile["rx_hz"], profile["tx_hz"]))
+                      for profile in profiles for frequency in (profile["rx_hz"], profile["tx_hz"]) if frequency)
     if unsupported:
         if len(bands) == 1:
             raise SatelliteTleError("single-band radio: the selected satellite profiles require frequencies outside "
@@ -523,10 +562,11 @@ def _parse_provider_text(text, strict=False):
             if strict:
                 if i + 2 >= len(lines) or not lines[i + 1].startswith("1 ") or not lines[i + 2].startswith("2 "):
                     raise SatelliteTleError("provider response is not a complete name, line 1, line 2 sequence")
-                if not lines[i + 1][2:7].isdigit():
+                catalog_id = tle_catalog_id(lines[i + 1][2:7])
+                if catalog_id is None:
                     raise SatelliteTleError("provider response contains an invalid catalog ID")
                 name = line[2:].strip() if line.startswith("0 ") else line.strip()
-                records.append({"catalog_id": int(lines[i + 1][2:7]), "name": name,
+                records.append({"catalog_id": catalog_id, "name": name,
                                 "line1": lines[i + 1], "line2": lines[i + 2]})
                 i += 3
                 continue
@@ -534,7 +574,7 @@ def _parse_provider_text(text, strict=False):
             continue
         if strict:
             raise SatelliteTleError("provider response contains a TLE pair without its satellite name")
-        if not line[2:7].isdigit() or i + 1 >= len(lines) or not lines[i + 1].startswith("2 "):
+        if tle_catalog_id(line[2:7]) is None or i + 1 >= len(lines) or not lines[i + 1].startswith("2 "):
             raise SatelliteTleError("provider response contains an incomplete TLE pair")
         name_index = i - 1
         while name_index >= 0 and not lines[name_index].strip():
@@ -543,7 +583,7 @@ def _parse_provider_text(text, strict=False):
             raise SatelliteTleError("provider TLE entry is missing its satellite name")
         name_line = lines[name_index].strip()
         name = name_line[2:].strip() if name_line.startswith("0 ") else name_line
-        records.append({"catalog_id": int(line[2:7]), "name": name,
+        records.append({"catalog_id": tle_catalog_id(line[2:7]), "name": name,
                         "line1": line, "line2": lines[i + 1]})
         i += 2
     if not records:
@@ -634,13 +674,16 @@ def set_radio_profile_ids(link, profile_ids, protocol_version=None):
         protocol_version = parse_info(_request(link, OP_INFO))[0]
     if protocol_version < PROFILE_PROTOCOL_MIN_VERSION:
         raise SatelliteTleError("radio profile updates require satellite protocol version 3 or newer")
+    if protocol_version < ALPHA5_PROTOCOL_VERSION and not set(profile_ids) <= LEGACY_PROFILE_IDS:
+        raise SatelliteTleError("the selection includes satellites added in satellite protocol version 8; "
+                                "update the radio firmware")
     if len(profile_ids) <= PROFILE_SET_IDS_MAX:
         payload = bytes([len(profile_ids)]) + struct.pack(f"<{len(profile_ids)}I", *profile_ids)
         if _request(link, OP_PROFILE_SET, payload):
             raise SatelliteTleError("radio returned unexpected data after profile update")
     else:
         if protocol_version < PROFILE_SET_CHUNK_PROTOCOL_VERSION:
-            raise SatelliteTleError(f"more than {PROFILE_SET_IDS_MAX} profiles require satellite protocol version 8")
+            raise SatelliteTleError(f"more than {PROFILE_SET_IDS_MAX} profiles require satellite protocol version 9")
         for start in range(0, len(profile_ids), PROFILE_SET_IDS_MAX):
             chunk = profile_ids[start:start + PROFILE_SET_IDS_MAX]
             payload = bytes([len(profile_ids), start, len(chunk)]) + struct.pack(f"<{len(chunk)}I", *chunk)
@@ -745,6 +788,11 @@ def install_records(link, records, profile_ids=None, profiles=None):
         raise SatelliteTleError("frequency-valued bundles require satellite protocol version 5")
     if full_profiles is not None and len(full_profiles) > 4 and version < PROFILE_CHUNK_PROTOCOL_VERSION:
         raise SatelliteTleError("more than four frequency profiles require satellite protocol version 6")
+    if version < ALPHA5_PROTOCOL_VERSION and (
+            needs_v8([item["catalog_id"] for item in validated], full_profiles or ()) or
+            (full_profiles is None and selected_ids is not None and not set(selected_ids) <= LEGACY_PROFILE_IDS)):
+        raise SatelliteTleError("six-digit catalog numbers and listen-only satellites require satellite protocol "
+                                "version 8; update the radio firmware")
     if len(validated) > capacity:
         raise SatelliteTleError(f"this radio holds {capacity} satellites; {len(validated)} are selected")
     selected_count = len(full_profiles) if full_profiles is not None else \
@@ -966,13 +1014,9 @@ def main(argv=None):
                     actual = set_radio_profile_ids(link, selected, version)
                 else:
                     actual = radio_profile_ids(link, version)
-            names = {25544: "ISS", 27607: "SO-50", 40908: "LILACSAT-2", 40931: "IO-86",
-                     43017: "AO-91", 43678: "PO-101", 61781: "AO-123", 63213: "TEVEL2-4",
-                     63214: "TEVEL2-5", 63215: "TEVEL2-6", 63217: "TEVEL2-1",
-                     63218: "TEVEL2-3", 63219: "TEVEL2-2", 63237: "TEVEL2-9",
-                     63238: "TEVEL2-7", 63239: "TEVEL2-8", 67291: "RS95S"}
             for catalog_id in actual:
-                print(f"{names[catalog_id]} ({catalog_id})")
+                listen = " (listen only)" if PROFILE_FREQUENCIES[catalog_id][1] == 0 else ""
+                print(f"{PROFILE_NAMES[catalog_id]} ({catalog_id}){listen}")
             print(f"frequency profiles: {len(actual)}/{profile_max}; read-back verified")
             return 0
 

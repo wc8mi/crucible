@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // YSF DN voice on a channel (docs/spec/ysf.md 5): the call layer (ysf.h) on an air interface session
 // (core/air/air_session.h). The radio core begins it on a YSF channel and ends it on leaving; in between it receives
 // calls, hands their voice frames to a sink, and transmits when the radio core says so. No RTOS call: the radio
@@ -11,6 +12,12 @@
 #include "../air/air_voice.h"
 #include "../air/air_softmodem.h"
 
+// The voice path a call's frames go to (ysf.md 5.5): the DMR side's (AMBE+2: DN, V/D mode 1) or P25's full-rate
+// one (IMBE: VW, CONFIG_YSF_VW). NONE while the radio core switches between them
+#define YSF_PATH_NONE		0
+#define YSF_PATH_AMBE		1
+#define YSF_PATH_IMBE		2
+
 typedef struct {
 	// Receive, from the provider's task. start: a call we play began (its fields may still fill in: update). voice:
 	// a voice frame of the DMR side's voice path (ysf.h)
@@ -18,18 +25,27 @@ typedef struct {
 	void (*rx_update)(const ysf_call_t *c, void *ctx);
 	void (*rx_voice)(const uint8_t v[YSF_VOICE_BYTES], void *ctx);
 	void (*rx_end)(void *ctx);
-	// Transmit, from the provider's task: the next voice frame, false when none is ready. NULL: every frame is
-	// `silence`
-	bool (*tx_voice)(uint8_t v[YSF_VOICE_BYTES], void *ctx);
+	// Transmit, from the provider's task: the next voice frame of the transmission's path (YSF_VOICE_BYTES on the
+	// AMBE path, YSF_VW_BYTES on the IMBE path; v holds AIR_VOICE_FRAME_MAX), false when none is ready. NULL: every
+	// frame is silence
+	bool (*tx_voice)(uint8_t *v, void *ctx);
 	// A room reply heard, from the provider's task (ysf.md 9.3)
 	void (*rx_wx)(const ysf_wx_t *w, void *ctx);
+	// The call's voice on a path opens before its first frame there (open), and closes at the call's end if the path
+	// is still the one opened (a switch closes it itself). From the provider's task. NULL: nothing to open
+	void (*rx_path)(uint8_t path, bool open, void *ctx);
+	// A VW voice frame for the IMBE path (CONFIG_YSF_VW); errs packed as fec_imbe88_decode. From the provider's task
+	void (*rx_vw)(const uint8_t imbe[YSF_VW_BYTES], uint8_t errs, void *ctx);
 } ysf_engine_hooks_t;
 
 typedef struct {
 	uint8_t rx_dgid;	// YSF_DGID_ALL: every call; else only calls with this DG-ID
 	ysf_tx_id_t tx;		// what we send: callsign, radio ID, DG-ID, route
 	bool tx_inhibit;	// no callsign: PTT refused
+	uint8_t voice;		// ysf_cp_voice_t (ysf_codeplug.h): what PTT sends; only a mode this build can send
+	bool narrow;		// half deviation (ADR 005 5): the session's profile, and FICH DEV on transmit
 	const uint8_t *silence;	// a voice frame of silence (YSF_VOICE_BYTES), from the vocoder
+	const uint8_t *silence_vw;	// an IMBE frame of silence (YSF_VW_BYTES), for VW; NULL: no VW transmit
 } ysf_engine_cfg_t;
 
 typedef struct {
@@ -39,6 +55,7 @@ typedef struct {
 	uint8_t tx;		// air_tx_state_t
 	uint32_t rx_calls, tx_calls;
 	uint32_t tx_filler;	// silence frames sent because the encoder had none ready
+	uint32_t path_drops;	// VCH dropped while the voice path was not the one their data type needs
 } ysf_engine_view_t;
 
 typedef struct {
@@ -49,6 +66,12 @@ typedef struct {
 	ysf_engine_hooks_t hooks;
 	void *ctx;
 	ysf_call_t heard;		// the call heard as published with av's view
+	// The voice path (ysf_engine_path_*): path the radio core's task writes, the frames' one now; want the provider's,
+	// what the call heard needs (between calls the home path, the one the channel transmits on); gate odd while the provider is inside a voice hook, so the radio
+	// core knows when the old path is no longer in use; opened the path whose voice the call opened
+	volatile uint8_t path, want, gate;
+	uint8_t opened;
+	uint32_t path_drops;
 	uint8_t frame[YSF_FRAME_BYTES];		// the framer's frame buffer ...
 	int8_t soft[YSF_FRAME_SYMS];		// ... and its soft values, for the decoders
 #if CONFIG_AIR_RX_ADAPT
@@ -56,8 +79,8 @@ typedef struct {
 #endif
 } ysf_engine_t;
 
-// What the board's provider gives YSF: AIR_FIT_xxx, 0 = this board can't
-uint32_t ysf_engine_fit(const hal_air_t *air);
+// What the board's provider gives YSF at a deviation: AIR_FIT_xxx, 0 = this board can't
+uint32_t ysf_engine_fit(const hal_air_t *air, bool narrow);
 // Start on the tuned channel (the board in its digital mode, its DMR stack stopped). False: no provider, no fit
 bool ysf_engine_begin(ysf_engine_t *e, const hal_air_t *air, const ysf_engine_cfg_t *cfg,
 		      const ysf_engine_hooks_t *hooks, void *ctx);
@@ -79,5 +102,17 @@ void ysf_engine_tx_clear(ysf_engine_t *e);
 
 // A copy of the state for the radio core's task
 void ysf_engine_view(const ysf_engine_t *e, ysf_engine_view_t *out);
+
+// The voice path, the radio core's task (ysf.md 5.5). want: the path the call heard needs. A switch: close (frames drop
+// from then on, the token to give quiet), quiet until true (no voice hook still runs on the old path), then the radio
+// core stops the old path, starts the new one and opens it
+uint8_t ysf_engine_path_want(const ysf_engine_t *e);
+// The path the channel transmits on (IMBE for VW, else AMBE): the engine wants it between calls, and PTT needs it
+uint8_t ysf_engine_path_home(const ysf_engine_t *e);
+// The data type PTT sends: YSF_DT_VD2 (DN), YSF_DT_VD1 or YSF_DT_VW, from cfg.voice
+uint8_t ysf_engine_tx_dt(const ysf_engine_t *e);
+uint8_t ysf_engine_path_close(ysf_engine_t *e);
+bool ysf_engine_path_quiet(const ysf_engine_t *e, uint8_t token);
+void ysf_engine_path_open(ysf_engine_t *e, uint8_t path);
 
 #endif

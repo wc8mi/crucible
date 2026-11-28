@@ -101,7 +101,7 @@ enum {
 
 // DL_CMD_SATELLITE operations (first payload byte; docs/spec/satellite.md 6)
 enum {
-	DL_SAT_OP_INFO = 0,	// -> version u8, capacity u16, installed count u16; v8 adds profile capacity u8
+	DL_SAT_OP_INFO = 0,	// -> version u8, capacity u16, installed count u16; v9 adds profile capacity u8
 	DL_SAT_OP_LIST,		// start u16 -> count u8, then (catalog ID u32, epoch Unix seconds u32) entries
 	DL_SAT_OP_BEGIN,	// count u16, bytes u16, CRC-32 u32 -> transaction ID u16
 	DL_SAT_OP_DATA,		// transaction ID u16, offset u16, up to 59 data bytes -> next offset u16
@@ -115,7 +115,7 @@ enum {
 	DL_SAT_OP_PROFILE_VALUES_GET,	// -> count u8, then (ID, RX Hz, TX Hz u32, tone tenths u16) records
 	DL_SAT_OP_PROFILE_STAGE_CHUNK,	// transaction ID u16, total u8, offset u8, count u8, then profile records
 	DL_SAT_OP_SYNC_CHANNELS_STATUS,	// -> satellite_channels_sync_status_t
-	DL_SAT_OP_PROFILE_SET_CHUNK	// v8: total u8, start u8, count u8, then IDs u32; applied with the last chunk
+	DL_SAT_OP_PROFILE_SET_CHUNK	// v9: total u8, start u8, count u8, then IDs u32; applied with the last chunk
 };
 
 // DL_CMD_HWOPT operations (first payload byte; docs/spec/debuglink.md 3.25)

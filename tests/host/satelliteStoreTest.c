@@ -32,7 +32,7 @@ void storage_quick_unlock(void) { }
 #define TEST_RECORD_MAX (4u + 1u + 48u + 2u * 69u)
 // A profile ID list that fits one PROFILE_SET request (the protocol-v7 clients' maximum)
 #define V7_PROFILES 10u
-#define INFO_LEN 7u	// protocol v8: status, version, capacity u16, count u16, profile capacity
+#define INFO_LEN 7u	// protocol v9: status, version, capacity u16, count u16, profile capacity
 static band_t test_band = { .lo_hz = 10000000u, .hi_hz = 999999999u, .tx = true };
 static const hal_flash_map_t map = {
 	.settings_addr = 0x01000u, .settings_size = 0x02000u, .journal_addr = 0x03000u,
@@ -98,7 +98,8 @@ static void make_line(uint8_t *line, char number, uint32_t id, const char *epoch
 	memset(line, ' ', 69);
 	line[0] = (uint8_t)number;
 	line[1] = ' ';
-	line[2] = (uint8_t)('0' + id / 10000u);
+	static const char alpha5[] = "ABCDEFGHJKLMNPQRSTUVWXYZ";	// 10 to 33: Alpha-5 skips I and O
+	line[2] = (uint8_t)(id < 100000u ? '0' + id / 10000u : alpha5[id / 10000u - 10u]);
 	line[3] = (uint8_t)('0' + id / 1000u % 10u);
 	line[4] = (uint8_t)('0' + id / 100u % 10u);
 	line[5] = (uint8_t)('0' + id / 10u % 10u);
@@ -321,7 +322,7 @@ static bool install_replace_profile_chunks(const uint8_t *data, uint16_t data_le
 static void test_inventory_transactions(void)
 {
 	uint8_t req[9] = { DL_SAT_OP_INFO };
-	CHECK(command(req, 1) == INFO_LEN && output[0] == DL_ST_OK && output[1] == 8 &&
+	CHECK(command(req, 1) == INFO_LEN && output[0] == DL_ST_OK && output[1] == 9 &&
 	      get16(output + 2) == SATELLITE_STORE_MAX_RECORDS && get16(output + 4) == 0 &&
 	      output[6] == SATELLITE_PROFILE_MAX);
 	uint8_t profile_req = DL_SAT_OP_PROFILE_GET;
@@ -724,6 +725,49 @@ static void test_first_install_recovery(void)
 	CHECK(command(&info, 1u) == INFO_LEN && output[0] == DL_ST_OK && get16(output + 4) == 1u);
 }
 
+// Six-digit catalog numbers arrive as Alpha-5 TLEs; listen-only profiles carry TX 0 and no tone
+static void test_alpha5_and_listen_only_profiles(void)
+{
+	sim_flash_create(FLASH_SIZE, &map);
+	CHECK(storage_init());
+	uint8_t record[TEST_RECORD_MAX];
+	uint16_t length = make_record(record, 101102u, "HADES-L", "26315.50000000");
+	CHECK(record[5 + 7 + 2] == 'A' && record[5 + 7 + 69 + 2] == 'A');
+	satellite_frequency_profile_t profile = {
+		.catalog_id = 101102u, .name = "SO-132", .rx_hz = 436665000u, .tx_hz = 0u, .tx_tone_tenths = 0u,
+	};
+	CHECK(install_replace_profile(record, length, profile));
+	satellite_record_t installed;
+	CHECK(satellite_store_count() == 1u && satellite_store_get(0u, &installed) &&
+	      installed.catalog_id == 101102u && strncmp(installed.line1 + 2, "A1102", 5u) == 0);
+	satellite_frequency_profile_t readback;
+	CHECK(satellite_frequency_profile(101102u, &readback) && readback.rx_hz == 436665000u &&
+	      readback.tx_hz == 0u && readback.tx_tone_tenths == 0u && strcmp(readback.name, "SO-132") == 0);
+	uint8_t list[3] = { DL_SAT_OP_LIST };
+	CHECK(command(list, sizeof(list)) == 10u && output[0] == DL_ST_OK && output[1] == 1u &&
+	      get32(output + 2u) == 101102u);
+
+	satellite_frequency_profile_t listen[2] = {
+		{ 59112u, "SONATE-2", 145880000u, 0u, 0u },
+		{ 101101u, "SO-131", 436888000u, 145925000u, 0u },
+	};
+	CHECK(satellite_store_frequency_profiles_set(2u, listen));
+	listen[0].tx_tone_tenths = 670u;	// a tone with no uplink is a malformed profile
+	CHECK(!satellite_store_frequency_profiles_set(2u, listen));
+	listen[0].tx_tone_tenths = 0u;
+	listen[0].catalog_id = SATELLITE_CATALOG_ID_MAX + 1u;
+	CHECK(!satellite_store_frequency_profiles_set(2u, listen));
+	static const uint32_t catalog_ids[] = { 59112u, 101101u, 101102u, 43770u };
+	CHECK(satellite_store_profiles_set(4u, catalog_ids));
+	CHECK(satellite_frequency_profile(43770u, &readback) && readback.tx_hz == 0u);
+
+	length = make_record(record, SATELLITE_CATALOG_ID_MAX, "Z9999", "26315.50000000");
+	CHECK(strncmp((const char *)record + 5 + 5 + 2, "Z9999", 5u) == 0);
+	profile.catalog_id = SATELLITE_CATALOG_ID_MAX;
+	CHECK(install_replace_profile(record, length, profile));
+	CHECK(satellite_store_get(0u, &installed) && installed.catalog_id == SATELLITE_CATALOG_ID_MAX);
+}
+
 static void test_cross_band_profiles_install(void)
 {
 	static const satellite_frequency_profile_t profiles[SATELLITE_PROFILE_MAX] = {
@@ -795,7 +839,7 @@ static void test_eighteen_records(void)
 	CHECK(satellite_store_count() == SATELLITE_STORE_MAX_RECORDS);
 }
 
-// Protocol v8's PROFILE_SET_CHUNK: a catalog ID list longer than one request, in order, applied with its last chunk
+// Protocol v9's PROFILE_SET_CHUNK: a catalog ID list longer than one request, in order, applied with its last chunk
 static void test_profile_set_chunk(void)
 {
 	sim_flash_create(FLASH_SIZE, &map);
@@ -924,6 +968,7 @@ int main(void)
 	test_eighteen_records();
 	test_profile_set_chunk();
 	test_v4_bank_reads();
+	test_alpha5_and_listen_only_profiles();
 	CHECK(sim_flash_violations() == 0);
 	sim_flash_free();
 	if (failures != 0) {

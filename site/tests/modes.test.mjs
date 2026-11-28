@@ -477,13 +477,15 @@ test("vectors: NXDN conventional block, unit ID record", () => {
 
 test("vectors: YSF channel block, callsign record", () => {
 	assert.ok(vectors("ysfchan").length >= 8);
+	const voice = (w) => w.toLowerCase();
 	for (const l of vectors("ysfchan")) {
-		const [b, tx, rx] = l.split(" ");
-		assert.deepEqual(ysf.decodeChan(bytes(b) ?? new Uint8Array(0)), { txDgid: parseInt(tx, 16), rxDgid: parseInt(rx, 16) }, l);
+		const [b, tx, rx, v, narrow] = l.split(" ");
+		assert.deepEqual(ysf.decodeChan(bytes(b) ?? new Uint8Array(0)),
+			{ txDgid: parseInt(tx, 16), rxDgid: parseInt(rx, 16), voice: voice(v), narrow: narrow === "1" }, l);
 	}
 	for (const l of vectors("ysfenc")) {
-		const [tx, rx, b] = l.split(" ");
-		assert.equal(hexOf(ysf.encodeChan({ txDgid: parseInt(tx, 16), rxDgid: parseInt(rx, 16) })), b, l);
+		const [tx, rx, v, narrow, b] = l.split(" ");
+		assert.equal(hexOf(ysf.encodeChan({ txDgid: parseInt(tx, 16), rxDgid: parseInt(rx, 16), voice: voice(v), narrow: narrow === "1" })), b, l);
 	}
 	for (const l of vectors("ysfcall")) {
 		const [b, call] = l.split(" ");
@@ -492,9 +494,14 @@ test("vectors: YSF channel block, callsign record", () => {
 });
 
 test("YSF: a channel round-trips, the callsign record too, and no field holds a radio ID", () => {
-	const v = ysf.encodeChan({ txDgid: 12, rxDgid: 0 }, Uint8Array.of(0, 0, 0xAA, 0xBB));
-	assert.equal(hexOf(v), "0C00AABB");	// bytes past the block kept
-	assert.deepEqual(ysf.decodeChan(v), { txDgid: 12, rxDgid: 0 });
+	// byte 2 written from the fields, its reserved bits (0xA8 here) and the bytes past the block kept
+	const v = ysf.encodeChan({ txDgid: 12, rxDgid: 0, voice: "vw", narrow: true }, Uint8Array.of(0, 0, 0xAA, 0xBB));
+	assert.equal(hexOf(v), "0C00AFBB");
+	assert.deepEqual(ysf.decodeChan(v), { txDgid: 12, rxDgid: 0, voice: "vw", narrow: true });
+	// a block an older editor or firmware wrote grows byte 2; a new channel is DN Wide
+	assert.equal(hexOf(ysf.encodeChan({ txDgid: 1, rxDgid: 2, voice: "vd1", narrow: false }, Uint8Array.of(1, 2))), "010200");
+	assert.deepEqual(ysf.ysfKind.newParams(), { txDgid: 0, rxDgid: 0, voice: "dn", narrow: false });
+	assert.equal(hexOf(ysf.encodeChan(ysf.ysfKind.newParams())), "000002");
 	assert.equal(ysf.encodeRadio({ callsign: "" }), null);	// none: the radio name's
 	assert.equal(hexOf(ysf.encodeRadio({ callsign: "n0call" })), "4E3043414C4C00000000");
 	const keys = [...ysf.ysfKind.fields().map((f) => f.key), ...ysf.ysfKind.settings.fields.map((f) => f.key)];

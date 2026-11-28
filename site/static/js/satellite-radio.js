@@ -86,7 +86,7 @@ async function radioBands(link) {
 	const text = new TextDecoder().decode(reply.subarray(5));
 	const match = /^bands=([^\r\n]*)$/m.exec(text);
 	if (!match || !match[1]) throw new Error("Radio did not report its supported frequency bands");
-	// The view includes RX-only ranges; no catalog satellite uplink currently falls in one.
+	// The view includes RX-only ranges; no catalog satellite uplink currently falls in one. TX 0 is listen only.
 	return match[1].split(",").map((range) => {
 		const parsed = /^(\d+)-(\d+)$/.exec(range);
 		if (!parsed || Number(parsed[1]) > Number(parsed[2]))
@@ -97,7 +97,7 @@ async function radioBands(link) {
 
 async function checkProfileBands(link, profiles) {
 	const bands = await radioBands(link);
-	const unsupported = profiles.some((profile) => [profile.rx_hz, profile.tx_hz].some((frequency) =>
+	const unsupported = profiles.some((profile) => [profile.rx_hz, profile.tx_hz].some((frequency) => frequency &&
 		!bands.some(([low, high]) => frequency >= low && frequency <= high)));
 	if (unsupported) {
 		const translationKey = bands.length === 1 ? SINGLE_BAND_ERROR : OTHER_BAND_ERROR;
@@ -111,13 +111,18 @@ export async function pushSatelliteBundle(link, bundle, onProgress = () => {}) {
 	    bundle.records.length < 1 || bundle.records.length > MAX_SELECTED_PROFILES || bundle.profiles.length !== bundle.records.length)
 		throw new Error("Invalid satellite bundle");
 	const info = await link.request(COMMAND, new Uint8Array([OP.INFO]));
-	// INFO: version, record capacity u16, installed count u16; protocol v8 appends the profile capacity (else 10)
+	// INFO: version, record capacity u16, installed count u16; protocol v9 appends the profile capacity (else 10)
 	if (info.length < 5 || info[0] < 5) throw new Error("Radio firmware needs satellite protocol version 5 or newer");
-	if (info.length !== (info[0] >= 8 ? 6 : 5)) throw new Error("Radio returned malformed satellite capability data");
-	const profileMax = info[0] >= 8 ? info[5] : 10;
+	if (info.length !== (info[0] >= 9 ? 6 : 5)) throw new Error("Radio returned malformed satellite capability data");
+	const profileMax = info[0] >= 9 ? info[5] : 10;
 	if (bundle.profiles.length > 4 && info[0] < 6)
 		throw Object.assign(new Error("Radio firmware needs satellite protocol version 6 or newer for more than four profiles"),
 			{ translationKey: "tools.satellite.status.profile_version" });
+	// Older firmware refuses both; say why instead of letting the transfer fail
+	if (info[0] < 8 && (bundle.records.some((record) => record.catalog_id > 99999) ||
+	    bundle.profiles.some((profile) => profile.tx_hz === 0)))
+		throw Object.assign(new Error("Radio firmware needs satellite protocol version 8 or newer for these satellites"),
+			{ translationKey: "tools.satellite.status.wide_version" });
 	const radioMax = Math.min(profileMax, get16(new DataView(info.buffer, info.byteOffset, info.byteLength), 1));
 	if (radioMax < bundle.records.length)
 		throw Object.assign(new Error(`This radio keeps at most ${radioMax} satellites`),

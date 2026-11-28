@@ -1,27 +1,63 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // YSF DN voice on a channel (ysf_engine.h), on the shared voice engine (air_voice.h)
 #include "ysf_engine.h"
 
 #include <stddef.h>
 #include <string.h>
 
-_Static_assert(YSF_VOICE_BYTES <= AIR_VOICE_FRAME_MAX, "a voice frame fits air_voice's");
+#include "config.h"
+#include "ysf_codeplug.h"
 
-uint32_t ysf_engine_fit(const hal_air_t *air)
+_Static_assert(YSF_VOICE_BYTES <= AIR_VOICE_FRAME_MAX && YSF_VW_BYTES <= AIR_VOICE_FRAME_MAX, "a voice frame fits air_voice's");
+
+uint32_t ysf_engine_fit(const hal_air_t *air, bool narrow)
 {
-	return air_session_fit(air, &ysf_air_mode);
+	return air_session_fit(air, narrow ? &ysf_air_mode_narrow : &ysf_air_mode);
 }
 
 // ── Receive (provider's task) ──
-// DN voice whose DG-ID is ours, or every call with ours at 0 (ysf.md 5.1)
+// Voice this build plays (DN, V/D mode 1, VW with CONFIG_YSF_VW) whose DG-ID is ours, or every call with ours at 0
+// (ysf.md 5.1)
 static bool wanted(const ysf_engine_t *e, const ysf_call_t *c)
 {
-	return c->dt == YSF_DT_VD2 && (e->cfg.rx_dgid == YSF_DGID_ALL || c->dgid == e->cfg.rx_dgid);
+	bool voice = c->dt == YSF_DT_VD2 || c->dt == YSF_DT_VD1 || (CONFIG_YSF_VW && c->dt == YSF_DT_VW);
+
+	return voice && (e->cfg.rx_dgid == YSF_DGID_ALL || c->dgid == e->cfg.rx_dgid);
 }
+
+// A voice frame for path: asked for (the radio core switches to it), and true when it may go there now, the path
+// opened for the call first. The caller holds the gate (gate_in, gate_out) around this and the hook it calls
+static bool path_ready(ysf_engine_t *e, uint8_t path)
+{
+	e->want = path;
+	if (e->path != path) {
+		e->path_drops++;
+		return false;
+	}
+	if (e->opened != path) {
+		e->opened = path;
+		if (e->hooks.rx_path)
+			e->hooks.rx_path(path, true, e->ctx);
+	}
+	return true;
+}
+
+static void gate_in(ysf_engine_t *e) { e->gate = (uint8_t)(e->gate + 1); }
+static void gate_out(ysf_engine_t *e) { e->gate = (uint8_t)(e->gate + 1); }
 
 static void notify(ysf_engine_t *e, const ysf_call_t *c, air_voice_event_t ev)
 {
+	if (ev == AIR_VOICE_END) {
+		// The call no longer plays (it ended, or left our DG-ID): its voice closes on the path it opened, if a switch
+		// hasn't closed that already
+		gate_in(e);
+		if (e->opened != YSF_PATH_NONE && e->opened == e->path && e->hooks.rx_path)
+			e->hooks.rx_path(e->opened, false, e->ctx);
+		e->opened = YSF_PATH_NONE;
+		gate_out(e);
+	}
 	if (ev == AIR_VOICE_START && e->hooks.rx_start)
 		e->hooks.rx_start(c, e->ctx);
 	else if (ev == AIR_VOICE_UPDATE && e->hooks.rx_update)
@@ -51,14 +87,37 @@ static void on_voice(const uint8_t v[YSF_VOICE_BYTES], void *ctx)
 
 	if (air_voice_recheck_due(&e->av))
 		rx_fields(e, &e->rx.call, false);
-	if (air_voice_rx_voice(&e->av) && e->hooks.rx_voice)
+	if (!air_voice_rx_voice(&e->av))
+		return;
+	gate_in(e);
+	if (path_ready(e, YSF_PATH_AMBE) && e->hooks.rx_voice)
 		e->hooks.rx_voice(v, e->ctx);
+	gate_out(e);
 }
+
+#if CONFIG_YSF_VW
+static void on_vw(const uint8_t imbe[YSF_VW_BYTES], uint8_t errs, void *ctx)
+{
+	ysf_engine_t *e = ctx;
+
+	if (air_voice_recheck_due(&e->av))
+		rx_fields(e, &e->rx.call, false);
+	if (!air_voice_rx_voice(&e->av))
+		return;
+	gate_in(e);
+	if (path_ready(e, YSF_PATH_IMBE) && e->hooks.rx_vw)
+		e->hooks.rx_vw(imbe, errs, e->ctx);
+	gate_out(e);
+}
+#else
+#define on_vw NULL
+#endif
 
 static void on_end(void *ctx)
 {
 	ysf_engine_t *e = ctx;
 
+	e->want = ysf_engine_path_home(e);	// between calls: the path a transmission sends on
 	notify(e, NULL, air_voice_rx_end(&e->av));
 }
 
@@ -70,7 +129,7 @@ static void on_wx(const ysf_wx_t *w, void *ctx)
 		e->hooks.rx_wx(w, e->ctx);
 }
 
-static const ysf_call_sink_t sink = { on_start, on_update, on_voice, on_end, on_wx };
+static const ysf_call_sink_t sink = { on_start, on_update, on_voice, on_end, on_wx, on_vw };
 
 // ── Transmit: the call layer behind air_voice's tx_fill ──
 static uint16_t t_ready(void *t, uint16_t *first) { return ysf_call_tx_ready(t, first); }
@@ -89,7 +148,13 @@ static int8_t t_next(void *eng, uint8_t v[AIR_VOICE_FRAME_MAX])
 		return -1;
 	return e->hooks.tx_voice(v, e->ctx) ? 1 : 0;
 }
-static const uint8_t *t_silence(void *eng) { return ((ysf_engine_t *)eng)->cfg.silence; }
+// Asked before the transmission begins as well as during it: by the data type PTT sends
+static const uint8_t *t_silence(void *eng)
+{
+	ysf_engine_t *e = eng;
+
+	return ysf_engine_tx_dt(e) == YSF_DT_VW ? e->cfg.silence_vw : e->cfg.silence;
+}
 
 _Static_assert(offsetof(ysf_engine_t, av) == 0, "air_voice_t first: tx_fill reaches the engine from it");
 static const air_voice_tx_ops_t tx_ops = {
@@ -103,11 +168,12 @@ bool ysf_engine_begin(ysf_engine_t *e, const hal_air_t *air, const ysf_engine_cf
 	e->cfg = *cfg;
 	e->hooks = *hooks;
 	e->ctx = ctx;
+	e->path = e->want = ysf_engine_path_home(e);	// the radio core starts this path with the engine
 	ysf_call_rx_init(&e->rx, &sink, e);
 #if CONFIG_AIR_RX_ADAPT
 	air_softmodem_lend(&e->adapt);	// before the open: a provider with a soft modem sets it up there
 #endif
-	if (air_voice_open(&e->av, air, &ysf_air_mode, &e->rx.rx, e->frame, e->soft, YSF_FRAME_SYMS, &tx_ops))
+	if (air_voice_open(&e->av, air, cfg->narrow ? &ysf_air_mode_narrow : &ysf_air_mode, &e->rx.rx, e->frame, e->soft, YSF_FRAME_SYMS, &tx_ops))
 		return true;
 #if CONFIG_AIR_RX_ADAPT
 	air_softmodem_lend(NULL);
@@ -131,6 +197,8 @@ void ysf_engine_retuned(ysf_engine_t *e)
 void ysf_engine_set(ysf_engine_t *e, const ysf_engine_cfg_t *cfg)
 {
 	e->cfg = *cfg;
+	if (e->opened == YSF_PATH_NONE)
+		e->want = ysf_engine_path_home(e);	// no call playing: the new home path, which the radio core switches to
 	air_voice_recheck(&e->av);
 }
 
@@ -139,7 +207,7 @@ bool ysf_engine_tx_prepare(ysf_engine_t *e)
 	if (e->cfg.tx_inhibit || !air_voice_tx_can(&e->av, true))
 		return false;
 	if (air_voice_tx_begin(&e->av))
-		ysf_call_tx_begin(&e->tx, &e->cfg.tx);
+		ysf_call_tx_begin(&e->tx, &e->cfg.tx, ysf_engine_tx_dt(e), e->cfg.narrow);
 	return air_voice_tx_prime(&e->av);
 }
 
@@ -188,4 +256,44 @@ void ysf_engine_view(const ysf_engine_t *e, ysf_engine_view_t *out)
 	out->rx_calls = v.rx_calls;
 	out->tx_calls = v.tx_calls;
 	out->tx_filler = v.tx_filler;
+	out->path_drops = e->path_drops;
+}
+
+uint8_t ysf_engine_path_want(const ysf_engine_t *e)
+{
+	return e->want;
+}
+
+uint8_t ysf_engine_tx_dt(const ysf_engine_t *e)
+{
+	switch (e->cfg.voice) {
+	case YSF_CP_VOICE_VD1:
+		return YSF_DT_VD1;
+	case YSF_CP_VOICE_VW:
+		return CONFIG_YSF_VW ? YSF_DT_VW : YSF_DT_VD2;
+	default:
+		return YSF_DT_VD2;
+	}
+}
+
+uint8_t ysf_engine_path_home(const ysf_engine_t *e)
+{
+	return ysf_engine_tx_dt(e) == YSF_DT_VW ? YSF_PATH_IMBE : YSF_PATH_AMBE;
+}
+
+uint8_t ysf_engine_path_close(ysf_engine_t *e)
+{
+	e->path = YSF_PATH_NONE;
+	return e->gate;		// read after the write: a hook entered from now on sees NONE
+}
+
+bool ysf_engine_path_quiet(const ysf_engine_t *e, uint8_t token)
+{
+	// Even: no hook was running at the close. Odd: one was, on the old path; quiet once the gate moved on
+	return (token & 1u) == 0 || e->gate != token;
+}
+
+void ysf_engine_path_open(ysf_engine_t *e, uint8_t path)
+{
+	e->path = path;
 }

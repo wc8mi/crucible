@@ -11,6 +11,7 @@
 
 #define SATELLITE_NAME_MAX 48u
 #define SATELLITE_TLE_LINE_LENGTH 69u
+#define SATELLITE_CATALOG_ID_MAX 339999u	// Z9999 in Alpha-5
 // 18 records and their profiles fill one 4 KiB erase sector at the 48-byte name limit (store.c checks it)
 #define SATELLITE_STORE_MAX_RECORDS 18u
 #define SATELLITE_PROFILE_MAX 18u

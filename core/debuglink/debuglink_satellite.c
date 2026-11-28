@@ -12,7 +12,8 @@
 #if CONFIG_SATELLITE_TLE
 #define SAT_MAX_RECORDS SATELLITE_STORE_MAX_RECORDS
 #define SAT_PROFILE_CHUNK_MAX 4u
-#define SAT_PROTOCOL_VERSION 8u
+#define SAT_PROTOCOL_VERSION 9u	// 8: six-digit (Alpha-5) catalog numbers and listen-only (TX 0) profiles;
+				// 9: 18 records and profiles, INFO's profile capacity, PROFILE_SET_CHUNK
 // PROFILE_SET_CHUNK: op, total, start, count, then IDs within the 64-byte request
 #define SAT_PROFILE_SET_CHUNK_MAX ((DL_REQ_MAX - 4u) / 4u)
 
@@ -180,7 +181,7 @@ size_t debuglink_cmd_satellite(const uint8_t *req, uint16_t len, uint8_t *out, s
 		out[1] = SAT_PROTOCOL_VERSION;
 		put16(out + 2u, SAT_MAX_RECORDS);
 		put16(out + 4u, satellite_store_count());
-		out[6] = SATELLITE_PROFILE_MAX;	// v8: frequency profiles the radio keeps
+		out[6] = SATELLITE_PROFILE_MAX;	// v9: frequency profiles the radio keeps
 		return 7u;
 	}
 	case DL_SAT_OP_LIST:
