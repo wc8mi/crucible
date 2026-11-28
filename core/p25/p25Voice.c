@@ -61,6 +61,8 @@ static bool cb_live, cb_primed, cb_playing, cb_speaker, cb_mixing;
 // had it on. The first block sends cb_speaker whatever it was, or the route (and the board's amplifier) stays on
 static bool cb_speaker_unsent;
 static uint8_t cb_lead;			// silent blocks left before the first frame plays
+static uint8_t prime = P25_VOICE_PRIME;	// p25VoiceBegin: frames queued before playback starts
+static rx_agc_mode_t agc_mode = RX_AGC_P25;	// p25VoiceBegin: whose receive AGC settings apply
 static uint32_t cb_call_frames;
 
 #if CONFIG_RX_AGC
@@ -127,6 +129,17 @@ static void rx_voice(const uint8_t imbe[P25_IMBE_BYTES], uint8_t errs, void *ctx
 	e->errs = errs;
 	memcpy(e->imbe, imbe, P25_IMBE_BYTES);
 	STORE(rx_head, (uint8_t)(h + 1));
+}
+
+void p25VoiceRxIdentity(uint32_t source, uint16_t scope)
+{
+#if CONFIG_RX_AGC
+	rx_source = source;
+	rx_scope = scope;
+#else
+	(void)source;
+	(void)scope;
+#endif
 }
 
 static void rx_end(void *ctx)
@@ -205,7 +218,7 @@ static void rx_block(int16_t *spk)
 	if (queued != 0) {
 		const p25_voice_entry_t *first = &mem->q[t & (P25_VOICE_QUEUE - 1)];
 		if (!agc.started)
-			rx_agc_begin(&agc, RX_AGC_P25, first->source, first->scope);
+			rx_agc_begin(&agc, agc_mode, first->source, first->scope);
 		else
 			rx_agc_identify(&agc, first->source, first->scope);
 	}
@@ -215,7 +228,7 @@ static void rx_block(int16_t *spk)
 		return;
 	}
 	if (!cb_primed) {
-		if (queued < P25_VOICE_PRIME && !(ended && queued > 0)) {
+		if (queued < prime && !(ended && queued > 0)) {
 			if (ended) {
 				cb_live = false;	// a call that ended before playing anything
 			}
@@ -911,8 +924,10 @@ void p25VoiceInit(const hal_audio_t *audio)
 	aud = audio;
 }
 
-void p25VoiceBegin(p25_voice_mem_t *m)
+void p25VoiceBegin(p25_voice_mem_t *m, uint8_t burst, rx_agc_mode_t mode)
 {
+	prime = burst != 0 && burst <= P25_VOICE_QUEUE / 2 ? burst : P25_VOICE_PRIME;
+	agc_mode = mode;
 #if CONFIG_RX_AGC
 	rx_agc_end(&agc);
 #endif

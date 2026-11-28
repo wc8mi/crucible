@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // YSF channels in the codeplug (ysf_codeplug.h, docs/spec/ysf-codeplug.md)
 #include <string.h>
 #include "config.h"
@@ -13,15 +14,32 @@
 void ysf_chan_decode(const uint8_t *b, int len, ysf_chan_t *out)
 {
 	uint8_t tx = len >= 1 ? b[0] : 0u, rx = len >= 2 ? b[1] : 0u;
+	// byte 2 absent (a block an older firmware or editor wrote): DN Wide, as before the byte existed
+	uint8_t b2 = len >= 3 ? b[2] : YSF_CP_DT_DN;
 
 	out->tx_dgid = tx <= YSF_CP_DGID_MAX ? tx : 0u;
 	out->rx_dgid = rx <= YSF_CP_DGID_MAX ? rx : 0u;
+	switch (b2 & 3u) {
+	case YSF_CP_DT_VW:
+		out->voice = YSF_CP_VOICE_VW;
+		break;
+	case YSF_CP_DT_VD1:
+		out->voice = YSF_CP_VOICE_VD1;
+		break;
+	default:
+		out->voice = YSF_CP_VOICE_DN;
+		break;
+	}
+	out->narrow = (b2 & YSF_CP_NARROW) != 0u;
 }
 
 void ysf_chan_encode(const ysf_chan_t *c, uint8_t out[YSF_CP_CHAN_LEN])
 {
+	uint8_t dt = c->voice == YSF_CP_VOICE_VW ? YSF_CP_DT_VW : c->voice == YSF_CP_VOICE_VD1 ? YSF_CP_DT_VD1 : YSF_CP_DT_DN;
+
 	out[0] = c->tx_dgid <= YSF_CP_DGID_MAX ? c->tx_dgid : 0u;
 	out[1] = c->rx_dgid <= YSF_CP_DGID_MAX ? c->rx_dgid : 0u;
+	out[2] = (uint8_t)(dt | (c->narrow ? YSF_CP_NARROW : 0u));
 }
 
 // A stored text field: up to the first NUL, trailing spaces dropped; "" when any character is outside `ok`

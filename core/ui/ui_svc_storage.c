@@ -1388,7 +1388,7 @@ static bool ysf_save_now(uint16_t number, const channel_t *ch, const ysf_chan_t 
 {
 	radio_ysf_settings_t s;
 	radio_ysf_settings(&s);
-	ysf_chan_t yc = { .tx_dgid = s.tx_dgid, .rx_dgid = s.rx_dgid };
+	ysf_chan_t yc = { .tx_dgid = s.tx_dgid, .rx_dgid = s.rx_dgid, .voice = s.voice, .narrow = s.narrow };
 	if (given != NULL)
 		yc = *given;
 	if (ch != &job_ch)

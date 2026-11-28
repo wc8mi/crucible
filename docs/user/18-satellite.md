@@ -14,10 +14,12 @@ Connect the radio over its debug-link USB connection. On the computer, browse a 
 python tools/satellite_tle.py catalog --source amsat
 ```
 
-For a browser workflow, open **Tools > Satellite TLE Update** on the RadioFoundry site. Load the AMSAT daily bulletin
-or browse for a TLE file, then choose up to 10 FM satellites by name. Non-FM objects are not shown. ISS, SO-50 and
-AO-91 start selected when present. Search does not clear checked selections. The page refreshes the AMSAT bulletin
-before each push or bundle download; a selected file is used as supplied. A push replaces checked satellites' existing
+For a browser workflow, open **Tools > Satellite TLE Update** on the RadioFoundry site. Click **Load latest
+TLEs** or browse for a TLE file, then choose up to 10 FM satellites by name. The button reads the AMSAT daily bulletin
+and PE0SAT's amateur list and keeps the newest TLE for each satellite; each satellite shows its TLE's age and source.
+Non-FM objects are not shown. ISS, SO-50 and AO-91 start selected when present, and the page remembers your choices
+for the next visit. Search does not clear checked selections. The page fetches both lists again before each push or
+bundle download; a selected file is used as supplied. A push replaces checked satellites' existing
 TLEs and verifies their epochs. The page can push directly over USB/serial or create a JSON bundle for the PC utility.
 Direct push requires a supported browser and a secure context (HTTPS or localhost).
 After an install or update, the web flasher offers this page when the installed build reports satellite support.
@@ -40,8 +42,8 @@ The utility checks both TLE lines, their identity and checksums, and element age
 The website replaces the satellite TLE inventory and selected frequency profiles. Command-line `sync` and `install`
 also replace the entire TLE inventory with the selected records; an orbital-only bundle leaves frequency profiles
 unchanged. Neither workflow creates, modifies, or removes codeplug zones or channels. Check the [AMSAT live FM satellite list](https://www.amsat.org/live-fm-satellites/)
-for current operating status before transmitting. The built-in frequency snapshot reflects that page's October 31,
-2026 update. SO-50 requires a 2-second 74.4 Hz CTCSS transmission to arm its timer; switch back to its normal
+for current operating status before transmitting. The built-in frequency snapshot reflects that page as of November
+27, 2026, plus listen-only SSTV and telemetry satellites. SO-50 requires a 2-second 74.4 Hz CTCSS transmission to arm its timer; switch back to its normal
 67.0 Hz uplink tone afterward. Use `read` to inspect installed IDs and epochs:
 
 ```sh
@@ -49,7 +51,9 @@ python tools/satellite_tle.py read
 ```
 
 Frequency profiles are separate from orbital elements. The daily TLE bulletin contains no frequencies; the page uses
-the known entries in AMSAT's live FM table, which currently covers all listed FM satellites. Non-FM objects are omitted.
+the radio's built-in table: the FM voice satellites on AMSAT's live FM page, plus satellites you can only listen to
+(SSTV and telemetry downlinks, or an uplink outside the radio's bands). The page marks those "listen only, no TX".
+Non-FM objects are omitted. TLEs with six-digit catalog numbers (Alpha-5, such as `A1101` for 101101) are read too.
 A profile list has a maximum of 10 entries. A website push replaces the radio's satellite TLE and frequency tables with
 the selected satellites, so unselected satellites disappear from the tracking list. The codeplug is left unchanged.
 The PC utility also reads or changes the built-in profile ID list directly:
@@ -61,7 +65,8 @@ python tools/satellite_tle.py profiles --id 25544,27607,43017
 
 The PC utility requires protocol v4 or later for replacement. Schema-v3 frequency bundles require protocol v5.
 Protocol v5 supports up to four selected frequency profiles;
-protocol v6 supports the full ten. Profile-only ID changes require protocol v3 or newer.
+protocol v6 supports the full ten. Listen-only satellites and six-digit catalog numbers require protocol v8: update
+the radio firmware if the page or utility asks for it. Profile-only ID changes require protocol v3 or newer.
 
 ## Enter a TLE on the radio
 
@@ -98,6 +103,7 @@ channel does not change the runtime profile used for tracking.
 The radio accepts frequency profiles only when both frequencies are within its supported bands. The TLE tools check
 the connected radio's bands and report when a single-band radio cannot use the selected profiles. To install TLEs
 without frequency profiles for pass prediction, use `tools/satellite_tle.py sync`.
+While you track a listen-only satellite, the TX row shows "RX only" and the radio refuses PTT.
 
 The screen reports receive and transmit Doppler offsets, the current Doppler-adjusted RX and TX frequencies,
 and the next pass's AOS and LOS countdowns. The north-up circular sky plot shows the predicted path from horizon to

@@ -84,7 +84,7 @@ static void begin(void)
 	speaker_pending = false;
 	pending_checks = 0;
 	starts = stops = 0;
-	p25VoiceBegin(&vmem);
+	p25VoiceBegin(&vmem, P25_VOICE_PRIME, RX_AGC_P25);
 }
 
 static void testPlayback(void)
@@ -372,6 +372,47 @@ static void testRouteTakeover(void)
 }
 
 
+// YSF VW bursts are one frame's 5 voice frames, not a 9-frame LDU (p25VoiceBegin's prime): playback starts after 5
+static void testFiveFramePriming(void)
+{
+	p25_voice_stats_t s;
+	uint8_t f[P25_IMBE_BYTES];
+	bool heard = false;
+
+	p25VoiceEnd();
+	p25VoiceResetStats();
+	running = spk_on = false;
+	p25VoiceBegin(&vmem, 5, RX_AGC_YSF);
+	hk->rx_start(NULL, NULL);
+	p25VoicePoll();
+	for (int i = 0; i < 4; i++) {
+		frame(f, i);
+		hk->rx_voice(f, 0, NULL);
+	}
+	CHECK(!block() && !spk_on, "played before 5 frames were in");
+	frame(f, 4);
+	hk->rx_voice(f, 0, NULL);
+	for (int i = 0; i < P25_VOICE_LEAD; i++)
+		CHECK(!block(), "lead-in block %d not silent", i);
+	CHECK(spk_on, "5 frames did not start playback");
+	for (int i = 0; i < 5; i++)
+		heard |= block();
+	p25VoiceGetStats(&s);
+	CHECK(heard && s.rx_calls == 1 && s.rx_frames == 5, "5-frame burst: heard %d calls %u frames %u", heard,
+	      (unsigned)s.rx_calls, (unsigned)s.rx_frames);
+	hk->rx_end(NULL);
+	// P25 again: 9 frames, as before
+	begin();
+	hk->rx_start(NULL, NULL);
+	p25VoicePoll();
+	for (int i = 0; i < 5; i++) {
+		frame(f, i);
+		hk->rx_voice(f, 0, NULL);
+	}
+	CHECK(!block() && !spk_on, "P25 played after 5 frames: the YSF priming was left over");
+	p25VoiceEnd();
+}
+
 #if CONFIG_RX_AGC
 static void testReceiveAgc(void)
 {
@@ -398,6 +439,31 @@ static void testReceiveAgc(void)
 	for (int i = 0; i <= P25_VOICE_LEAD; i++) block();
 	rx_agc_view(RX_AGC_P25, &v);
 	CHECK(v.cached, "P25 caller metadata reaches the history");
+	p25VoiceEnd();
+	rx_agc_reset();
+}
+
+// YSF VW through this path: YSF's receive AGC settings and the caller set by p25VoiceRxIdentity
+static void testReceiveAgcYsf(void)
+{
+	rx_agc_view_t v;
+
+	p25VoiceEnd();
+	p25VoiceBegin(&vmem, 5, RX_AGC_YSF);
+	rx_agc_reset();
+	rx_agc_configure(RX_AGC_YSF, 5);
+	hk->rx_start(NULL, NULL);
+	p25VoiceRxIdentity(0x4E30u, 12);
+	p25VoicePoll();
+	for (int n = 0; n < 20; n++) {
+		ldu(0);
+		for (int i = 0; i < P25_VOICE_FRAMES; i++) block();
+	}
+	rx_agc_view(RX_AGC_YSF, &v);
+	CHECK(v.enabled && v.valid, "YSF VW: the YSF receive AGC measured nothing");
+	rx_agc_view(RX_AGC_P25, &v);
+	CHECK(!v.valid, "YSF VW: the P25 receive AGC ran");
+	hk->rx_end(NULL);
 	p25VoiceEnd();
 	rx_agc_reset();
 }
@@ -637,7 +703,7 @@ static void testParrotMatchesTx(void)
 	CHECK(hk->tx_voice(bits, NULL), "no transmit frame to compare with capture");
 	p25VoiceGetStats(&s);
 	p25VoiceEnd();
-	p25VoiceBegin(&vmem);
+	p25VoiceBegin(&vmem, P25_VOICE_PRIME, RX_AGC_P25);
 	p25VoiceParrotReady(frames, 217, frames + 217);
 	p25VoiceSetMicGain(5);
 	CHECK(p25VoiceParrotCapture(false, -25, 10, false), "manual parrot capture refused");
@@ -665,7 +731,7 @@ static void testParrotAgcMatchesTx(void)
 		CHECK(hk->tx_voice(transmitted[b], NULL), "missing live AGC frame");
 	}
 	p25VoiceEnd();
-	p25VoiceBegin(&vmem);
+	p25VoiceBegin(&vmem, P25_VOICE_PRIME, RX_AGC_P25);
 	p25VoiceParrotReady(frames, 217, frames + 217);
 	CHECK(p25VoiceParrotCapture(true, -20, 5, false), "AGC parity capture refused");
 	for (unsigned b = 0; b < 60; b++) {
@@ -924,8 +990,10 @@ int main(void)
 	testMixerAndTx();
 	testTransmit();
 	testRouteTakeover();
+	testFiveFramePriming();
 #if CONFIG_RX_AGC
 	testReceiveAgc();
+	testReceiveAgcYsf();
 #endif
 	testTxManualCeiling();
 #if CONFIG_P25_TX_AGC

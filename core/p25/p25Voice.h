@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 /*
  * P25 voice between the engine (p25_engine.h, 88-bit full-rate voice frames) and the board's PCM audio
  * (hal_audio_t). docs/spec/p25.md 5.
@@ -35,7 +36,7 @@
 #include "p25_parrot.h"
 
 #define P25_VOICE_QUEUE		32	// frames (640 ms), power of two: two LDUs and room for jitter
-#define P25_VOICE_PRIME		P25_VOICE_FRAMES	// frames queued before playback starts: one LDU
+#define P25_VOICE_PRIME		P25_VOICE_FRAMES	// P25's frames per burst (p25VoiceBegin): one LDU
 #define P25_VOICE_LEAD		2	// blocks of silence after that, the margin for the next LDU
 #define P25_VOICE_TX_QUEUE	8	// encoded frames waiting for the engine (160 ms), power of two
 
@@ -92,8 +93,13 @@ typedef struct {
 
 // The board's PCM audio (NULL: frames are counted, nothing plays). Once, at start-up
 void p25VoiceInit(const hal_audio_t *audio);
-// Start on mem (radio task, before p25_engine_begin); the stream starts with the first call (p25VoicePoll)
-void p25VoiceBegin(p25_voice_mem_t *mem);
+// Start on mem (radio task, before p25_engine_begin); the stream starts with the first call (p25VoicePoll). prime: the
+// frames a burst brings at once, queued before playback starts (P25_VOICE_PRIME, one LDU; YSF VW 5, one frame's);
+// agc: the receive AGC's mode, whose settings apply (RX_AGC_P25, or RX_AGC_YSF for YSF VW)
+void p25VoiceBegin(p25_voice_mem_t *mem, uint8_t prime, rx_agc_mode_t agc);
+// The caller and its scope for the receive AGC's memory, for a mode whose calls are not P25's (YSF VW): after the
+// rx_start hook, which clears them, and again as the fields fill in. Provider's task, as the hooks
+void p25VoiceRxIdentity(uint32_t source, uint16_t scope);
 // Radio task, every tick while P25 runs: starts the audio stream once a call is heard
 void p25VoicePoll(void);
 // A transmission starts (the stream starts if it was not running; from the next block the mic is encoded) or ends.
