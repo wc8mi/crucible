@@ -148,16 +148,22 @@ nxdnTest: nxdnTest.c $(NXDN) $(wildcard $(CORE)/nxdn/*.h) $(CORE)/air/air_framer
 nxdnEngineTest: nxdnEngineTest.c $(CORE)/nxdn/nxdn_engine.c $(CORE)/air/air_voice.c $(NXDN) $(CORE)/nxdn/nxdn_scramble.c $(CORE)/dmr/ambe/ambeFec.c $(wildcard $(CORE)/nxdn/*.h) $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(CORE)/air/air_softmodem.c $(FEC)
 	$(CC) $(CFLAGS) -DCONFIG_NXDN_SCRAMBLER=1 -I$(ROOT)/hal -Wshadow -o $@ nxdnEngineTest.c $(CORE)/nxdn/nxdn_engine.c $(CORE)/air/air_voice.c $(NXDN) $(CORE)/nxdn/nxdn_scramble.c $(CORE)/dmr/ambe/ambeFec.c $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(CORE)/air/air_softmodem.c $(FEC) -lm
 # YSF frames, their FEC, calls through the framer and the engine on two made-up providers (core/ysf)
-YSF     := $(CORE)/ysf/ysf_frame.c $(CORE)/ysf/ysf_rx.c $(CORE)/ysf/ysf_call.c $(CORE)/ysf/ysf_id.c $(CORE)/ysf/ysf_wx.c
+YSF     := $(CORE)/ysf/ysf_frame.c $(CORE)/ysf/ysf_vw.c $(CORE)/ysf/ysf_rx.c $(CORE)/ysf/ysf_call.c $(CORE)/ysf/ysf_id.c $(CORE)/ysf/ysf_wx.c
 TESTS   += ysfTest
-ysfTest: ysfTest.c $(YSF) $(CORE)/ysf/ysf_engine.c $(CORE)/air/air_voice.c $(wildcard $(CORE)/ysf/*.h) $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
+ysfTest: ysfTest.c ../vectors/ysf-vw-vd1.txt $(YSF) $(CORE)/ysf/ysf_engine.c $(CORE)/air/air_voice.c $(wildcard $(CORE)/ysf/*.h) $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -Wshadow -o $@ ysfTest.c $(YSF) $(CORE)/ysf/ysf_engine.c $(CORE)/air/air_voice.c $(CORE)/air/air_session.c $(CORE)/air/air_framer.c $(FEC) $(CORE)/dmr/ambe/ambeFec.c
 
 # The MBE synthesis core and the full-rate voice decoder on it (core/mbe), against golden vectors
-MBE     := $(wildcard $(CORE)/mbe/*.c)
+MBE2400 := $(wildcard $(CORE)/mbe/mbe2400*.c)
+MBE     := $(filter-out $(MBE2400),$(wildcard $(CORE)/mbe/*.c))
 TESTS   += mbeTest
 mbeTest: mbeTest.c $(MBE) $(wildcard $(CORE)/mbe/*.h) $(CORE)/dsp/fxp.h
 	$(CC) $(CFLAGS) -Wshadow -o $@ mbeTest.c $(MBE) -lm
+
+# The 2400 bit/s front end (core/mbe/mbe2400*): its frame, FEC and quantizer, and the test voice set through it
+TESTS   += mbe2400Test
+mbe2400Test: mbe2400Test.c $(MBE) $(MBE2400) $(FEC) $(wildcard $(CORE)/mbe/*.h) $(CORE)/dsp/fxp.h
+	$(CC) $(CFLAGS) -Wshadow -DCONFIG_MBE2400=1 -o $@ mbe2400Test.c $(MBE) $(MBE2400) $(FEC) -lm
 
 # The full-rate voice encoder (core/mbe): the quantizer against the dequantizer
 TESTS   += imbeEncTest
@@ -283,6 +289,7 @@ run: $(TESTS)
 	./fxpTest
 	./mbeTest | tail -1
 	./imbeEncTest | tail -1
+	./mbe2400Test | tail -1
 	for v in $(VOICE_SETS); do ./imbeVoiceGen --check $(VOICE)/$$v.pcm $(VOICE)/$$v.imbe || exit 1; done
 	./airSoftmodemTest | tail -1
 	./p25EngineTest
@@ -1993,7 +2000,7 @@ run-httpassets: httpAssetsTest httpAssetsTestPlain
 # defaults it (Ubuntu's GCC: the CI runners), and its printf wrappers rely on always_inline, which CFLAGS'
 # -D__attribute__(x)= removes, so they fail to compile: these are the only tests built optimized, hence no fortify
 FXPOPT  := -O1 -U_FORTIFY_SOURCE
-TESTS   += fxpHalvesTest fxpHalvesSplitTest mbeExactTest mbeExactSplitTest
+TESTS   += fxpHalvesTest fxpHalvesSplitTest mbeExactTest mbeExactSplitTest mbeExactOptsTest mbeExactOptsSplitTest
 fxpHalvesTest: fxpHalvesTest.c $(CORE)/dsp/fxp.h
 	$(CC) $(CFLAGS) -Wshadow $(FXPOPT) -o $@ fxpHalvesTest.c
 
@@ -2006,12 +2013,22 @@ mbeExactTest: mbeExactTest.c $(MBE) $(wildcard $(CORE)/mbe/*.h) $(CORE)/dsp/fxp.
 mbeExactSplitTest: mbeExactTest.c $(MBE) $(wildcard $(CORE)/mbe/*.h) $(CORE)/dsp/fxp.h
 	$(CC) $(CFLAGS) -Wshadow -DFXP_SPLIT16 -o $@ mbeExactTest.c $(MBE) -lm
 
+# The same with the MBE core's per-frame options built in (CONFIG_MBE_OPTS, on with the 2400 bit/s front end): the
+# full-rate CRCs must not move, and the 2400 bit/s codec's own hold with either kind of product
+mbeExactOptsTest: mbeExactTest.c $(MBE) $(MBE2400) $(FEC) $(wildcard $(CORE)/mbe/*.h) $(CORE)/dsp/fxp.h
+	$(CC) $(CFLAGS) -Wshadow -DCONFIG_MBE2400=1 -o $@ mbeExactTest.c $(MBE) $(MBE2400) $(FEC) -lm
+
+mbeExactOptsSplitTest: mbeExactTest.c $(MBE) $(MBE2400) $(FEC) $(wildcard $(CORE)/mbe/*.h) $(CORE)/dsp/fxp.h
+	$(CC) $(CFLAGS) -Wshadow -DCONFIG_MBE2400=1 -DFXP_SPLIT16 -o $@ mbeExactTest.c $(MBE) $(MBE2400) $(FEC) -lm
+
 run: run-mbe-halves
-run-mbe-halves: fxpHalvesTest fxpHalvesSplitTest mbeExactTest mbeExactSplitTest
+run-mbe-halves: fxpHalvesTest fxpHalvesSplitTest mbeExactTest mbeExactSplitTest mbeExactOptsTest mbeExactOptsSplitTest
 	./fxpHalvesTest | tail -1
 	./fxpHalvesSplitTest | tail -1
 	./mbeExactTest | tail -1
 	./mbeExactSplitTest | tail -1
+	./mbeExactOptsTest | tail -1
+	./mbeExactOptsSplitTest | tail -1
 .PHONY: run-mbe-halves
 
 # Each board's own host tests (boards/<id>/tests/host.mk): a fragment adds its tests to TESTS and a run-boards:: rule

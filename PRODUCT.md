@@ -20,7 +20,7 @@ desktop with Chrome or Edge, the radio on a USB programming cable, and want to u
 
 ## Product Purpose
 
-Crucible is firmware for DMR radios, downstream of RadioFoundry (MIT): a subset of its radios with the maintainer's
+Crucible is firmware for DMR radios, downstream of RadioFoundry (MIT), GPL-3.0-or-later as a whole: a subset of its radios with the maintainer's
 own choices (DMR, P25, NXDN and an incomplete YSF; trunking off). Its flasher page updates a connected radio to a
 Crucible release that matches it: connect, pick a release made for the radio and its band/power option, update.
 A first install is RadioFoundry's: the page links its flash page and
@@ -54,7 +54,7 @@ RadioFoundry. Contributions go upstream to RadioFoundry. Every release is a pre-
 - Marks (docs/crucible/brand): hot-core (body `#FF7738`, flame `#FFC45D`) for color uses, single-cut (one color) for
   mono uses. The radio's boot screen draws the same mark.
 - The color scheme is the brand's: hot-core orange and flame, not RadioFoundry's colors.
-- Credit: "based on RadioFoundry (MIT), not affiliated"; LICENSE and notices kept.
+- Credit: "based on RadioFoundry (MIT), not affiliated"; LICENSE-MIT and notices kept, every other source credited in CREDITS.md.
 
 ## Evidence on Hand
 

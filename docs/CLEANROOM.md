@@ -1,6 +1,10 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 David Behnke -->
 
 # Clean-room rules
+
+> **Crucible:** these are RadioFoundry's rules, kept for reference. Crucible is GPL-3.0-or-later, sends no work
+> upstream and does not follow them. Its licensing rule is [AGENTS.md](../AGENTS.md) rule 1.
 
 Some of RadioFoundry's authors also worked on a popular alternative aftermarket firmware for these radios ("the aftermarket firmware" in these docs), whose license forbids commercial use. RadioFoundry is a separate project, not a fork or a successor. None of the aftermarket firmware's code, or code derived from it, may enter this repository or its history. These rules say how the work is split so that holds.
 

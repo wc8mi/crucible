@@ -14,10 +14,12 @@ Connect the radio over its debug-link USB connection. On the computer, browse a 
 python tools/satellite_tle.py catalog --source amsat
 ```
 
-For a browser workflow, open **Tools > Satellite TLE Update** on the RadioFoundry site. Load the AMSAT daily bulletin
-or browse for a TLE file, then choose up to 10 FM satellites by name. Non-FM objects are not shown. ISS, SO-50 and
-AO-91 start selected when present. Search does not clear checked selections. The page refreshes the AMSAT bulletin
-before each push or bundle download; a selected file is used as supplied. A push replaces checked satellites' existing
+For a browser workflow, open **Tools > Satellite TLE Update** on the RadioFoundry site. Click **Load latest
+TLEs** or browse for a TLE file, then choose up to 10 FM satellites by name. The button reads the AMSAT daily bulletin
+and PE0SAT's amateur list and keeps the newest TLE for each satellite; each satellite shows its TLE's age and source.
+Non-FM objects are not shown. ISS, SO-50 and AO-91 start selected when present, and the page remembers your choices
+for the next visit. Search does not clear checked selections. The page fetches both lists again before each push or
+bundle download; a selected file is used as supplied. A push replaces checked satellites' existing
 TLEs and verifies their epochs. The page can push directly over USB/serial or create a JSON bundle for the PC utility.
 Direct push requires a supported browser and a secure context (HTTPS or localhost).
 After an install or update, the web flasher offers this page when the installed build reports satellite support.

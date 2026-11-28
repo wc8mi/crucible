@@ -5752,7 +5752,7 @@ static const char *about_text(void)
 	about_support(&b);
 #endif
 	sb_str(&b, TR(ABOUT_BODY_LICENSE, "License: "));
-	sb_str(&b, "MIT, (c) 2026 The RadioFoundry Authors\n");
+	sb_str(&b, RFOUNDRY_LICENSE_LINE "\n");
 	// The authors (the copyright line above) are everyone who has contributed: too many to list here, so the page
 	// names the maintainers (AUTHORS) and says where the contributors are listed. One maintainer per line, in AUTHORS
 	// order: a comma-joined list wraps mid-name on every display

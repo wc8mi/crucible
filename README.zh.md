@@ -65,6 +65,6 @@ Crucible 不接受外部拉取请求。欢迎报告 Crucible 本身的问题。�
 
 ## 许可与致谢
 
-MIT（[LICENSE](LICENSE)）。Crucible 基于 RadioFoundry，版权归 The RadioFoundry Authors 所有（[AUTHORS](AUTHORS)、
-[CONTRIBUTORS](CONTRIBUTORS)）。Crucible 的改动版权归 David Behnke 所有。按照 [FORKING.md](FORKING.md)，许可声明随每个文件、
+GPL-3.0-or-later（[LICENSE](LICENSE)）。Crucible 基于 RadioFoundry，版权归 The RadioFoundry Authors 所有（[AUTHORS](AUTHORS)、
+[CONTRIBUTORS](CONTRIBUTORS)），其文件仍采用 MIT 许可（[LICENSE-MIT](LICENSE-MIT)）。来自其他项目的代码保留其作者的声明，见 [CREDITS.md](CREDITS.md)。Crucible 的改动版权归 David Behnke 所有。按照 [FORKING.md](FORKING.md)，许可声明随每个文件、
 固件和版本保留。第三方许可见 [LICENSES/](LICENSES/)。
