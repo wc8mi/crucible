@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2026 David Behnke
 // The codeplug editor against simulated radios: tests/host/cpsSim built as each image of each radio with a codeplug,
 // with that board's name, flash map, codeplug base, power levels and features (site/tests/fixtures.py sim_radios). The
