@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // qdmr YAML in the codeplug editor: the YAML subset (static/js/codeplug/yaml.js), the mapping to the editing model
 // (static/js/codeplug/qdmr.js), round trips on a file written the way qdmr 0.15 writes one and on cpsSim's populated
 // codeplug, the radioFoundry block of every mode, the Tools page converters, and, when dmrconf is installed, qdmr itself encoding what the editor exports.
@@ -490,7 +491,7 @@ test("radioFoundry block: keys are never written; a system read back keeps the k
 
 test("radioFoundry block: modes and system types this editor doesn't know are left out with a note", () => {
 	const m = empty();
-	const r = importQdmr(m, MODES.replace("mode: P25T,", "mode: M17,").replace("type: NXDN", "type: DSTAR"));
+	const r = importQdmr(m, MODES.replace("mode: P25T,", "mode: DSTAR,").replace("type: NXDN", "type: DSTAR"));
 	assert.deepEqual(r.notes, [{ code: "mode_unknown", n: 3 }]);
 	assert.deepEqual(m.systems.map((s) => s.name), ["Ham Trunk", "Ham P25"]);
 	assert.equal(m.channels[1].kind, 0);
