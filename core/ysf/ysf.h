@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // YSF (C4FM) voice, DN mode (docs/spec/ysf.md): the frame and its channels, the framer's table for the
 // mode, and a voice call on top of them.
 //
@@ -16,6 +17,7 @@
 
 #include "../air/air_framer.h"
 #include "../dmr/ambe/ambeFec.h"
+#include "ysf_vw.h"
 #include "ysf_wx.h"
 
 // ── The frame ──
@@ -46,6 +48,7 @@
 #define YSF_MR_UP_FREE		1		// to a repeater, which is idle
 #define YSF_MR_UP_BUSY		2
 #define YSF_FT_DN		6		// the DCH cycle of a DN call: frames FN 0..6
+#define YSF_FT_VD1		2		// ... of a V/D mode 1 call: FN 0..2 (voice only, no data frames)
 #define YSF_DGID_MAX		99
 #define YSF_DGID_ALL		0		// a receiver's DG-ID 0 takes every one
 
@@ -92,6 +95,16 @@ int ysf_dch_get(const uint8_t *hard, const int8_t *soft, ysf_fec_work_t *w, uint
 // repeated bits whose copies disagreed (0..27)
 void ysf_vch_put(uint8_t *frame, uint8_t n, const uint8_t bits[AMBE_PARAM_BITS]);
 int ysf_vch_get(const uint8_t *hard, const int8_t *soft, uint8_t n, uint8_t bits[AMBE_PARAM_BITS]);
+// V/D mode 1 (ysf.md 3.5): the DCH (20 bytes, its content by the FICH's FN) and VCH n = 0..4, each the DMR side's
+// 72-bit AMBE+2 frame as it is (ambeFecDecode reads it)
+void ysf_vd1_dch_put(uint8_t *frame, const uint8_t in[YSF_CSD_BYTES]);
+int ysf_vd1_dch_get(const uint8_t *hard, const int8_t *soft, ysf_fec_work_t *w, uint8_t out[YSF_CSD_BYTES]);
+void ysf_vd1_vch_put(uint8_t *frame, uint8_t n, const uint8_t v[AMBE_FRAME_BYTES]);
+void ysf_vd1_vch_get(const uint8_t *hard, uint8_t n, uint8_t v[AMBE_FRAME_BYTES]);
+// VW sub-header (ysf.md 3.5, FN 0 and FT 1 of a VW call): its DCH (CSD3). Its two VCH and every VCH of the frames after
+// it are ysf_vw.h's
+void ysf_vw_dch_put(uint8_t *frame, const uint8_t in[YSF_CSD_BYTES]);
+int ysf_vw_dch_get(const uint8_t *hard, const int8_t *soft, ysf_fec_work_t *w, uint8_t out[YSF_CSD_BYTES]);
 
 // The parts of the codec, for tests and tools
 uint8_t ysf_pn(uint16_t i);				// the whitening sequence's bit i
@@ -120,6 +133,7 @@ typedef struct {
 } ysf_rx_t;
 
 extern const air_mode_t ysf_air_mode;
+extern const air_mode_t ysf_air_mode_narrow;	// half deviation (ADR 005 5)
 
 void ysf_rx_init(ysf_rx_t *rx, void (*frame)(const ysf_rx_frame_t *f, void *ctx), void (*lost)(void *ctx), void *ctx);
 
@@ -140,12 +154,18 @@ typedef struct {
 	void (*end)(void *ctx);
 	// A room reply heard (a data transmission, ysf.md 9): valid during the call. NULL: data is ignored
 	void (*wx)(const ysf_wx_t *w, void *ctx);
+	// A VW voice frame (CONFIG_YSF_VW: data type 3), for the IMBE codec; errs: what its codes corrected, packed as
+	// fec_imbe88_decode. NULL: VW voice is held, as without the switch
+	void (*vw)(const uint8_t imbe[YSF_VW_BYTES], uint8_t errs, void *ctx);
 } ysf_call_sink_t;
 
 typedef struct {
 	uint32_t calls, frames, fich_fail, csd_fail, dch_fail;
-	uint32_t voice;		// VCH handed on
-	uint32_t voice_held;	// VCH of another data type
+	uint32_t voice;		// VCH handed on, every data type
+	uint32_t voice_held;	// VCH of a data type not played (VW without CONFIG_YSF_VW)
+	uint32_t vd1_frames;	// of voice: V/D mode 1 VCH
+	uint32_t vw_frames;	// of voice: VW VCH
+	uint32_t vw_fec_bits;	// bits the VW VCH's codes corrected
 	uint32_t fec_bits;	// bits the FICH, CSD and DCH decoders corrected
 	uint32_t vch_fixed;	// VCH bits the vote corrected
 	uint32_t data_frames, wx_replies;	// frames of data transmissions; room replies parsed from them
@@ -177,6 +197,9 @@ typedef struct {
 typedef struct {
 	uint8_t state;
 	bool ending;
+	uint8_t dt;			// YSF_DT_VD2 (DN), _VD1 or _VW: the voice frames' kind (ysf.md 4.4)
+	bool narrow;			// FICH DEV
+	bool sub;			// VW: the communications frame in hand is the sub-header
 	uint8_t fn;			// of the communications frame in hand
 	uint8_t nvoice;			// VCH filled in it
 	uint16_t nsyms, ready, sent, pre_left;
@@ -188,7 +211,8 @@ typedef struct {
 	uint8_t frame[YSF_FRAME_BYTES];
 } ysf_call_tx_t;
 
-void ysf_call_tx_begin(ysf_call_tx_t *t, const ysf_tx_id_t *id);
+// dt: YSF_DT_VD2 (DN), YSF_DT_VD1 or YSF_DT_VW; narrow: FICH DEV
+void ysf_call_tx_begin(ysf_call_tx_t *t, const ysf_tx_id_t *id, uint8_t dt, bool narrow);
 // A data transmission instead (ysf.md 9.1): preamble, header, data frames FN 0 to the last, terminator; it ends by
 // itself, no voice asked for
 void ysf_call_tx_begin_data(ysf_call_tx_t *t, const ysf_tx_id_t *id, const uint8_t *data, uint8_t len);
@@ -196,11 +220,12 @@ uint16_t ysf_call_tx_ready(const ysf_call_tx_t *t, uint16_t *first);
 const uint8_t *ysf_call_tx_syms(const ysf_call_tx_t *t);
 void ysf_call_tx_sent(ysf_call_tx_t *t, uint16_t n);
 bool ysf_call_tx_wants_voice(const ysf_call_tx_t *t);
-// v: a voice frame of the DMR side's voice path. False when the call takes none now
-bool ysf_call_tx_voice(ysf_call_tx_t *t, const uint8_t v[YSF_VOICE_BYTES]);
-// The operator let go: the frame in hand is filled with silence (one without voice yet is dropped), then the
-// terminator
-void ysf_call_tx_end(ysf_call_tx_t *t, const uint8_t silence[YSF_VOICE_BYTES]);
+// v: a voice frame of the call's path: the DMR side's (YSF_VOICE_BYTES) for DN and V/D mode 1, an IMBE frame
+// (YSF_VW_BYTES) for VW. False when the call takes none now
+bool ysf_call_tx_voice(ysf_call_tx_t *t, const uint8_t *v);
+// The operator let go: the frame in hand is filled with silence of the same kind (one without voice yet is dropped),
+// then the terminator
+void ysf_call_tx_end(ysf_call_tx_t *t, const uint8_t *silence);
 bool ysf_call_tx_done(const ysf_call_tx_t *t);
 
 // The DCH a DN transmission sends at FN 0..6 (docs/spec/ysf.md 4), and the header's two long channels

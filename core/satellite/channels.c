@@ -17,7 +17,9 @@ static void apply_fm_profile(uint32_t catalog_id, channel_t *channel)
 	if (!satellite_frequency_profile(catalog_id, &profile))
 		return;
 	channel->rx_hz = profile.rx_hz;
-	channel->tx_hz = profile.tx_hz;
+	// A listen-only profile (TX 0) makes a receive-only channel; the codeplug wants a TX frequency all the same
+	channel->tx_hz = profile.tx_hz != 0u ? profile.tx_hz : profile.rx_hz;
+	channel->rx_only = profile.tx_hz == 0u;
 	if (profile.tx_tone_tenths != 0u)
 		channel->tx_tone = (subtone_t){ TONE_CTCSS, profile.tx_tone_tenths };
 }
@@ -110,8 +112,8 @@ bool satellite_channels_sync(void)
 		channel.bw = RADIO_BW_12K5;
 		channel.rx_tone = (subtone_t){ 0 };
 		channel.tx_tone = (subtone_t){ 0 };
-		apply_fm_profile(record.catalog_id, &channel);
 		channel.rx_only = false;
+		apply_fm_profile(record.catalog_id, &channel);
 		channel.contact = 0u;
 		channel.listen_list = 0u;
 		channel.dmr_id = 0u;

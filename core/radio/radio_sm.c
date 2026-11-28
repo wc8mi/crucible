@@ -1593,6 +1593,11 @@ static uint8_t tx_check(const radio_sm_t *sm)
 	const channel_t *ch = &sm->view.ch;
 	// A trunked channel's frequencies are the system's: checked when it keys (p25t_tick, p25t_burst)
 	bool trunk = ch->kind == CODEPLUG_KIND_P25_TRUNK;
+#if CONFIG_SATELLITE_TLE
+	if (sm->satellite_session && sm->satellite_view.nominal_tx_hz == 0u) {
+		return TXDENY_RX_ONLY;	// a listen-only satellite: tracking tuned no uplink, whatever the channel holds
+	}
+#endif
 	if (sm->set.tx_inhibit || (!trunk && !tx_limit_allows(ch->tx_hz))) {
 		return TXDENY_INHIBIT;		// the test TX limit denies PTT as the inhibit does
 	}

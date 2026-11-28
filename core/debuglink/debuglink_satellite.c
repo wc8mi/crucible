@@ -11,7 +11,7 @@
 #if CONFIG_SATELLITE_TLE
 #define SAT_MAX_RECORDS SATELLITE_STORE_MAX_RECORDS
 #define SAT_PROFILE_CHUNK_MAX 4u
-#define SAT_PROTOCOL_VERSION 7u
+#define SAT_PROTOCOL_VERSION 8u	// 8: six-digit (Alpha-5) catalog numbers and listen-only (TX 0) profiles
 
 static uint16_t get16(const uint8_t *p)
 {
