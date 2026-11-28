@@ -14,12 +14,13 @@ community = "https://discord.gg/y2jHahNK6h"	# Crucible Community on Discord (App
 flasher = "https://tinker.wc8mi.net/crucible/"
 upstream = "https://github.com/radiofoundry/radiofoundry"
 
-# The release the next builds lead to, a semantic version (semver.org; CRUCIBLE.md "Versions"). tools/kf8s_build.py
-# labels each test build v<version>-beta.N (a GitHub pre-release) and, with --final, the release v<version>. After a
-# release, raise it: the patch for fixes only, the minor for new features, the major (from 1.0.0) for a change that
-# breaks settings or codeplugs.
+# The next release, a semantic version (semver.org; CRUCIBLE.md "Versions"). tools/kf8s_build.py names the build
+# v<version> and refuses a version already tagged. After each release, raise it: the patch for fixes only, the minor
+# for new features, the major (from 1.0.0) for a change that breaks settings or codeplugs. prerelease marks every
+# release a GitHub pre-release (a test release); set it false once a build is stable.
 [release]
 version = "0.1.0"
+prerelease = true
 
 # The radios Crucible builds, releases, tests and documents: board ids (boards/<id>/). The other boards stay in the tree
 # untouched, so upstream changes to them merge without conflicts; they are just never built or listed here.
