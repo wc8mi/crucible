@@ -40,6 +40,9 @@ void debuglink_view_ysf(const radio_view_t *v, dl_text_t *t)
 	radio_ysf_settings(&s);
 	dl_text(t, "ysf.tx_dgid=%u\nysf.rx_dgid=%u\nysf.run.tx_dgid=%u\nysf.run.rx_dgid=%u\n", s.tx_dgid, s.rx_dgid,
 		y->tx_dgid, y->rx_dgid);
+	// The voice mode (ysf_cp_voice_t) and deviation: the VFO's settings, and those in force (a stored channel's own)
+	dl_text(t, "ysf.voice_mode=%u\nysf.narrow=%u\nysf.run.voice_mode=%u\nysf.run.narrow=%u\n", s.voice,
+		(unsigned)s.narrow, y->voice, (unsigned)y->narrow);
 	radio_ysf_stats(&c);
 	dl_text(t, "ysf.begins=%u\nysf.begin_fails=%u\nysf.rx_calls=%u\nysf.tx_calls=%u\nysf.tx_filler=%u\n",
 		(unsigned)c.begins, (unsigned)c.begin_fails, (unsigned)c.air.rx_calls, (unsigned)c.air.tx_calls,

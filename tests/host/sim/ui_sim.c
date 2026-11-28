@@ -817,6 +817,9 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 		return false;
 	if (id == UI_SET_SCAN_HOLD_S && (value < 0 || value > (int32_t)RADIO_SCAN_HOLD_MAX_S))
 		return false;
+	if ((id == UI_SET_YSF_VOICE && (value < 0 || value > 2)) ||
+	    (id == UI_SET_YSF_NARROW && value != 0 && value != 1))
+		return false;	// ui_svc_storage.c's ysf_vfo_set: DN, VW, V/D mode 1; Wide, Narrow
 #if CONFIG_NXDN
 	if (id >= UI_SET_NXDN_RATE && id <= UI_SET_NXDN_TG)
 		return sim_nxdn_default(id, value);
@@ -2877,6 +2880,8 @@ void sim_reset(const sim_geom_t *g, sim_map_t map)
 	sim_late[UI_SET_NXDN_RATE - UI_SET_RAM_COUNT] = sim_late[UI_SET_NXDN_RX_RAN - UI_SET_RAM_COUNT] = 0;
 	sim_late[UI_SET_NXDN_TX_RAN - UI_SET_RAM_COUNT] = sim_late[UI_SET_NXDN_TG - UI_SET_RAM_COUNT] = 1;
 #endif
+	// The VFO in YSF as a new radio starts: DN, Wide
+	sim_late[UI_SET_YSF_VOICE - UI_SET_RAM_COUNT] = sim_late[UI_SET_YSF_NARROW - UI_SET_RAM_COUNT] = 0;
 	sim_late[UI_SET_SCAN_DELAY_MS - UI_SET_RAM_COUNT] = RADIO_SCAN_DELAY_MS;	// the radio core's default
 	sim_late[UI_SET_SCAN_RESUME - UI_SET_RAM_COUNT] = SCAN_RESUME_CARRIER;		// its defaults too
 	sim_late[UI_SET_SCAN_HOLD_S - UI_SET_RAM_COUNT] = RADIO_SCAN_HOLD_S;

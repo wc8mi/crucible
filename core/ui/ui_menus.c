@@ -2650,7 +2650,7 @@ static const ui_scr_def_t chlist_screen = {
 // ======================= One channel's settings, edited in place (ui.md 2.1) =======================
 // Without CONFIG_CHANNEL_EDIT the rows are read only and OK goes to the channel
 
-enum { CE_NAME, CE_NUMBER, CE_MODE, CE_CODE, CE_RATE, CE_RX, CE_TX, CE_POWER, CE_RX_ONLY, CE_BW, CE_RX_TONE, CE_TX_TONE, CE_VOX,
+enum { CE_NAME, CE_NUMBER, CE_MODE, CE_CODE, CE_RATE, CE_VOICE, CE_RX, CE_TX, CE_POWER, CE_RX_ONLY, CE_BW, CE_RX_TONE, CE_TX_TONE, CE_VOX,
        CE_BURST, CE_AES, CE_CC, CE_TS, CE_CONTACT, CE_LIST, CE_ID, CE_DMO, CE_BEEP, CE_ALIAS1, CE_ALIAS2, CE_TOT, CE_SCAN, CE_ECO,
        CE_ZONES, CE_GO, CE_SHARE, CE_SAVE, CE_SAVE_NEW, CE_COUNT, CE_NONE = 0xFF };
 
@@ -2837,7 +2837,8 @@ static bool ced_air_changed(uint8_t r)
 #endif
 #if CONFIG_YSF
 	if (ced_is_ysf(&ced_ch))
-		return r == CE_CODE && (a->ysf.rx_dgid != b->ysf.rx_dgid || a->ysf.tx_dgid != b->ysf.tx_dgid);
+		return r == CE_CODE ? a->ysf.rx_dgid != b->ysf.rx_dgid || a->ysf.tx_dgid != b->ysf.tx_dgid :
+		       r == CE_RATE ? a->ysf.narrow != b->ysf.narrow : a->ysf.voice != b->ysf.voice;
 #endif
 	(void)a;
 	(void)b;
@@ -2864,7 +2865,7 @@ static bool ced_changed(uint8_t r)
 		return ced_ch.kind != ced_orig.kind || ced_ch.system != ced_orig.system || ced_ch.aes_ref != ced_orig.aes_ref;
 #endif
 #if CONFIG_P25 || CONFIG_NXDN || CONFIG_YSF
-	if (r == CE_CODE || r == CE_RATE)
+	if (r == CE_CODE || r == CE_RATE || r == CE_VOICE)
 		return ced_air_changed(r);
 #endif
 	const uint8_t *a = (const uint8_t *)&ced_ch + ced_fields[r].off, *b = (const uint8_t *)&ced_orig + ced_fields[r].off;
@@ -3009,8 +3010,9 @@ static void ced_build(void)
 		// P25, NXDN and YSF: no sub-audio tones or width; of the digital rows the talk target and unit ID (not
 		// YSF's: it names us by callsign), P25's talkaround; the NAC, RAN or DG-ID, NXDN's rate
 		bool air_row = air && ((r == CE_CONTACT && CONFIG_DMR && !ysf) || (r == CE_ID && !ysf) || (r == CE_DMO && p25) ||
-				       (r == CE_CODE && !into) || (r == CE_RATE && nxdn && !into));
-		if (r == CE_CODE || r == CE_RATE ? !air_row : air && (fm_only || (dmr_only && !air_row)))
+				       (r == CE_CODE && !into) || (r == CE_RATE && (nxdn || ysf) && !into) ||
+				       (r == CE_VOICE && ysf && !into));
+		if (r == CE_CODE || r == CE_RATE || r == CE_VOICE ? !air_row : air && (fm_only || (dmr_only && !air_row)))
 			continue;
 		if (!air_row && ((fm_only && dmr) || (tone && listen) || (dmr_only && !dmr) || (r == CE_MODE && !CONFIG_DMR)))
 			continue;
@@ -3168,6 +3170,22 @@ static int32_t ced_val_or(int32_t stored)
 
 #if CONFIG_P25 || CONFIG_NXDN || CONFIG_YSF
 // The NAC (hex) or RAN, received then sent where they differ ("F7E/293"); editing, the value on the spinner
+#if CONFIG_YSF
+// A YSF channel's voice mode (ysf_cp_voice_t) as the editor shows it; VW also in a build that sends it as DN
+static const char *ysf_voice_name(uint8_t voice)
+{
+	return voice == YSF_CP_VOICE_VW ? "VW" : voice == YSF_CP_VOICE_VD1 ? tr(TRX(YSF_VALUE_VD1, "V/D mode 1")) : "DN";
+}
+
+// The next voice mode OK offers: DN, VW where this build sends it, V/D mode 1
+static uint8_t ysf_voice_next(uint8_t voice)
+{
+	if (voice == YSF_CP_VOICE_DN)
+		return CONFIG_YSF_VW ? YSF_CP_VOICE_VW : YSF_CP_VOICE_VD1;
+	return voice == YSF_CP_VOICE_VW ? YSF_CP_VOICE_VD1 : YSF_CP_VOICE_DN;
+}
+#endif
+
 static void sb_ced_code(sbuf_t *b, const channel_t *ch, bool editing)
 {
 	uint16_t rx = 0, tx = 0;
@@ -3213,7 +3231,8 @@ static void sb_ced_code(sbuf_t *b, const channel_t *ch, bool editing)
 static void chinfo_item(uint16_t i, ui_item_t *it)
 {
 	static const tr_id_t labels[CE_COUNT] = { TRN(LABEL_NAME, "Name"), TRN(CHAN_LABEL_NUMBER, "Number"),
-		TRN(LABEL_MODE, "Mode"), TRX(CHAN_LABEL_NAC, "NAC"), TRN(CHAN_LABEL_RATE, "Rate"), TRX(CHAN_LABEL_RX, "RX"), TRX(CHAN_LABEL_TX, "TX"), TRN(LABEL_POWER, "Power"),
+		TRN(LABEL_MODE, "Mode"), TRX(CHAN_LABEL_NAC, "NAC"), TRN(CHAN_LABEL_RATE, "Rate"),
+		TRN(CHAN_LABEL_VOICE_MODE, "Voice mode"), TRX(CHAN_LABEL_RX, "RX"), TRX(CHAN_LABEL_TX, "TX"), TRN(LABEL_POWER, "Power"),
 		TRN(WORD_RX_ONLY, "RX only"), TRN(CHAN_LABEL_BANDWIDTH, "Bandwidth"),
 		TRN(CHAN_LABEL_RX_TONE, "RX CTCSS/DCS"), TRN(CHAN_LABEL_TX_TONE, "TX CTCSS/DCS"), TRX(WORD_VOX, "VOX"),
 		TRN(WORD_TONE_BURST, "Tone burst"), TRN(CHAN_AES_KEY, "AES key"), TRN(CHAN_LABEL_COLOR_CODE, "Color code"),
@@ -3238,7 +3257,8 @@ static void chinfo_item(uint16_t i, ui_item_t *it)
 		it->flags |= UI_ITEM_TEMP;
 #endif
 	str_copy(it->label, sizeof it->label, r == CE_DMO && ced_is_p25(ch) ? TR(CHAN_LABEL_TALKAROUND, "Talkaround") :
-		r == CE_CODE && ced_is_nxdn(ch) ? "RAN" : r == CE_CODE && ced_is_ysf(ch) ? "DG-ID" : tr(labels[r]));
+		r == CE_CODE && ced_is_nxdn(ch) ? "RAN" : r == CE_CODE && ced_is_ysf(ch) ? "DG-ID" :
+		r == CE_RATE && ced_is_ysf(ch) ? TR(CHAN_LABEL_DEVIATION, "Deviation") : tr(labels[r]));
 #if CONFIG_ZONE_SHARE
 	if (r == CE_SHARE && !(feats() & UI_FEAT_ZONE_SHARE))
 		it->flags |= UI_ITEM_DIM;
@@ -3284,8 +3304,19 @@ static void chinfo_item(uint16_t i, ui_item_t *it)
 		sb_ced_code(&b, ch, editing);
 		break;
 	case CE_RATE:
+#if CONFIG_YSF
+		if (ced_is_ysf(ch)) {
+			sb_str(&b, ced_air.ysf.narrow ? TR(CHAN_YSF_NARROW, "Narrow") : TR(CHAN_YSF_WIDE, "Wide"));
+			break;
+		}
+#endif
 #if CONFIG_NXDN
 		sb_str(&b, ced_air.nxdn.rate9600 ? "9600 bit/s" : "4800 bit/s");
+#endif
+		break;
+	case CE_VOICE:
+#if CONFIG_YSF
+		sb_str(&b, ysf_voice_name(ced_air.ysf.voice));
 #endif
 		break;
 #endif
@@ -3470,7 +3501,7 @@ static bool ced_write(uint16_t num, bool as_new)
 	// NXDN; unchanged, the tag is written as without the editor (a plain channel in P25 or NXDN takes the radio's
 	// settings, a copy its source's tag)
 	if ((ced_is_p25(&ced_ch) || ced_is_nxdn(&ced_ch) || ced_is_ysf(&ced_ch)) &&
-	    (ced_air_changed(CE_CODE) || ced_air_changed(CE_RATE)))
+	    (ced_air_changed(CE_CODE) || ced_air_changed(CE_RATE) || ced_air_changed(CE_VOICE)))
 		return ui_svc_write_channel_air(num, &ced_ch, ced_src, &ced_air);
 #endif
 	return ui_svc_write_channel(num, &ced_ch, ced_src);
@@ -3888,8 +3919,19 @@ static void chinfo_select(uint16_t i, bool hold)
 			ced_val = ced_air.ysf.tx_dgid;
 #endif
 		break;
+	case CE_RATE:
+#if CONFIG_YSF
+		if (ced_is_ysf(c)) {
+			ced_air.ysf.narrow = !ced_air.ysf.narrow;
+			break;
+		}
+#endif
 #if CONFIG_NXDN
-	case CE_RATE: ced_air.nxdn.rate9600 = !ced_air.nxdn.rate9600; break;
+		ced_air.nxdn.rate9600 = !ced_air.nxdn.rate9600;
+#endif
+		break;
+#if CONFIG_YSF
+	case CE_VOICE: ced_air.ysf.voice = ysf_voice_next(ced_air.ysf.voice); break;
 #endif
 #endif
 	case CE_TS: c->timeslot = c->timeslot == 2 ? 1 : 2; break;
@@ -7017,7 +7059,7 @@ bool ui_menus_home_leave(ui_scr_t scr, bool text_open)
 typedef enum { ST_TOGGLE, ST_LIST, ST_NUMBER, ST_ACTION } set_type_t;
 enum { SA_DIAG, SA_FIRMWARE, SA_CODEPLUG, SA_RESET, SA_MY_RADIO, SA_CRASH, SA_LANGUAGE, SA_HARDWARE, SA_FIXED_POS,
 	SA_SAVE_GPS_POS, SA_DATA_SERVICES, SA_BL_TEST, SA_P25_PARROT, SA_AES_RECOVERY, SA_SIG_BEGIN, SA_SIG_END,
-	SA_SIG_IDLE, SA_RSSI, SA_RSSI_RESET, SA_NXDN };	// signaling tone steps, by sig_event_t
+	SA_SIG_IDLE, SA_RSSI, SA_RSSI_RESET, SA_NXDN, SA_YSF };	// signaling tone steps, by sig_event_t
 
 typedef struct {
 	tr_id_t name;			// TRN; TR_NONE for a key's row (set_name)
@@ -7406,6 +7448,10 @@ static const set_item_t s_talk[] = {
 	LIST(TRN(SET_LABEL_SFR_CW_ID, "SFR CW ID"), "single frequency repeater morse callsign identify",
 		UI_SET_SFR_CWID, v_sfrcwid, n_sfrcwid),
 #endif
+#if CONFIG_YSF
+	// The VFO in YSF (s_ysf), a page of its own
+	ACTION(TRX(SET_ROW_YSF, "YSF"), "fusion C4FM voice mode DN VW wide narrow deviation VFO", SA_YSF),
+#endif
 #if CONFIG_NXDN
 	// The NXDN radio default (s_nxdn), a page of its own
 	ACTION(TRX(SET_ROW_NXDN, "NXDN"), "rate 4800 9600 RAN talk group VFO default", SA_NXDN),
@@ -7592,6 +7638,27 @@ static const set_item_t s_nxdn[] = {
 };
 #define NXDN_TG_ALL	((int32_t)UI_NXDN_ID_ALL)	// the talkgroup row's All
 #endif
+#if CONFIG_YSF
+// The VFO in YSF (docs/crucible/adr/005-ysf-vw-vd1.md 6): what the VFO and a channel in YSF for now send and at what
+// deviation. A stored YSF channel keeps its own. Settings > Talk & listen > YSF. VW is offered where this build
+// sends it
+static const int16_t v_ysf_voice[] = { YSF_CP_VOICE_DN,
+#if CONFIG_YSF_VW
+	YSF_CP_VOICE_VW,
+#endif
+	YSF_CP_VOICE_VD1 };
+static const tr_id_t n_ysf_voice[] = { TRX(YSF_VALUE_DN, "DN"),
+#if CONFIG_YSF_VW
+	TRX(YSF_VALUE_VW, "VW"),
+#endif
+	TRX(YSF_VALUE_VD1, "V/D mode 1") };
+static const int16_t v_ysf_narrow[] = { 0, 1 };
+static const tr_id_t n_ysf_narrow[] = { TRN(CHAN_YSF_WIDE, "Wide"), TRN(CHAN_YSF_NARROW, "Narrow") };
+static const set_item_t s_ysf[] = {
+	LIST(TRN(CHAN_LABEL_VOICE_MODE, "Voice mode"), "YSF DN VW V/D fusion", UI_SET_YSF_VOICE, v_ysf_voice, n_ysf_voice),
+	LIST(TRN(CHAN_LABEL_DEVIATION, "Deviation"), "YSF wide narrow", UI_SET_YSF_NARROW, v_ysf_narrow, n_ysf_narrow),
+};
+#endif
 #if CONFIG_SIGNAL_METER
 static const set_item_t s_rssi[] = {
 	NUMBER(TRN(SET_ROW_RSSI_VHF, "VHF correction"), NULL, UI_SET_RSSI_VHF, -20, 20, 1, "dB"),
@@ -7715,6 +7782,8 @@ static bool set_hidden(const set_item_t *s)
 // Pages a row opens, numbered after the groups (SCR_GROUP's argument): no row in Settings, Find doesn't list them
 #define GROUP_RSSI	GROUPS
 #define GROUP_NXDN	(GROUPS + 1u)
+#define GROUP_YSF	(GROUPS + 2u)
+#define GROUP_LAST	GROUP_YSF
 
 // The i-th setting of group g that this radio has, NULL past the end
 static const set_item_t *set_nth(uint8_t g, uint16_t i)
@@ -7726,6 +7795,10 @@ static const set_item_t *set_nth(uint8_t g, uint16_t i)
 #if CONFIG_NXDN
 	if (g == GROUP_NXDN)
 		return i < sizeof s_nxdn / sizeof s_nxdn[0] ? &s_nxdn[i] : NULL;
+#endif
+#if CONFIG_YSF
+	if (g == GROUP_YSF)
+		return i < sizeof s_ysf / sizeof s_ysf[0] ? &s_ysf[i] : NULL;
 #endif
 	if (g >= GROUPS)
 		return NULL;
@@ -8012,7 +8085,7 @@ static int32_t set_value;
 static const set_item_t *set_item_at(uint16_t i)
 {
 	uint16_t g = ui_frame()->arg;
-	return g <= GROUP_NXDN ? set_nth((uint8_t)g, i) : NULL;
+	return g <= GROUP_LAST ? set_nth((uint8_t)g, i) : NULL;
 }
 
 #if CONFIG_KEY_ASSIGN
@@ -8162,12 +8235,17 @@ static const char *set_why_not(const set_item_t *s)
 {
 	if (s->type == ST_ACTION && s->id == SA_NXDN)
 		return feats() & UI_FEAT_NXDN ? NULL : TR(WHY_NOT_ON_THIS_RADIO, "Not on this radio");
+	if (s->type == ST_ACTION && s->id == SA_YSF)
+		return feats() & UI_FEAT_YSF ? NULL : TR(WHY_NOT_ON_THIS_RADIO, "Not on this radio");
 	if (s->type == ST_ACTION)
 		return s->id >= SA_SIG_BEGIN && s->id <= SA_SIG_IDLE && !(CONFIG_BEEP && CONFIG_SIG_TONES) ?
 			TR(WHY_TONES_NOT_IN_BUILD, "Tones: not in this build") : NULL;
 	switch (s->id) {
 	case UI_SET_NXDN_RATE ... UI_SET_NXDN_TG:
 		return feats() & UI_FEAT_NXDN ? NULL : TR(WHY_NOT_ON_THIS_RADIO, "Not on this radio");
+	case UI_SET_YSF_VOICE:
+	case UI_SET_YSF_NARROW:
+		return feats() & UI_FEAT_YSF ? NULL : TR(WHY_NOT_ON_THIS_RADIO, "Not on this radio");
 	case UI_SET_VOICE_PROMPTS:
 		return TR(WHY_VOICE_PROMPTS_NOT_IN_BUILD, "Voice prompts: not in this build");
 	case UI_SET_TALK_PERMIT:
@@ -8383,6 +8461,7 @@ static void group_select(uint16_t i, bool hold)
 #endif
 #if CONFIG_NXDN
 		case SA_NXDN: ui_push(SCR_GROUP, GROUP_NXDN); break;
+		case SA_YSF: ui_push(SCR_GROUP, GROUP_YSF); break;
 #endif
 		case SA_DIAG:
 			if (CONFIG_DIAG)
@@ -8522,6 +8601,10 @@ static const char *group_title(void)
 	if (g == GROUP_NXDN)
 		return "NXDN";	// a mode's name is never translated
 #endif
+#if CONFIG_YSF
+	if (g == GROUP_YSF)
+		return "YSF";
+#endif
 	return g < GROUPS ? tr(groups[g].title) : "";
 }
 
@@ -8532,6 +8615,10 @@ static const char *group_body(void)
 	if (ui_frame()->arg == GROUP_NXDN)
 		return TR(SET_BODY_NXDN_DEFAULT, "For the VFO and channels in NXDN for now. Stored NXDN channels keep their "
 			"own.");
+#endif
+#if CONFIG_YSF
+	if (ui_frame()->arg == GROUP_YSF)
+		return TR(SET_BODY_YSF_VFO, "For the VFO and channels in YSF for now. Stored YSF channels keep their own.");
 #endif
 	return NULL;
 }

@@ -2292,7 +2292,12 @@ msgctxt "CHAN_LABEL_RATE"
 msgid "Rate"
 msgstr "Velocità"
 
-#: core/ui/ui_menus.c core/ui/ui_screens.c
+#: core/ui/ui_menus.c
+msgctxt "CHAN_LABEL_VOICE_MODE"
+msgid "Voice mode"
+msgstr "Modo voce"
+
+#: core/ui/ui_menus.c core/ui/ui_satellite.c core/ui/ui_screens.c
 msgctxt "WORD_RX_ONLY"
 msgid "RX only"
 msgstr "Solo RX"
@@ -2401,6 +2406,21 @@ msgstr "Salva come nuovo canale"
 msgctxt "CHAN_LABEL_TALKAROUND"
 msgid "Talkaround"
 msgstr "Diretto"
+
+#: core/ui/ui_menus.c
+msgctxt "CHAN_LABEL_DEVIATION"
+msgid "Deviation"
+msgstr "Deviazione"
+
+#: core/ui/ui_menus.c
+msgctxt "CHAN_YSF_NARROW"
+msgid "Narrow"
+msgstr "Stretta"
+
+#: core/ui/ui_menus.c
+msgctxt "CHAN_YSF_WIDE"
+msgid "Wide"
+msgstr "Larga"
 
 #: core/ui/ui_menus.c
 msgctxt "VALUE_YES"
@@ -4841,6 +4861,11 @@ msgstr "Le impostazioni si salvano al cambio"
 msgctxt "SET_BODY_NXDN_DEFAULT"
 msgid "For the VFO and channels in NXDN for now. Stored NXDN channels keep their own."
 msgstr "Per il VFO e i canali in NXDN per ora. I canali NXDN salvati usano i propri."
+
+#: core/ui/ui_menus.c
+msgctxt "SET_BODY_YSF_VFO"
+msgid "For the VFO and channels in YSF for now. Stored YSF channels keep their own."
+msgstr "Per il VFO e i canali in YSF per ora. I canali YSF salvati usano i propri."
 
 #: core/ui/ui_menus.c core/ui/ui_position.c
 msgctxt "HINT_OK_CHANGE_BACK"

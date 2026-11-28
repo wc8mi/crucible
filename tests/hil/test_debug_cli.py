@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 The RadioFoundry Authors
+# Copyright (c) 2026 David Behnke
 """rfoundry_debug.py's radio command: what it parses and sends. No radio: these run anywhere, and tools/ci.sh runs them.
 `radio ysf` had a handler but no place in the parser's choices, so every call failed before it reached the radio, and
 bench A/Bs that switched the soft modem's options over it measured with them on all along."""
@@ -58,3 +59,15 @@ def test_ysf_settings_sends_the_bench_byte():
     link.radio = lambda op, args=b"": sent.append((op, args))
     link.ysf_settings(1, 2, bench=7)
     assert sent == [(rfoundry_debug.OP_YSF, bytes([1, 2, 7]))]
+
+
+def test_ysf_voice_mode_and_deviation():
+    assert ysf("voice=vd1") == {"voice": 2}
+    assert ysf("voice=vw", "dev=narrow") == {"voice": 1, "narrow": True}
+    assert ysf("dev=wide") == {"narrow": False}
+    sent = []
+    link = rfoundry_debug.DebugLink.__new__(rfoundry_debug.DebugLink)
+    link.radio = lambda op, args=b"": sent.append((op, args))
+    link.ysf_settings(1, 2, voice=2)
+    link.ysf_settings(1, 2, bench=3, voice=0, narrow=True)
+    assert sent == [(rfoundry_debug.OP_YSF, bytes([1, 2, 0, 2])), (rfoundry_debug.OP_YSF, bytes([1, 2, 3, 0, 1]))]

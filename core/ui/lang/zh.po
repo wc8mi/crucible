@@ -2294,7 +2294,12 @@ msgctxt "CHAN_LABEL_RATE"
 msgid "Rate"
 msgstr "速率"
 
-#: core/ui/ui_menus.c core/ui/ui_screens.c
+#: core/ui/ui_menus.c
+msgctxt "CHAN_LABEL_VOICE_MODE"
+msgid "Voice mode"
+msgstr "语音模式"
+
+#: core/ui/ui_menus.c core/ui/ui_satellite.c core/ui/ui_screens.c
 msgctxt "WORD_RX_ONLY"
 msgid "RX only"
 msgstr "仅接收"
@@ -2403,6 +2408,21 @@ msgstr "存为新信道"
 msgctxt "CHAN_LABEL_TALKAROUND"
 msgid "Talkaround"
 msgstr "直通"
+
+#: core/ui/ui_menus.c
+msgctxt "CHAN_LABEL_DEVIATION"
+msgid "Deviation"
+msgstr "频偏"
+
+#: core/ui/ui_menus.c
+msgctxt "CHAN_YSF_NARROW"
+msgid "Narrow"
+msgstr "小"
+
+#: core/ui/ui_menus.c
+msgctxt "CHAN_YSF_WIDE"
+msgid "Wide"
+msgstr "宽"
 
 #: core/ui/ui_menus.c
 msgctxt "VALUE_YES"
@@ -4843,6 +4863,11 @@ msgstr "设置更改即保存"
 msgctxt "SET_BODY_NXDN_DEFAULT"
 msgid "For the VFO and channels in NXDN for now. Stored NXDN channels keep their own."
 msgstr "用于 VFO 和临时切换到 NXDN 的信道。已保存的 NXDN 信道保留其设置。"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_BODY_YSF_VFO"
+msgid "For the VFO and channels in YSF for now. Stored YSF channels keep their own."
+msgstr "用于 VFO 和临时切换到 YSF 的信道。已保存的 YSF 信道保留其设置。"
 
 #: core/ui/ui_menus.c core/ui/ui_position.c
 msgctxt "HINT_OK_CHANGE_BACK"

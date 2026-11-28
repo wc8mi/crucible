@@ -33,7 +33,7 @@ State:
 |---|---|
 | Channel | 12.5 kHz |
 | Modulation | 4-level FSK, 4800 symbols/s (9600 bit/s) |
-| Deviation | ±2700 Hz outer, ±900 Hz inner |
+| Deviation | Wide: ±2700 Hz outer, ±900 Hz inner (FICH DEV 0). Narrow: half that, ±1350 Hz outer (FICH DEV 1). Wide is the default ([ADR 005](../crucible/adr/005-ysf-vw-vd1.md) 5) |
 | Pulse | root raised cosine, roll-off 0.2 |
 | Dibits | the air interface's: `01` +3, `00` +1, `10` -1, `11` -3 |
 | Timing | continuous, 100 ms frames |
@@ -244,7 +244,8 @@ Yaesu's tables (ADR 005 4): unverified on air. Receive accepts any FT (4.3).
 | Item | Rule |
 |---|---|
 | Mode | `RADIO_MODE_YSF`, a channel's mode only: the board stays in its digital mode, its DMR stack stopped, as for P25 and NXDN. Offered where the board's air interface fits the profile (`radio_ysf_fits`) |
-| Channels | A stored channel of kind 103 runs in YSF with its own DG-IDs ([ysf-codeplug.md](ysf-codeplug.md)); the VFO and a channel in YSF for now take the RAM settings (DG-ID 0 both ways until the debug link sets others) |
+| Channels | A stored channel of kind 103 runs in YSF with its own DG-IDs, voice mode and deviation ([ysf-codeplug.md](ysf-codeplug.md) 2); the VFO and a channel in YSF for now take the radio's YSF settings: DG-ID 0 both ways until the debug link or quick settings set others, and the voice mode and deviation in Settings > Talk & listen > YSF (stored, `settings_t.ysf_vfo`; DN Wide by default). A quick DG-ID on a stored channel keeps the channel's voice mode and deviation. A VW choice in a build without `CONFIG_YSF_VW` runs as DN |
+| Deviation | The engine opens its session with the channel's profile (`ysf_air_mode` Wide, `ysf_air_mode_narrow` Narrow); `ysf_engine_fit` takes the choice, so a provider can refuse one deviation and take the other. Receive and transmit use the same profile; a change of deviation (another channel, the VFO's setting) starts a new session, a change of voice mode alone does not |
 | Memory | The engine runs in P25's memory where P25's isn't lent to the vocoder, else in one block it shares with NXDN (`radio_air_mem.c`): one air mode runs at a time. With `CONFIG_YSF_VW` and P25's own memory, a VW call's voice takes that memory, so the engine has a block of its own (5.5) |
 | PTT | Refused without a callsign (`TXDENY_NO_ID`), without the vocoder (`TXDENY_NO_CODEC`), where the provider can't transmit the profile, and while the channel's transmit path isn't running: a call heard holds the other one, a switch is due, or the IMBE path found no memory (5.5) |
 | Scan, dual watch | As NXDN: a stop holds on a call it would play. Dual watch pairs a YSF channel with any other mode's (FM, DMR, P25, NXDN, YSF): one receiver alternates, each look starts that channel's engine or the DMR stack and stops the other first, never two at once (`radioCoreTestAir`); a radio with a second receiver gives it the FM or DMR channel and alternates the main one only between two air channels |

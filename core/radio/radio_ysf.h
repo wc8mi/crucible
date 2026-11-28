@@ -98,7 +98,8 @@ bool radio_ysf_wx_room(uint8_t i, ysf_wx_room_t *out);
 
 extern const radio_air_ops_t radio_ysf_air;
 
-void radio_ysf_init(void);
+// The VFO's voice mode (ysf_cp_voice_t) and deviation from the stored settings (settings_t ysf_vfo)
+void radio_ysf_init(uint8_t voice, bool narrow);
 // The board's provider gives YSF something (receive or transmit; any task)
 bool radio_ysf_fits(void);
 uint32_t radio_ysf_fit(void);

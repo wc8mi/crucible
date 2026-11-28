@@ -398,6 +398,12 @@ static __attribute__((noinline)) int32_t setting_get_flash(uint8_t id)
 		return dagc_tx_p25_stored(SETTINGS_FIELD(tx_level_p25));
 	case UI_SET_TX_LEVEL_NXDN:
 		return dagc_tx_nxdn_stored(SETTINGS_FIELD(tx_level_nxdn), SETTINGS_FIELD(tx_level_dmr));
+#if CONFIG_YSF
+	case UI_SET_YSF_VOICE:
+		return SETTINGS_FIELD(ysf_vfo) & SETTINGS_YSF_VOICE;
+	case UI_SET_YSF_NARROW:
+		return (SETTINGS_FIELD(ysf_vfo) & SETTINGS_YSF_NARROW) != 0;
+#endif
 #if CONFIG_NXDN
 	case UI_SET_NXDN_RATE:
 		return (SETTINGS_FIELD(nxdn_flags) & SETTINGS_NXDN_9600) != 0;
@@ -533,6 +539,29 @@ static bool nxdn_default_set(uint8_t id, int32_t value)
 	}
 	settings_end(hal_millis());
 	radio_req_nxdn_settings(&n);
+	return true;
+}
+#endif
+
+#if CONFIG_YSF
+// The VFO in YSF (settings_t ysf_vfo): stored, and into the radio's RAM settings at once (DG-IDs kept). VW is stored
+// in a build without it too, so a codeplug-wide choice survives; the radio sends DN there (radio_ysf params)
+static bool ysf_vfo_set(uint8_t id, int32_t value)
+{
+	if (id == UI_SET_YSF_VOICE ? value < YSF_CP_VOICE_DN || value > YSF_CP_VOICE_VD1 : value != 0 && value != 1)
+		return false;
+	radio_ysf_settings_t y;
+	radio_ysf_settings(&y);
+	settings_t *st = settings_begin();
+	if (id == UI_SET_YSF_VOICE) {
+		st->ysf_vfo = (uint8_t)((st->ysf_vfo & ~SETTINGS_YSF_VOICE) | (uint8_t)value);
+		y.voice = (uint8_t)value;
+	} else {
+		st->ysf_vfo = (uint8_t)(value ? st->ysf_vfo | SETTINGS_YSF_NARROW : st->ysf_vfo & ~SETTINGS_YSF_NARROW);
+		y.narrow = value != 0;
+	}
+	settings_end(hal_millis());
+	radio_req_ysf_settings(&y);
 	return true;
 }
 #endif
@@ -848,6 +877,11 @@ bool ui_svc_setting_set(uint8_t id, int32_t value)
 	case UI_SET_NXDN_TX_RAN:
 	case UI_SET_NXDN_TG:
 		return nxdn_default_set(id, value);
+#endif
+#if CONFIG_YSF
+	case UI_SET_YSF_VOICE:
+	case UI_SET_YSF_NARROW:
+		return ysf_vfo_set(id, value);
 #endif
 	case UI_SET_NOISE_REDUCTION:	// ui_svc_apply hands them to the vocoder
 	case UI_SET_MIC_AGC: {

@@ -1012,7 +1012,7 @@ static void test_settings_layout(void)
 		{ offsetof(settings_t, nxdn_tx_ran), 431 },
 		{ offsetof(settings_t, nxdn_tg), 432 },
 		{ offsetof(settings_t, mic_input), 434 },
-		{ offsetof(settings_t, nxdn_reserved), 435 },
+		{ offsetof(settings_t, ysf_vfo), 435 },
 	};
 	CHECK(sizeof(settings_t) == 436);
 	for (unsigned i = 0; i < sizeof(offs) / sizeof(offs[0]); i++) {
@@ -1472,7 +1472,7 @@ static void test_settings_nxdn_default(void)
 	settings_t d;
 	settings_defaults(&d);
 	nxdn_block_is_default(&d);
-	CHECK(d.mic_input == 0 && d.nxdn_reserved[0] == 0);
+	CHECK(d.mic_input == 0 && d.ysf_vfo == 0);
 
 	settings_t set = d;
 	set.squelch = 3;
@@ -1520,6 +1520,21 @@ static void test_settings_nxdn_default(void)
 	boot_audio_record(&wild, CURRENT_SETTINGS_BYTES);
 	settings_read(&s);
 	CHECK(s.nxdn_tg == SETTINGS_NXDN_TG);
+
+	// The VFO's YSF voice mode and deviation ride in the block: kept, an unknown bit or mode dropped
+	settings_t ysf = set;
+	ysf.ysf_vfo = 2u | SETTINGS_YSF_NARROW;	// V/D mode 1, Narrow
+	boot_audio_record(&ysf, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.ysf_vfo == (2u | SETTINGS_YSF_NARROW) && s.nxdn_tg == 4000);
+	ysf.ysf_vfo = 0xF0u | SETTINGS_YSF_VOICE;
+	boot_audio_record(&ysf, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.ysf_vfo == 0);
+	foreign.ysf_vfo = SETTINGS_YSF_NARROW;	// another firmware's block: DN Wide
+	boot_audio_record(&foreign, CURRENT_SETTINGS_BYTES);
+	settings_read(&s);
+	CHECK(s.ysf_vfo == 0);
 
 	// All groups is a talk group the block holds
 	settings_t all = set;

@@ -8759,7 +8759,7 @@ void radio_sm_init(radio_sm_t *sm, uint32_t now_ms)
 	radio_nxdn_init((st.nxdn_flags & SETTINGS_NXDN_9600) != 0, st.nxdn_rx_ran, st.nxdn_tx_ran, st.nxdn_tg);
 #endif
 #if CONFIG_YSF
-	radio_ysf_init();
+	radio_ysf_init(st.ysf_vfo & SETTINGS_YSF_VOICE, (st.ysf_vfo & SETTINGS_YSF_NARROW) != 0);
 #endif
 #if CONFIG_P25
 	radio_p25_init(pcm_audio());

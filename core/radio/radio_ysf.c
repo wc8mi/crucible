@@ -68,9 +68,11 @@ static void rid_update(void)
 	rid_seq++;
 }
 
-void radio_ysf_init(void)
+void radio_ysf_init(uint8_t voice, bool narrow)
 {
 	memset(&set, 0, sizeof set);
+	set.voice = voice <= YSF_CP_VOICE_VD1 ? voice : YSF_CP_VOICE_DN;
+	set.narrow = narrow;
 	eng = NULL;
 	rid_update();		// the chip's ID now; a fallback is worked out again at each begin, once the codeplug is read
 }
@@ -503,6 +505,10 @@ void radio_ysf_apply(const channel_t *ch, uint16_t number, const char *radio_nam
 	if (eng == NULL || ysf_engine_tx_state(eng) != AIR_TX_IDLE)
 		return;
 	params(ch, number, radio_name, &cfg);
+	if (cfg.narrow != eng->cfg.narrow) {
+		(void)radio_ysf_begin(ch, number, radio_name);	// another deviation is another session (ADR 005 5)
+		return;
+	}
 	ysf_engine_set(eng, &cfg);
 }
 

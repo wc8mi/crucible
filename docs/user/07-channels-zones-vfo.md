@@ -437,14 +437,14 @@ they say "NXDN: set in the channel".
 ### YSF in the VFO
 
 On a radio that runs YSF, YSF is one of the VFO's modes, after NXDN ("VFO: YSF"). It is YSF
-digital voice in DN mode (C4FM, 12.5 kHz), through the radio's DMR voice codec. Other YSF radios, repeaters
+digital voice (C4FM, 12.5 kHz): DN by default, through the radio's DMR voice codec. Other YSF radios, repeaters
 and room nodes hear it as they hear a commercial portable.
 
 - It hears voice calls in DN, V/D mode 1 and, where the radio runs P25, VW (full rate), with every DG-ID. A VW call
   takes the P25 voice path for its length, so its first fraction of a second is lost. A call in data mode shows on
   Home but stays silent.
-- PTT sends in the channel's voice mode: DN by default, VW or V/D 1 where set ([YSF channel](04-programming.md)). VW
-  is sent at the **P25 TX level**. VW and V/D 1 transmit have not been checked on air yet.
+- PTT sends in the voice mode set for the VFO (below) or the channel: DN by default. VW is sent at the **P25 TX
+  level**. VW and V/D 1 transmit have not been checked on air yet.
 - PTT sends with DG-ID 0, your callsign and your radio ID. The callsign is the codeplug's YSF callsign, else the first
   word of the radio name when it reads as a callsign. Set it in **Settings > My radio > YSF callsign**. Without one,
   Home says "No callsign" and PTT is refused.
@@ -459,6 +459,10 @@ and room nodes hear it as they hear a commercial portable.
   Up/Down, **OK** sets it for receive and transmit (00 hears every DG-ID). In the VFO it stays until the radio is
   switched off; on a stored channel it lasts until you change channel. To keep a channel's DG-ID, set it in the
   channel editor.
+- **Voice mode** and **Deviation**: **Settings > Talk & listen > YSF**. The voice mode is what PTT sends: DN (the
+  default), VW where the radio has it, or V/D mode 1. Deviation is Wide (the default) or Narrow; use Narrow only where
+  the repeater or the other radios are set to it. Both are kept when the radio is switched off, and apply to the VFO and
+  to channels in YSF for now. A stored YSF channel keeps its own.
 
 Not in this first version: Group Monitor, sending
 your position, and a repeater's news (voice messages, pictures). They are planned for later.
@@ -471,6 +475,8 @@ channel: press **OK** on its Mode until it says YSF, set the DG-ID, and save. A 
 
 - **DG-ID** (0-99) is in the channel's settings: the radio sends it and hears only calls with it. 00 sends 0 and hears
   every DG-ID. (The codeplug can hold different DG-IDs for sending and hearing; the Codeplug Editor sets them apart.)
+- **Deviation** (Wide or Narrow) and **Voice mode** (DN, VW where the radio has it, V/D mode 1) are under the DG-ID:
+  **OK** steps each. A new YSF channel starts DN Wide. A channel set to VW on a radio without VW shows VW and sends DN.
 - A YSF channel has no TX contact and no Own ID: YSF names you by your callsign and radio ID.
 - **OK** on Mode steps on to FM, then back round to YSF with its settings as they were. Saving the channel as another
   mode removes its YSF settings: the radio asks first.
