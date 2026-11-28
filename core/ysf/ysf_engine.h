@@ -41,6 +41,8 @@ typedef struct {
 	uint8_t rx_dgid;	// YSF_DGID_ALL: every call; else only calls with this DG-ID
 	ysf_tx_id_t tx;		// what we send: callsign, radio ID, DG-ID, route
 	bool tx_inhibit;	// no callsign: PTT refused
+	uint8_t voice;		// ysf_cp_voice_t (ysf_codeplug.h): what PTT sends; only a mode this build can send
+	bool narrow;		// half deviation (ADR 005 5): the session's profile, and FICH DEV on transmit
 	const uint8_t *silence;	// a voice frame of silence (YSF_VOICE_BYTES), from the vocoder
 } ysf_engine_cfg_t;
 
@@ -75,8 +77,8 @@ typedef struct {
 #endif
 } ysf_engine_t;
 
-// What the board's provider gives YSF: AIR_FIT_xxx, 0 = this board can't
-uint32_t ysf_engine_fit(const hal_air_t *air);
+// What the board's provider gives YSF at a deviation: AIR_FIT_xxx, 0 = this board can't
+uint32_t ysf_engine_fit(const hal_air_t *air, bool narrow);
 // Start on the tuned channel (the board in its digital mode, its DMR stack stopped). False: no provider, no fit
 bool ysf_engine_begin(ysf_engine_t *e, const hal_air_t *air, const ysf_engine_cfg_t *cfg,
 		      const ysf_engine_hooks_t *hooks, void *ctx);

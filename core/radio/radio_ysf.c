@@ -88,11 +88,13 @@ void radio_ysf_set_settings(const radio_ysf_settings_t *s)
 		set.rx_dgid = 0;
 	if (set.temp_dgid > RADIO_YSF_DGID_MAX)
 		set.temp_chan = 0;
+	if (set.voice > YSF_CP_VOICE_VD1)
+		set.voice = YSF_CP_VOICE_DN;
 }
 
 uint32_t radio_ysf_fit(void)
 {
-	return board.air != NULL ? ysf_engine_fit(board.air) : 0;
+	return board.air != NULL ? ysf_engine_fit(board.air, false) : 0;
 }
 
 bool radio_ysf_fits(void)
@@ -143,7 +145,7 @@ void radio_ysf_callsign(const char *radio_name, char out[RADIO_YSF_CALL_LEN + 1]
 }
 
 // The engine's configuration for channel ch at number (0: the VFO): a live stored YSF channel's tag gives the
-// DG-IDs (or the quick settings' DG-ID for it, for now), else the settings
+// DG-IDs (or the quick settings' DG-ID for it, for now), the voice mode and the deviation, else the settings
 static void params(const channel_t *ch, uint16_t number, const char *radio_name, ysf_engine_cfg_t *c)
 {
 	ysf_chan_t yc;
@@ -153,16 +155,23 @@ static void params(const channel_t *ch, uint16_t number, const char *radio_name,
 	c->silence = dmr_ambe_silence;
 	if (number != set.temp_chan)
 		set.temp_chan = 0;	// another channel (or the VFO): the quick DG-ID was for the one left
-	if (number != 0 && number == set.temp_chan) {
-		c->rx_dgid = set.temp_dgid;
-		c->tx.dgid = set.temp_dgid;
-	} else if (number != 0 && ysf_chan_load(number, ch, &yc)) {
+	if (number != 0 && ysf_chan_load(number, ch, &yc)) {
 		c->rx_dgid = yc.rx_dgid;
 		c->tx.dgid = yc.tx_dgid;
+		c->voice = yc.voice;
+		c->narrow = yc.narrow;
 	} else {
 		c->rx_dgid = set.rx_dgid;
 		c->tx.dgid = set.tx_dgid;
+		c->voice = set.voice;
+		c->narrow = set.narrow;
 	}
+	if (number != 0 && number == set.temp_chan) {
+		c->rx_dgid = set.temp_dgid;	// the quick DG-ID: the channel's voice mode and deviation stay
+		c->tx.dgid = set.temp_dgid;
+	}
+	if (c->voice > YSF_CP_VOICE_VD1 || (!CONFIG_YSF_VW && c->voice == YSF_CP_VOICE_VW))
+		c->voice = YSF_CP_VOICE_DN;	// only a mode this build sends (ADR 005 6: a VW channel sends DN without VW)
 	c->tx.mr = YSF_MR_DIRECT;
 	radio_ysf_callsign(radio_name, c->tx.callsign);
 	radio_ysf_rid(c->tx.radio_id, &weak);
@@ -380,7 +389,7 @@ bool radio_ysf_begin(const channel_t *ch, uint16_t number, const char *radio_nam
 		rid_update();	// the fallback follows the codeplug
 	params(ch, number, radio_name, &cfg);
 	eng = engine_mem();
-	if (eng == NULL || board.air == NULL || ysf_engine_fit(board.air) == 0) {
+	if (eng == NULL || board.air == NULL || ysf_engine_fit(board.air, cfg.narrow) == 0) {
 		eng = NULL;
 		stats.begin_fails++;
 		return false;
@@ -470,6 +479,8 @@ bool radio_ysf_poll(radio_ysf_view_t *v)
 		n.tx = AIR_TX_IDLE;
 		n.rx_dgid = set.rx_dgid;
 		n.tx_dgid = set.tx_dgid;
+		n.voice = set.voice;
+		n.narrow = set.narrow;
 	} else {
 #if CONFIG_YSF_VW
 		path_service();
@@ -499,6 +510,8 @@ bool radio_ysf_poll(radio_ysf_view_t *v)
 		n.path = eng->path;
 		n.rx_dgid = eng->cfg.rx_dgid;
 		n.tx_dgid = eng->cfg.tx.dgid;
+		n.voice = eng->cfg.voice;
+		n.narrow = eng->cfg.narrow;
 		memcpy(n.src, ev.rx.src, sizeof n.src);
 		memcpy(n.src_rid, ev.rx.src_id, sizeof n.src_rid);
 	}

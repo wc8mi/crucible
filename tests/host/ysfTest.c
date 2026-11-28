@@ -508,7 +508,7 @@ static void testEngines(void)
 	uint16_t n, first;
 
 	voice_frame(silence);
-	CHECK(ysf_engine_fit(&air0) == (AIR_FIT_RX | AIR_FIT_TX | AIR_FIT_SOFT) && ysf_engine_fit(NULL) == 0, "fit");
+	CHECK(ysf_engine_fit(&air0, false) == (AIR_FIT_RX | AIR_FIT_TX | AIR_FIT_SOFT) && ysf_engine_fit(&air0, true) == (AIR_FIT_RX | AIR_FIT_TX | AIR_FIT_SOFT) && ysf_engine_fit(NULL, false) == 0, "fit");
 
 	// A call: callsigns, voice in order, no underrun, the over ends soon after the key comes up
 	begin(0, &c0);

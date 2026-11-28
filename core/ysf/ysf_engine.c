@@ -11,9 +11,9 @@
 
 _Static_assert(YSF_VOICE_BYTES <= AIR_VOICE_FRAME_MAX, "a voice frame fits air_voice's");
 
-uint32_t ysf_engine_fit(const hal_air_t *air)
+uint32_t ysf_engine_fit(const hal_air_t *air, bool narrow)
 {
-	return air_session_fit(air, &ysf_air_mode);
+	return air_session_fit(air, narrow ? &ysf_air_mode_narrow : &ysf_air_mode);
 }
 
 // ── Receive (provider's task) ──
@@ -166,7 +166,7 @@ bool ysf_engine_begin(ysf_engine_t *e, const hal_air_t *air, const ysf_engine_cf
 #if CONFIG_AIR_RX_ADAPT
 	air_softmodem_lend(&e->adapt);	// before the open: a provider with a soft modem sets it up there
 #endif
-	if (air_voice_open(&e->av, air, &ysf_air_mode, &e->rx.rx, e->frame, e->soft, YSF_FRAME_SYMS, &tx_ops))
+	if (air_voice_open(&e->av, air, cfg->narrow ? &ysf_air_mode_narrow : &ysf_air_mode, &e->rx.rx, e->frame, e->soft, YSF_FRAME_SYMS, &tx_ops))
 		return true;
 #if CONFIG_AIR_RX_ADAPT
 	air_softmodem_lend(NULL);

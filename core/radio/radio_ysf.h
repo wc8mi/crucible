@@ -28,6 +28,8 @@
 typedef struct {
 	uint8_t tx_dgid;	// 0..99
 	uint8_t rx_dgid;	// 0..99; 0 hears every DG-ID
+	uint8_t voice;		// ysf_cp_voice_t: what PTT sends (VW kept here in a build without it, sent as DN)
+	bool narrow;		// half deviation (ADR 005 5)
 	// A stored channel's DG-ID for now (quick settings): both ways on channel temp_chan while it is in use; another
 	// channel taken drops it. 0: none
 	uint16_t temp_chan;
@@ -52,6 +54,8 @@ typedef struct {
 	uint8_t dt;		// of the call heard: its data type (YSF_DT_*: V/D mode 1, data, DN, VW)
 	uint8_t path;		// the voice path running (YSF_PATH_*: the DMR side's, P25's IMBE for VW, none mid-switch)
 	uint8_t rx_dgid, tx_dgid;	// in force
+	uint8_t voice;		// in force: ysf_cp_voice_t, what PTT sends
+	bool narrow;		// in force: half deviation
 	uint16_t fit;		// what the board's provider gives YSF (AIR_FIT_*), 0: nothing
 	char src[RADIO_YSF_CALL_LEN + 1];	// the caller, "" not known yet
 	char src_rid[RADIO_YSF_RID_LEN + 1];	// the caller's radio ID, "" not known yet

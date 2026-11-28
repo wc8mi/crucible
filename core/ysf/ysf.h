@@ -132,6 +132,7 @@ typedef struct {
 } ysf_rx_t;
 
 extern const air_mode_t ysf_air_mode;
+extern const air_mode_t ysf_air_mode_narrow;	// half deviation (ADR 005 5)
 
 void ysf_rx_init(ysf_rx_t *rx, void (*frame)(const ysf_rx_frame_t *f, void *ctx), void (*lost)(void *ctx), void *ctx);
 
