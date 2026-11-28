@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 David Behnke -->
 
 # Keys and Navigation
 
@@ -37,7 +38,7 @@ a key the radio doesn't have.
 | **#** | While you transmit on FM with **PTT**: its [touch tone](08-fm.md#touch-tones-dtmf). Otherwise: actions for the focused item. Home: actions for the last caller. VFO: tunes a frequency being typed, as **OK** | DMR channels: the talk target picker (pick a talkgroup, or type an ID). Recent is **OK**, **3** |
 | **0** to **9** | Home: start Find. Lists: pick a numbered row, or type to filter. VFO: type a frequency. While you transmit with **PTT**: FM sends the key's [touch tone](08-fm.md#touch-tones-dtmf), DMR nothing | Home: speed dial (not built yet). While you transmit with **PTT**: as a press |
 | **Previous zone**, **Next zone** | Home: previous or next zone | |
-| **Monitor** | FM: opens the squelch while held. DMR: digital monitor (every talkgroup) on or off | |
+| **Monitor** | FM: opens the squelch while held. DMR, NXDN, P25: digital monitor (every talkgroup) on or off | |
 | **Talk target** | Talk target picker (DMR channels) | Dual watch on or off |
 | **Power level** | Home: next power level | Hold 1.5 s: emergency ([Emergency](11-emergency.md)) |
 | **PTT** | Transmit | |

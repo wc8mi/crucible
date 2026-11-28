@@ -9194,6 +9194,97 @@ static void test_p25_mic_gain(void)
 	radio_p25_end();
 }
 
+// Digital monitor on P25 (p25.md 7.5, ADR 007): the monitor key's press latches every NAC and talk group on a
+// conventional channel; PTT still sends the channel's NAC, unit and talk group; another channel ends it. In dual watch
+// between two P25 channels each keeps its own latch
+static void test_p25_monitor(void)
+{
+	const radio_p25_view_t *v = &sm.view.p25;
+	radio_p25_settings_t s, mine = { .rx_nac = 0x123, .tx_nac = 0x123, .rx_tgid = 55, .talkaround = RADIO_P25_TA_AUTO,
+					 .tx_dst = 55 };
+
+	setup_codeplug_p25();
+	add(2, "P25 VFO", 446200000, RADIO_MODE_P25, false, 2);	// position 1: the radio's settings
+	add(3, "P25 rptr", 446100000, RADIO_MODE_DMR, false, 2);	// position 2: a stored channel
+	chans[3].kind = CODEPLUG_KIND_P25;
+	chans[3].system = 0xFF;
+	stored_p25[3] = (p25_conv_cfg_t){ .conv = { 0x2A0, 0x2A1, P25_SQUELCH_SELECTIVE }, .unit_id = 1234567,
+					  .target = 201, .target_unit = false, .talkaround = true };
+	start();
+	radio_req_p25_settings(&mine);
+	req(RREQ_ZONE_POS, 2);
+	CHECK(sm.view.channel_number == 3 && radio_p25_running() && !sm.view.dmr.hear_all_latch);
+	// Off: another NAC stays silent
+	far_begin(0x1B5, 1001, false, 7);
+	CHECK(p25_engine_tx_prepare(&far_eng) && p25_engine_tx_go(&far_eng));
+	far_tx = true;
+	run(600);
+	CHECK(!(v->flags & RADIO_P25_PLAYED) && sm.view.state == RS_IDLE);
+	p25_engine_tx_stop(&far_eng);
+	run(600);
+	// The key: on at the release; only the receive side changes
+	req(RREQ_MONITOR, 1);
+	CHECK(!sm.view.monitor && !sm.view.dmr.hear_all_latch);
+	req(RREQ_MONITOR, 0);
+	CHECK(sm.view.dmr.hear_all_latch && radio_p25_in_force(&s) && s.rx_nac == P25_NAC_ANY && s.rx_tgid == 0);
+	CHECK(s.tx_nac == 0x2A1 && s.tx_dst == 201 && s.unit_id == 1234567 && !s.unit_call);
+	far_begin(0x1B5, 1001, false, 7);
+	CHECK(p25_engine_tx_prepare(&far_eng) && p25_engine_tx_go(&far_eng));
+	far_tx = true;
+	run(600);
+	CHECK(sm.view.state == RS_RX && (v->flags & RADIO_P25_PLAYED) && v->dst == 7);
+	p25_engine_tx_stop(&far_eng);
+	run(600);
+	// PTT: the channel's NAC, unit and talk group
+	far_begin(0x2A1, 1001, false, 1);
+	run(100);
+	req(RREQ_PTT, 1);
+	CHECK(sm.view.state == RS_TX);
+	run(1000);
+	CHECK(far_heard.starts == 1 && far_heard.call.nac == 0x2A1 && far_heard.call.lc.src == 1234567 &&
+	      far_heard.call.lc.tgid == 201);
+	req(RREQ_PTT, 0);
+	run(600);
+	CHECK(sm.view.state == RS_IDLE && sm.view.dmr.hear_all_latch && radio_p25_in_force(&s) &&
+	      s.rx_nac == P25_NAC_ANY);
+	// Off with the key; on with the request; another P25 channel ends it
+	req(RREQ_MONITOR, 1);
+	req(RREQ_MONITOR, 0);
+	CHECK(!sm.view.dmr.hear_all_latch && radio_p25_in_force(&s) && s.rx_nac == 0x2A0 && s.rx_tgid == 201);
+	req(RREQ_DMR_HEAR_ALL, 1);
+	CHECK(sm.view.dmr.hear_all_latch && radio_p25_in_force(&s) && s.rx_nac == P25_NAC_ANY);
+	req(RREQ_ZONE_POS, 1);
+	CHECK(sm.view.channel_number == 2 && radio_p25_running() && !sm.view.dmr.hear_all_latch);
+	CHECK(radio_p25_in_force(&s) && s.rx_nac == 0x123 && s.rx_tgid == 55);
+	req(RREQ_ZONE_POS, 2);
+	CHECK(!sm.view.dmr.hear_all_latch && radio_p25_in_force(&s) && s.rx_nac == 0x2A0);
+#if CONFIG_SCAN && CONFIG_DUAL_WATCH
+	// Dual watch, B selected and latched: at every look B hears all and A its own NAC and talk group
+	const ui_dual_ref_t a = { false, 0, 1 }, b = { false, 0, 2 }, pair[2] = { a, b };
+	CHECK(ui_svc_dual(pair, 1) && sm.view.scan == SCAN_DUAL);
+	req(RREQ_MONITOR, 1);
+	req(RREQ_MONITOR, 0);
+	CHECK(sm.view.channel_number == 3 && sm.view.dmr.hear_all_latch);
+	uint16_t looks_a = 0, looks_b = 0, bad = 0;
+	for (int i = 0; i < 4000 / RADIO_POLL_MS; i++) {
+		run(RADIO_POLL_MS);
+		if (!radio_p25_in_force(&s))
+			continue;
+		if (sm.view.channel_number == 3) {
+			looks_b++;
+			bad += !sm.view.dmr.hear_all_latch || s.rx_nac != P25_NAC_ANY;
+		} else if (sm.view.channel_number == 2) {
+			looks_a++;
+			bad += sm.view.dmr.hear_all_latch || s.rx_nac != 0x123 || s.rx_tgid != 55;
+		}
+	}
+	CHECK(sm.view.scan == SCAN_DUAL && looks_a > 0 && looks_b > 0 && bad == 0);
+	CHECK(ui_svc_dual(NULL, 0) && sm.view.scan == SCAN_OFF);
+#endif
+	far_stop();
+	p25_defaults();
+}
+
 static void test_p25(void)
 {
 #if CONFIG_P25_TRUNK
@@ -9208,6 +9299,7 @@ static void test_p25(void)
 #endif
 	test_p25_rx();
 	test_p25_stored();
+	test_p25_monitor();
 #if CONFIG_SCAN
 	test_p25_scan();
 #if CONFIG_DUAL_WATCH
@@ -10325,6 +10417,127 @@ static void test_nxdn_radio_default(void)
 	setup_codeplug();
 }
 
+// Digital monitor on NXDN (nxdn.md 6.5, ADR 007): the monitor key's press latches every RAN and every call on the
+// channel, the squelch not opened; PTT still sends the channel's; a retune to another channel ends it, an NXDN one too.
+// In dual watch between two NXDN channels each keeps its own latch at every look
+static void test_nxdn_monitor(void)
+{
+	const radio_nxdn_view_t *v = &sm.view.nxdn;
+	radio_nxdn_settings_t s, mine = nxdn_default_set;
+
+	setup_codeplug_nxdn();
+	add(2, "NXDN VFO", 446200000, RADIO_MODE_NXDN, false, 2);	// position 1: the radio's settings
+	add(3, "NXDN rptr", 446100000, RADIO_MODE_DMR, false, 2);	// position 2: a stored channel
+	chans[3].kind = CODEPLUG_KIND_NXDN;
+	chans[3].system = 0xFF;
+	stored_nxdn[3] = (nxdn_conv_cfg_t){ .conv = { .rate9600 = true, .rx_ran = 7, .tx_ran = 8,
+						      .squelch = NXDN_SQUELCH_SELECTIVE },
+					    .unit_id = 4321, .target = 20, .target_unit = false };
+	start();
+	mine.rx_ran = 5;
+	mine.rx_gid = 30;
+	radio_req_nxdn_settings(&mine);
+	aud.feed = true;
+	req(RREQ_ZONE_POS, 2);
+	CHECK(sm.view.channel_number == 3 && radio_nxdn_running() && !sm.view.dmr.hear_all_latch);
+	// Off: another RAN stays silent
+	nfar_begin(true, 9, 2001, false, 21);
+	nfar_call(600);
+	CHECK(sm.view.state == RS_IDLE);
+	// The key: on at the release, the squelch never opened; only the receive side changes
+	req(RREQ_MONITOR, 1);
+	CHECK(!sm.view.monitor && !sm.view.dmr.hear_all_latch);
+	req(RREQ_MONITOR, 0);
+	CHECK(sm.view.dmr.hear_all_latch && radio_nxdn_in_force(&s) && s.rx_ran == NXDN_RAN_ANY && s.rx_gid == 0);
+	CHECK(s.tx_ran == 8 && s.tx_dst == 20 && s.unit_id == 4321 && !s.unit_call);
+	nfar_begin(true, 9, 2001, false, 21);
+	CHECK(nxdn_engine_tx_prepare(&nfar) && nxdn_engine_tx_go(&nfar));
+	nfar_tx = true;
+	run(800);
+	CHECK(sm.view.state == RS_RX && (v->flags & RADIO_NXDN_PLAYED) && v->dst == 21 && v->ran == 9);
+	nxdn_engine_tx_stop(&nfar);
+	run(500);
+	// PTT: the channel's RAN, unit and group; the latch is still on after it
+	nfar_begin(true, 8, 2001, false, 1);
+	run(100);
+	req(RREQ_PTT, 1);
+	CHECK(sm.view.state == RS_TX);
+	run(1000);
+	CHECK(nfar_heard.starts == 1 && nfar_heard.call.ran == 8 && nfar_heard.call.vcall.src == 4321 &&
+	      nfar_heard.call.vcall.dst == 20);
+	req(RREQ_PTT, 0);
+	run(600);
+	CHECK(sm.view.state == RS_IDLE && sm.view.dmr.hear_all_latch && radio_nxdn_in_force(&s) &&
+	      s.rx_ran == NXDN_RAN_ANY);
+	// The key again: off, the channel's RAN and group back
+	req(RREQ_MONITOR, 1);
+	req(RREQ_MONITOR, 0);
+	CHECK(!sm.view.dmr.hear_all_latch && radio_nxdn_in_force(&s) && s.rx_ran == 7 && s.rx_gid == 20);
+	// The request sets the same latch; another NXDN channel ends it, and it stays off back here
+	req(RREQ_DMR_HEAR_ALL, 1);
+	CHECK(sm.view.dmr.hear_all_latch && radio_nxdn_in_force(&s) && s.rx_ran == NXDN_RAN_ANY);
+	req(RREQ_ZONE_POS, 1);
+	CHECK(sm.view.channel_number == 2 && radio_nxdn_running() && !sm.view.dmr.hear_all_latch);
+	CHECK(radio_nxdn_in_force(&s) && s.rx_ran == 5 && s.rx_gid == 30);
+	req(RREQ_ZONE_POS, 2);
+	CHECK(!sm.view.dmr.hear_all_latch && radio_nxdn_in_force(&s) && s.rx_ran == 7);
+#if CONFIG_SCAN && CONFIG_DUAL_WATCH
+	// Dual watch, B selected: the key latches B. At every look B hears all and A its own RAN and group
+	const ui_dual_ref_t a = { false, 0, 1 }, b = { false, 0, 2 }, pair[2] = { a, b };
+	CHECK(ui_svc_dual(pair, 1) && sm.view.scan == SCAN_DUAL);
+	req(RREQ_MONITOR, 1);
+	req(RREQ_MONITOR, 0);
+	CHECK(sm.view.channel_number == 3 && sm.view.dmr.hear_all_latch);
+	uint16_t looks_a = 0, looks_b = 0, bad = 0;
+	for (int i = 0; i < 4000 / RADIO_POLL_MS; i++) {
+		run(RADIO_POLL_MS);
+		if (!radio_nxdn_in_force(&s))
+			continue;
+		if (sm.view.channel_number == 3) {
+			looks_b++;
+			bad += !sm.view.dmr.hear_all_latch || s.rx_ran != NXDN_RAN_ANY;
+		} else if (sm.view.channel_number == 2) {
+			looks_a++;
+			bad += sm.view.dmr.hear_all_latch || s.rx_ran != 5 || s.rx_gid != 30;
+		}
+	}
+	CHECK(sm.view.scan == SCAN_DUAL && looks_a > 0 && looks_b > 0 && bad == 0);
+	CHECK(ui_svc_dual(NULL, 0) && sm.view.scan == SCAN_OFF);
+	// Both VFOs on NXDN, the second latched before the watch starts: the first, with nothing kept yet, starts without
+	// it (both are channel 0, so only the watch's own state tells them apart)
+	const ui_dual_ref_t v0 = { true, 0, 0 }, v1 = { true, 0, 1 }, vfos[2] = { v0, v1 };
+	req(RREQ_VFO, 1);
+	req(RREQ_VFO_SET, 446200000);
+	req(RREQ_MODE, RADIO_MODE_NXDN);
+	CHECK(ui_svc_dual(vfos, 1) && ui_svc_dual(NULL, 0) && sm.view.vfo && sm.view.vfo_index == 1);
+	req(RREQ_VFO_SET, 446300000);
+	req(RREQ_MODE, RADIO_MODE_NXDN);
+	CHECK(sm.view.ch.mode == RADIO_MODE_NXDN && radio_nxdn_running());
+	req(RREQ_DMR_HEAR_ALL, 1);
+	CHECK(sm.view.dmr.hear_all_latch);
+	CHECK(ui_svc_dual(vfos, 1) && sm.view.scan == SCAN_DUAL);
+	looks_a = looks_b = bad = 0;
+	for (int i = 0; i < 4000 / RADIO_POLL_MS; i++) {
+		run(RADIO_POLL_MS);
+		if (!sm.view.vfo || !radio_nxdn_in_force(&s))
+			continue;
+		if (sm.vfo_idx == 1) {
+			looks_b++;
+			bad += !sm.view.dmr.hear_all_latch || s.rx_ran != NXDN_RAN_ANY;
+		} else {
+			looks_a++;
+			bad += sm.view.dmr.hear_all_latch || s.rx_ran != 5;
+		}
+	}
+	CHECK(sm.view.scan == SCAN_DUAL && looks_a > 0 && looks_b > 0 && bad == 0);
+	CHECK(ui_svc_dual(NULL, 0) && sm.view.scan == SCAN_OFF);
+	req(RREQ_DMR_HEAR_ALL, 0);
+	req(RREQ_VFO, 0);
+#endif
+	nfar_stop();
+	nxdn_defaults();
+}
+
 static void test_nxdn(void)
 {
 	test_nxdn_rx();
@@ -10335,6 +10548,7 @@ static void test_nxdn(void)
 #endif
 	test_nxdn_mode();
 	test_nxdn_stored();
+	test_nxdn_monitor();
 #if CONFIG_SCAN
 	test_nxdn_scan();
 #if CONFIG_P25

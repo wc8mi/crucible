@@ -433,6 +433,7 @@ they say "NXDN: set in the channel".
   your unit ID (**Own ID**, up to 65519). RAN 0 receives every RAN. The squelch can be changed only from a computer.
 - Scan stops on NXDN channels and holds on a call you would hear there, at a rate the radio can receive. Dual watch
   takes one as A or B.
+- [Digital monitor](09-dmr.md#on-nxdn-and-p25) plays calls on every RAN and group, as on DMR.
 
 ### YSF in the VFO
 

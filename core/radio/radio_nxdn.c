@@ -95,6 +95,9 @@ bool radio_nxdn_receives(const channel_t *ch, uint16_t number)
 	return (number != 0 && nxdn_conv_load(number, ch, &cc) ? cc.conv.rate9600 : set.rate9600) ? fast != 0 : slow != 0;
 }
 
+// Digital monitor (radio_nxdn_monitor): every RAN and every call heard, whatever the channel says
+static bool monitor;
+
 // The engine's configuration for channel ch at number (0: the VFO): the one place NXDN parameters come from. A live
 // stored NXDN channel's tag and record give them (docs/spec/nxdn-codeplug.md 2), else the settings
 static void params(const channel_t *ch, uint16_t number, nxdn_engine_cfg_t *c)
@@ -139,6 +142,21 @@ static void params(const channel_t *ch, uint16_t number, nxdn_engine_cfg_t *c)
 	c->tx_call_type = set.unit_call ? NXDN_CALL_INDIVIDUAL : NXDN_CALL_GROUP;
 	c->tx_dst = set.tx_dst;
 	c->emergency = set.emergency;
+}
+
+// Digital monitor on top of the channel's parameters: the receive side only, what PTT sends stays the channel's
+static void params_monitored(const channel_t *ch, uint16_t number, nxdn_engine_cfg_t *c)
+{
+	params(ch, number, c);
+	if (monitor) {
+		c->rx_ran = NXDN_RAN_ANY;
+		c->rx_gid = 0;
+	}
+}
+
+void radio_nxdn_monitor(bool on)
+{
+	monitor = on;
 }
 
 // ── Voice: the DMR side's voice path (ambeVoice.h), its sink on receive and its source on transmit. The hooks run in
@@ -194,7 +212,7 @@ bool radio_nxdn_begin(const channel_t *ch, uint16_t number)
 
 	radio_nxdn_end();
 	stats.begins++;
-	params(ch, number, &cfg);
+	params_monitored(ch, number, &cfg);
 	eng = radio_air_engine_get(sizeof(nxdn_engine_t));
 	if (eng == NULL || board.air == NULL || nxdn_engine_fit(board.air, cfg.rate9600) == 0) {
 		eng = NULL;
@@ -240,7 +258,7 @@ void radio_nxdn_apply(const channel_t *ch, uint16_t number)
 
 	if (eng == NULL || nxdn_engine_tx_state(eng) != AIR_TX_IDLE)
 		return;
-	params(ch, number, &cfg);
+	params_monitored(ch, number, &cfg);
 	if (cfg.rate9600 != eng->cfg.rate9600) {
 		radio_nxdn_begin(ch, number);	// the mode is the session's: a new rate is a new session
 		return;

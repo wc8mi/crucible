@@ -100,6 +100,9 @@ bool radio_nxdn_running(void);
 void radio_nxdn_retuned(void);
 // The settings changed: the engine takes them (not while transmitting). A new rate starts the engine over
 void radio_nxdn_apply(const channel_t *ch, uint16_t number);
+// Digital monitor (the radio core's hear all latch): every RAN and every group, all and unit call play; what PTT
+// sends stays the channel's. Taken at the next begin or apply (nxdn.md 6.5)
+void radio_nxdn_monitor(bool on);
 // Every tick: the view and the counters. True when the view changed
 bool radio_nxdn_poll(radio_nxdn_view_t *v);
 

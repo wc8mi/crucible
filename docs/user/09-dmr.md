@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 David Behnke -->
 
 # DMR
 
@@ -276,6 +277,14 @@ the other timeslot, the channel counts as busy.
 On a [Tier III trunked channel](#setting-one-up) digital monitor follows calls on every talkgroup of the system, not
 only the channel's RX group list. It still plays only the system's calls, on their own timeslot. While it plays one,
 **PTT** talks on that call, as on any call the radio follows (not on a broadcast or an all-call someone else made).
+
+### On NXDN and P25
+
+Digital monitor works the same way on an NXDN channel, a P25 channel and the VFO in either mode: **Monitor**, **\***,
+**5** or a **Monitor toggle** key turns it on, and the chips show "DMon". It plays calls on every RAN (NXDN) or NAC
+(P25), to every group or talkgroup, and calls to other units. **PTT** still sends with the channel's RAN or NAC, group
+and ID. Encrypted calls stay silent. It ends as on DMR. In dual watch each channel keeps its own setting. P25 trunked
+channels don't have it.
 
 ## Privacy
 

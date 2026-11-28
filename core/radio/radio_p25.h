@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // P25 conventional on a channel, the radio core's side (docs/spec/p25.md 7): the engine (core/p25/p25_engine.h) and
 // the voice path (core/p25/p25Voice.h) on the memory they run in, the channel's P25 parameters, and a compact view
 // for the radio view. radio_sm.c decides when P25 runs and keys the transmitter; nothing here keys it.
@@ -152,6 +153,9 @@ bool radio_p25_trunked(void);
 void radio_p25_retuned(void);
 // The settings or the channel's parameters changed: the engine takes them (not while transmitting)
 void radio_p25_apply(const channel_t *ch, uint16_t number, uint32_t own_id);
+// Digital monitor (the radio core's hear all latch): every NAC and every talk group, everyone and unit call play;
+// what PTT sends stays the channel's. A conventional channel takes it at the next begin or apply (p25.md)
+void radio_p25_monitor(bool on);
 // Every tick: the voice stream, the view and the counters. True when the view changed
 bool radio_p25_poll(radio_p25_view_t *v);
 

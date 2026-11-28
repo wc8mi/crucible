@@ -1755,8 +1755,9 @@ void radio_req_monitor(bool down)
 {
 	if (down)
 		to_selected();
-	// As the radio core (#19): on DMR a short press toggles digital monitor on its release; FM holds it open
-	if (view.ch.mode == RADIO_MODE_DMR && !view.monitor) {
+	// As the radio core (#19): on DMR, NXDN and P25 a short press toggles digital monitor on its release; FM holds it
+	// open
+	if (radio_dmon_mode(&view.ch) && !view.monitor) {
 		if (!down) {
 			view.dmr.hear_all_latch = !view.dmr.hear_all_latch;
 			view.dmr.hear_all = view.dmr.hear_all_latch;

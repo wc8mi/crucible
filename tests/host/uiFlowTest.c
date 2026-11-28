@@ -238,6 +238,29 @@ static const flow_t flows[] = {
 #endif
 #endif
 	{ "P25 channel shows its mode", "dlmode:p25", "", "mode=p25 screen=home shows=P25 hides=No_tone hides=12.5k hides=25k hides=SQ5", 0, false },
+	// Digital monitor on P25 and NXDN as on DMR (ADR 007): the monitor key's press, tile 5, a Monitor toggle key
+#if CONFIG_P25	// digital monitor needs the P25 engine (radio_dmon_mode)
+	{ "P25 monitor key: digital monitor", "dlmode:p25", "mon",
+	  "mode=p25 hearall=1 monitor=0 toast=Digital_monitor_on",
+	  1, false },
+	{ "P25 monitor key, again: off", "dlmode:p25 mon", "mon", "hearall=0 toast=Digital_monitor_off", 1,
+	  false },
+	{ "P25 quick 5: digital monitor", "dlmode:p25", "quick 5", "hearall=1 monitor=0", 2, false },
+	{ "P25 monitor toggle key: digital monitor", "dlmode:p25", "monkey", "hearall=1 monitor=0", 1, false },
+	{ "P25 digital monitor: DMon on Home", "dlmode:p25 mon", "wait:100", "screen=home shows=DMon", 0, false },
+	{ "P25 digital monitor off: no DMon", "dlmode:p25 mon mon", "wait:100", "screen=home hides=DMon", 0, false },
+#endif
+#if CONFIG_NXDN
+	{ "NXDN monitor key: digital monitor", "dlmode:nxdn", "mon",
+	  "mode=nxdn hearall=1 monitor=0 toast=Digital_monitor_on",
+	  1, false },
+	{ "NXDN monitor key, again: off", "dlmode:nxdn mon", "mon", "hearall=0 toast=Digital_monitor_off", 1,
+	  false },
+	{ "NXDN quick 5: digital monitor", "dlmode:nxdn", "quick 5", "hearall=1 monitor=0", 2, false },
+	{ "NXDN monitor toggle key: digital monitor", "dlmode:nxdn", "monkey", "hearall=1 monitor=0", 1, false },
+	{ "NXDN digital monitor: DMon on Home", "dlmode:nxdn mon", "wait:100", "screen=home shows=DMon", 0, false },
+	{ "NXDN digital monitor off: no DMon", "dlmode:nxdn mon mon", "wait:100", "screen=home hides=DMon", 0, false },
+#endif
 #if CONFIG_NXDN
 	// NXDN the same way: the power, the RAN sent and the rate in the chips, the group PTT calls on the talk line
 	{ "NXDN channel shows its mode", "dlmode:nxdn", "", "mode=nxdn screen=home shows=NXDN shows=RAN_1_4800 shows=TG_1 hides=No_tone hides=SQ5", 0, false },

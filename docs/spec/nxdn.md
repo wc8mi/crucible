@@ -259,6 +259,33 @@ squelch waits for the VCALL (late entry: from the SACCH superframe); a call that
 group, encrypted) moves on. A channel at a rate the board's provider can't receive (`radio_nxdn_receives`: a transmit
 only fit) is never a stop.
 
+### 6.5 Digital monitor
+
+DMR's hear all latch ([dmr-voice.md](dmr-voice.md) 1) works on NXDN too ([ADR 007](../crucible/adr/007-nxdn-conventional.md)).
+One latch, one way to set it:
+
+| Where | What |
+|---|---|
+| Monitor key | a short press toggles it on the release, as on DMR; the squelch is not opened. Its hold function runs as on DMR |
+| Quick tile 5, a side key set to Monitor toggle | Digital monitor on an NXDN channel and the VFO in NXDN, as on DMR (FM keeps the squelch latch) |
+| `radio_req_dmr_hear_all`, debug link | the same latch (`view.dmr.hear_all_latch`; the name says DMR, the latch is shared) |
+
+While it is on, the engine's receive RAN is 0 (every RAN) and the group squelch is off (`rx_gid` 0): every group call,
+all call and unit call plays (`radio_nxdn_monitor`, applied over the channel's parameters). What PTT sends (the transmit
+RAN, the unit ID, the talk target) stays the channel's. A scrambled call plays only with its key.
+
+| Ends it | |
+|---|---|
+| Another channel, the VFO, a mode change | yes, as on DMR. A retune of the same channel does not |
+| BACK on Home, the key again | yes |
+| The end of a call, a transmission | no. A change made during a transmission applies when it ends |
+| A zone or VFO scan started with it on | keeps it at every stop and latches it on the channel the scan ends on, as on DMR |
+| Dual watch | each channel keeps its own: the latch set on one side stays with it at every look and never reaches the other side (the VFOs included) |
+
+The radio core keeps the latch across a retune between two air channels (P25, NXDN, YSF) as it does between two DMR
+channels: the engine stops and starts on the new channel, the latch and the talk target stay (`tune()`), and the latch
+applies only on the channel it was set on. A dual watch side with nothing kept starts with neither (`keep_load`).
+
 ## 7. The engine (`core/nxdn/nxdn_engine.c`)
 
 `nxdn_engine` is NXDN on a channel: the call layer on an air interface session, as `p25_engine` is P25's
@@ -295,9 +322,9 @@ The radio core needs from a board: a provider (`board_t.air`) whose fit takes 24
 | `tests/host/nxdnTest.c` | the scrambler against its register, the syncs, the LICH and its parity, SACCH and FACCH1 round trips through errors and CRC checks, VCH places, the 7.2.1 FEC frames, messages; calls through the framer: clear, RAN squelch, RAN 0, late entry, LICH coasting, symbol errors, a header sync with an error, encrypted, 9600 bit/s |
 | `tests/host/nxdnScrambleTest.c` | the complete TS 1-D v1.3 scramble vectors for EHR voice (7.2.1.1) and UDCH user data (7.2.2.1), plus FEC correction and invalid inputs |
 | `tests/host/nxdnEngineTest.c` | two engines on made-up providers at both rates: a call heard with its fields and voice in order, an encoder stall covered by silence, no underruns, the lead-in on air before the preamble and the call heard from its header at both rates (`testLeadIn`), late entry, group and individual squelch, a squelch change mid-call, an abort, another RAN, RAN 0, an encrypted call; a call through a modeled discriminator tap and the soft modem at 2400 symbols/s, eight calls per noise level |
-| `tests/host/radioCoreTest.c` (`radioCoreTestNxdn`, `radioCoreTestP25Nxdn`) | the radio core against an NXDN engine on a fake provider: a call heard, its voice in order to the vocoder, another RAN, group squelch; PTT heard by the far engine with the settings, the encoder idle while the lead-in is queued and no encoder overflow, settings sent mid-transmission, unit ID 0 sending the DMR ID or 1 when it is too long, 4800 bit/s, a TX-only and an RX-only fit, no fit, the time-out; the mode by request, the debug link and the VFO saved; P25 and NXDN in turn in the same memory; a zone scan over a stored NXDN channel: a stop with nothing on air, held on a late entry to its group, not on another group or RAN, never a stop at a rate the provider can't receive (`test_nxdn_scan`); dual watch with it as B: a hold on its group's call, not on another group, refused at such a rate, and with P25 on A one engine at a time (`test_nxdn_dual`); the NXDN radio default (`test_nxdn_radio_default`): 4800 at start, a stored value's effect on what PTT sends, refusals, the `nxdn.default.*` keys, All, Talk to for now, kept and back, a reload keeping a target for now, the seed at restart, a stored channel refusing Talk to; a target for now kept through a detour (`test_detour`) |
+| `tests/host/radioCoreTest.c` (`radioCoreTestNxdn`, `radioCoreTestP25Nxdn`) | the radio core against an NXDN engine on a fake provider: a call heard, its voice in order to the vocoder, another RAN, group squelch; PTT heard by the far engine with the settings, the encoder idle while the lead-in is queued and no encoder overflow, settings sent mid-transmission, unit ID 0 sending the DMR ID or 1 when it is too long, 4800 bit/s, a TX-only and an RX-only fit, no fit, the time-out; the mode by request, the debug link and the VFO saved; P25 and NXDN in turn in the same memory; a zone scan over a stored NXDN channel: a stop with nothing on air, held on a late entry to its group, not on another group or RAN, never a stop at a rate the provider can't receive (`test_nxdn_scan`); dual watch with it as B: a hold on its group's call, not on another group, refused at such a rate, and with P25 on A one engine at a time (`test_nxdn_dual`); the NXDN radio default (`test_nxdn_radio_default`): 4800 at start, a stored value's effect on what PTT sends, refusals, the `nxdn.default.*` keys, All, Talk to for now, kept and back, a reload keeping a target for now, the seed at restart, a stored channel refusing Talk to; a target for now kept through a detour (`test_detour`); digital monitor (`test_nxdn_monitor`): another RAN silent until the key latches every RAN and group, PTT on the channel's RAN, unit and group, off with the key, ended by another NXDN channel, and in dual watch between two NXDN channels or the two VFOs each side's own latch at every look |
 | `tests/host/settingsTest.c` (`test_settings_nxdn_default`) | the NXDN radio default's block: its offsets, the defaults, a round trip, a short record, another marker, values out of range read as defaults, All kept |
-| `tests/host/uiFlowTest.c` | the mode tile's order, the home screen in NXDN, the FM-only tiles; quick tile 8 as the rate and its refusal on a stored channel; Talk to from Contacts or typed, Back undoing it, an ID past 65519 refused, refused on a stored channel; the Settings NXDN page, All past the top, a typed value out of range, no NXDN on the radio |
+| `tests/host/uiFlowTest.c` | the mode tile's order, the home screen in NXDN, the FM-only tiles; quick tile 8 as the rate and its refusal on a stored channel; Talk to from Contacts or typed, Back undoing it, an ID past 65519 refused, refused on a stored channel; the Settings NXDN page, All past the top, a typed value out of range, no NXDN on the radio; digital monitor from the monitor key, quick tile 5 and a Monitor toggle key |
 | `tests/hil/test_nxdn.py` | on the radio: the mode switch, the settings, the stored NXDN radio default's keys in range (`test_nxdn_default_view`) and quick tile 8 flipping the stored rate and back (`test_nxdn_default_rate_tile`, no RF), a stored channel written over CPS; opt-in, an over decoded off air by the SDR bench's 4FSK receiver and `nxdntool` (one HR_C6000 radio: 9600 bit/s 78 frames, outer deviation 2399 Hz; 4800 bit/s 40 frames, 1012 Hz; no CRC failure), a stored channel that transmits keyed and decoded the same way with the channel's RAN, unit and group (`test_nxdn_stored_channel_tx`), a call the bench plays received (`test_nxdn_rx_from_bench`), and one whose voice frames are a speech recording's, decoded by the vocoder: every frame into the voice path, none silent, bad or lost, the decoded PCM peaking as speech does (`test_nxdn_rx_speech`, the speech of `tests/data/voice`; on a board with a speaker FIFO also its chunks, gaps and refused blocks), and a zone scan or dual watch that holds on a stored NXDN channel when the bench calls there (`test_nxdn_scan_from_bench`, with `--allow-codeplug-write`; not yet run on a radio). They skip where the fit has no RX. Nothing measures the sound at the speaker itself |
 | `tools/bench/nxdntool.py selftest` | the bench tool (below) both ways at both rates, with bit errors and through the soft modem, from bench receiver records, the summary line |
 

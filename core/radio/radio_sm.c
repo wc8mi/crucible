@@ -585,6 +585,12 @@ static inline __attribute__((always_inline)) void keep_save(radio_sm_t *sm, radi
 static inline __attribute__((always_inline)) void keep_load(radio_sm_t *sm, const radio_dual_keep_t *k)
 {
 	if (!k->valid) {
+#if CONFIG_DMR
+		// Nothing kept for this side: no talk target or hear all latch. A retune between two air channels keeps
+		// them (tune), so without this one side's latch would carry to the other
+		sm->manual = false;
+		sm->hear_all_latch = false;
+#endif
 		return;
 	}
 	if (k->temp_power) {
@@ -898,6 +904,7 @@ static void dmr_end(radio_sm_t *sm);
 // Not inlined: tune's frame is on the radio task's deepest path
 static void air_stop(radio_sm_t *sm) __attribute__((noinline));
 static void air_begin(radio_sm_t *sm) __attribute__((noinline));
+static void air_apply(radio_sm_t *sm);
 static bool air_running(void);
 #if CONFIG_SCAN
 static uint8_t air_heard(const radio_sm_t *sm);
@@ -1035,7 +1042,15 @@ static void tune(radio_sm_t *sm, uint32_t now_ms)
 	// No sub-audio squelch in DMR, P25, NXDN or YSF, whatever tone the channel or the VFO still holds from its FM settings
 	static const subtone_t no_tone = { TONE_NONE, 0 };
 	if (sm->board_mode == RADIO_MODE_DMR && mode != RADIO_MODE_DMR) {
-		dmr_end(sm);		// the call stack (or an air mode) lets go of the modem before the chip leaves DMR
+#if CONFIG_AIR
+		if (air && air_running()) {
+			// From one air channel to another (dual watch switches every dwell): the engine stops and starts again
+			// below, and the talk target and hear all latch stay, as on a retune between DMR channels. The latch
+			// is per channel (air_hear_all, keep_load)
+			air_stop(sm);
+		} else
+#endif
+			dmr_end(sm);	// the call stack (or an air mode) lets go of the modem before the chip leaves DMR
 	}
 #if CONFIG_AIR
 	if (!air && air_running()) {
@@ -2072,6 +2087,12 @@ static void set_hear_all_latch(radio_sm_t *sm, bool on)
 	sm->latch_vfo = sm->view.vfo;
 	sm->view.dmr.hear_all_latch = on;
 	dmr_reconfigure(sm);
+#if CONFIG_AIR
+	if (air_running()) {
+		air_apply(sm);	// NXDN or P25: the receive RAN or NAC and the group squelch (not while transmitting:
+				// the end of the transmission applies it)
+	}
+#endif
 }
 
 // A timeslot for now (RREQ_DMR_TS). The slot the radio would use without it (a contact's override, else the
@@ -4770,6 +4791,11 @@ static bool dual_tune(radio_sm_t *sm, uint8_t i, uint32_t now_ms)
 			dmr_configure(sm);	// a talk target or the hear all latch kept
 		}
 #endif
+#if CONFIG_AIR
+		if (air_running()) {
+			air_apply(sm);		// NXDN or P25: this VFO's latch (enter_vfo started the engine before it)
+		}
+#endif
 		sm->dual_at = i;
 		return true;
 	}
@@ -4978,7 +5004,7 @@ static void scan_stop(radio_sm_t *sm, bool cancel, uint32_t now_ms)
 #if CONFIG_DMR
 	// A scan with digital monitor leaves it on, latched on the channel it ends on (the stack still hears all)
 	sm->scan_hear_all = false;
-	if (hear_all && sm->view.ch.mode == RADIO_MODE_DMR) {
+	if (hear_all && radio_dmon_mode(&sm->view.ch)) {
 		set_hear_all_latch(sm, true);
 	}
 #endif
@@ -6744,8 +6770,30 @@ static uint8_t air_heard(const radio_sm_t *sm)
 #endif
 
 // On an air mode's channel, the board in its digital mode and tuned: the engine starts (dmr_end stopped any before)
+// Digital monitor for the air modes: the hear all latch on this channel (it ends when the channel changes, as on DMR),
+// or carried by a scan; told to NXDN and P25 before they take their parameters
+static void air_hear_all(radio_sm_t *sm)
+{
+	bool on = false;
+#if CONFIG_DMR
+	if (sm->hear_all_latch && (sm->latch_vfo != sm->view.vfo || sm->latch_ch != sm->view.channel_number)) {
+		sm->hear_all_latch = false;
+	}
+	on = radio_dmon_mode(&sm->view.ch) && hear_all_on(sm);
+	sm->view.dmr.hear_all_latch = on;
+#endif
+#if CONFIG_NXDN
+	radio_nxdn_monitor(on);
+#endif
+#if CONFIG_P25
+	radio_p25_monitor(on);
+#endif
+	(void)on;
+}
+
 static void air_begin(radio_sm_t *sm)
 {
+	air_hear_all(sm);
 #if CONFIG_YSF
 	if (sm->view.ch.mode == RADIO_MODE_YSF) {
 		radio_ysf_begin(&sm->view.ch, air_number(sm), sm->radio_name);
@@ -6853,6 +6901,7 @@ static void air_key(radio_sm_t *sm, uint32_t now_ms, uint32_t hz)
 // The settings sent while it transmitted (RREQ_P25_SET, RREQ_NXDN_SET, RREQ_YSF_SET): the engine takes them now
 static void air_apply(radio_sm_t *sm)
 {
+	air_hear_all(sm);
 #if CONFIG_YSF
 	if (ysf_now(sm)) {
 		radio_ysf_apply(&sm->view.ch, air_number(sm), sm->radio_name);
@@ -9102,7 +9151,7 @@ static void monitor_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now
 	// arg 1 down, 0 up, 2 up after the key's hold function ran. DMR: a short press toggles digital monitor (the hear
 	// all latch) on its release, so a hold can do something else (#19); FM: the squelch is open while the key is
 	// held. A key held across a change to DMR is still released here
-	if (sm->view.ch.mode == RADIO_MODE_DMR && !sm->view.monitor) {
+	if (radio_dmon_mode(&sm->view.ch) && !sm->view.monitor) {	// NXDN and P25 as DMR (nxdn.md 6.5)
 		if (req->arg == 0) {
 			set_hear_all_latch(sm, !hear_all_on(sm));
 		}
