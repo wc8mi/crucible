@@ -75,7 +75,11 @@ export function parseTleCatalog(text) {
 	if (typeof text !== "string") throw new Error("TLE catalog must be text");
 	const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
 	const records = [];
-	const seen = new Set();
+	// Published lists can repeat an ID: two objects sharing one element set (the same lines under two names), or two
+	// element sets for one object. A repeat with the same lines keeps the first; with other lines the page cannot tell
+	// which is right, so that ID is left out (a selected one is then reported missing) instead of the whole list.
+	const seen = new Map();
+	const conflicting = new Set();
 	let name = "";
 	for (let i = 0; i < lines.length;) {
 		const line = lines[i];
@@ -94,17 +98,30 @@ export function parseTleCatalog(text) {
 		const line2 = lines[line2Index];
 		if (!line2?.startsWith("2 ")) throw new Error("Catalog contains an incomplete TLE pair");
 		const idText = line.slice(2, 7);
+		// An Alpha-5 number (a letter, then four digits: 100000 and up) is a valid object the radio cannot store; its
+		// IDs stop at 99999 (satellite_tle.py, the firmware), so the record is skipped, not the list
+		if (/^[A-HJ-NP-Z]\d{4}$/.test(idText)) {
+			name = "";
+			i = line2Index + 1;
+			continue;
+		}
 		if (!/^\d{5}$/.test(idText)) throw new Error("Catalog contains an invalid NORAD catalog ID");
 		const catalogId = Number(idText);
-		if (seen.has(catalogId)) throw new Error(`Catalog contains duplicate ID ${catalogId}`);
 		if (!name) throw new Error(`Catalog ID ${catalogId} has no satellite name`);
-		records.push({ catalog_id: catalogId, name, line1: line, line2 });
-		seen.add(catalogId);
+		const earlier = seen.get(catalogId);
+		if (!earlier) {
+			const record = { catalog_id: catalogId, name, line1: line, line2 };
+			records.push(record);
+			seen.set(catalogId, record);
+		} else if (earlier.line1 !== line || earlier.line2 !== line2) {
+			conflicting.add(catalogId);
+		}
 		name = "";
 		i = line2Index + 1;
 	}
-	if (!records.length) throw new Error("No TLE records found in the selected file");
-	return records;
+	const kept = records.filter((record) => !conflicting.has(record.catalog_id));
+	if (!kept.length) throw new Error("No TLE records found in the selected file");
+	return kept;
 }
 
 function checksumValid(line) {
