@@ -4663,6 +4663,16 @@ static void test_position(void)
 	position_set_cfg(&saved_cfg, now);
 	CHECK(position_fix(&merged_fix, now) == POSITION_SRC_FIXED && merged_fix.lat == up.lat_e7);
 #if CONFIG_SATELLITE_TLE
+	// A fixed position typed by hand has no altitude: satellites take it as 0 m, everything else as none
+	position_cfg_t typed_cfg = saved_cfg;
+	typed_cfg.fix_alt_m = INT16_MIN;
+	position_set_cfg(&typed_cfg, now);
+	CHECK(position_fix(&merged_fix, now) == POSITION_SRC_FIXED && merged_fix.alt_m == POSITION_ALT_NONE);
+	CHECK(position_fix_for_satellite(&merged_fix, now) == POSITION_SRC_FIXED);
+	CHECK(merged_fix.lat == up.lat_e7 && merged_fix.lon == up.lon_e7 && merged_fix.alt_m == 0);
+	position_set_cfg(&saved_cfg, now);
+#endif
+#if CONFIG_SATELLITE_TLE
 	CHECK(position_utc_fields(&gps_date, &gps_utc, now));
 #endif
 	saved_cfg.pref = original_cfg.pref;

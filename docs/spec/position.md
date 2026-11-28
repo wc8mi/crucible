@@ -42,7 +42,10 @@ Position source (setting: Auto, GPS, Computer, Fixed):
 - Auto takes a GPS fix younger than 60 s (`POSITION_STALE_MS`), else a configured fixed position, else a host fix
   younger than 60 s. This lets a saved location remain in use while GPS acquires a lock.
 - Satellite prediction uses the selected source when it has coordinates and altitude, then falls back to an
-  altitude-bearing fixed position if that source is unavailable. It obtains date and UTC independently from a fresh
+  altitude-bearing fixed position if that source is unavailable. A position still without altitude (a fixed
+  position typed by hand, a GPS fix without GGA) counts as 0 m for satellite prediction only
+  (`position_fix_for_satellite`): a few hundred meters move a low-orbit pass by seconds. Sent positions (DMR, LRRP,
+  APRS) still report no altitude. It obtains date and UTC independently from a fresh
   GPS or host NMEA stream. RMC date and GGA/RMC time components are retained even when a sentence reports no position
   fix, so a saved fixed coordinate can be used while the receiver acquires a fix.
 - Host fixes and their UTC are not saved across a restart. The host must send fresh position, altitude and date/time

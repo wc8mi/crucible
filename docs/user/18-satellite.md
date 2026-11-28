@@ -76,7 +76,8 @@ TLE available while entering it.
 Open **OK**, **6** (Tools), then choose **Satellite**. The radio uses the selected position source for coordinates
 and altitude, and fresh GPS or computer NMEA for UTC, to predict passes for the installed TLEs. A saved fixed position
 can therefore provide the observer location while the GPS is acquiring its first fix, once the receiver provides
-current date and time. Computer fixes and UTC do not survive a restart: send fresh NMEA again, including altitude and
+current date and time. A fixed position typed without altitude counts as sea level, which is close enough for pass
+times. Computer fixes and UTC do not survive a restart: send fresh NMEA again, including altitude and
 date/time. The list is ordered by time to AOS and shows each pass's maximum elevation. When prediction finishes, the
 first pass is highlighted. Up and Down select a pass; **OK** opens its details and starts tracking. The selected
 satellite is remembered across power cycles.
@@ -107,7 +108,7 @@ While SO-50 is actively tracked, long-press **OK** on its detail screen to send 
 seconds. The radio applies its normal transmit checks and uses the active Doppler-adjusted uplink. This does not change
 the normal 67.0 Hz profile tone, and the arm signal is never sent automatically when PTT is released.
 The radio retains one pass at a time: the upcoming pass becomes current at AOS, then tracking rolls forward to the next
-pass after LOS. A missing position, altitude, valid UTC, unavailable record or stale TLE leaves the session unavailable
+pass after LOS. A missing position, valid UTC, unavailable record or stale TLE leaves the session unavailable
 and does not apply a correction. The radio restores ordinary channel frequencies when tracking stops, the channel/VFO
 context changes, scan or hotspot mode starts, or required inputs become invalid.
 
