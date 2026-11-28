@@ -492,6 +492,10 @@
 #endif
 // ... and its host source: NMEA from a computer comes in through APRS's host link and debug link command only
 #define CONFIG_POSITION_HOST		CONFIG_APRS
+// The UTC clock (core/clock): satellite prediction keeps the time without a fresh GPS or computer fix
+#ifndef CONFIG_CLOCK
+#define CONFIG_CLOCK			(CONFIG_SATELLITE_TLE && CONFIG_POSITION)
+#endif
 // The air queue (core/dmr/dmrAirQueue.c): what the IP gateway and zone sharing send, in order with the guard
 #define CONFIG_DMR_AIR_QUEUE		(CONFIG_DMR_IP_GATEWAY || CONFIG_ZONE_SHARE)
 
@@ -548,6 +552,9 @@
 #endif
 #if CONFIG_SATELLITE_TLE && !CONFIG_DEBUGLINK
 #error "CONFIG_SATELLITE_TLE needs CONFIG_DEBUGLINK"
+#endif
+#if CONFIG_CLOCK && !(CONFIG_SATELLITE_TLE && CONFIG_POSITION)
+#error "CONFIG_CLOCK needs CONFIG_SATELLITE_TLE and CONFIG_POSITION"
 #endif
 #if CONFIG_TASK_STACKS && !CONFIG_DEBUGLINK
 #error "CONFIG_TASK_STACKS needs CONFIG_DEBUGLINK"

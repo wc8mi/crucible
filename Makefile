@@ -146,7 +146,7 @@ ifeq ($(CONFIG_POSITION),y)
 CORE_DIRS += core/position
 endif
 ifeq ($(CONFIG_SATELLITE_TLE),y)
-CORE_DIRS += core/satellite
+CORE_DIRS += core/satellite core/clock
 endif
 ifeq ($(CONFIG_SNMP),y)
 CORE_DIRS += core/snmp

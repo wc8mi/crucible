@@ -15,7 +15,7 @@ Tracking needs three independent inputs:
 |---|---|
 | Orbital elements | A valid, paired two-line element set (TLE) and its epoch. Reject malformed or incomplete sets. The element epoch and current UTC determine whether the prediction is usable. |
 | Observer location | Latitude, longitude and altitude from the selected position source; an unknown altitude counts as 0 m. A missing or stale position stops pass and Doppler updates; fixed position is usable when selected. |
-| Current time | Valid UTC. A local monotonic tick may schedule work but is not a substitute for UTC in orbit propagation. |
+| Current time | Valid UTC from the clock ([clock.md](clock.md)): a GPS or computer fix, a time typed in Settings or the board's real-time clock. Without `CONFIG_CLOCK`, a fresh GPS or computer time only. A local monotonic tick may schedule work but is not a substitute for UTC in orbit propagation. |
 
 Satellite calculations are pure, bounded work: they take a TLE, observer state and UTC instant, then return a result.
 They do not read board registers, access settings storage, wait, or tune hardware. Position remains owned by

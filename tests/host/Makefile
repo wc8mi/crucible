@@ -279,7 +279,7 @@ sfrTest: $(SFRSRC) $(CORE)/dmr/sfr.h
 # APRS protocol layers (AX.25, HDLC, AFSK, KISS, formats, NMEA and its satellites, beacon triggers, iGate rules)
 TESTS   += aprsTest
 NMEALIB := $(CORE)/position/nmea.c $(CORE)/position/nmea_sky.c
-POSLIB  := $(CORE)/position/position.c $(NMEALIB)
+POSLIB  := $(CORE)/position/position.c $(NMEALIB) $(CORE)/clock/clock.c $(CORE)/clock/utc.c
 APRSLIB := $(CORE)/aprs/ax25.c $(CORE)/aprs/hdlc.c $(CORE)/aprs/afsk.c $(CORE)/aprs/kiss.c $(CORE)/aprs/aprs_fmt.c \
            $(CORE)/aprs/aprs_beacon.c $(CORE)/aprs/aprs_igate.c
 
@@ -1597,6 +1597,11 @@ run-settings: settingsTest digitalAgcTest spiNorTest spiNandTest nandSectorsTest
 	./nandSectorsTest
 .PHONY: run-settings
 
+# The UTC clock: calendar arithmetic, counting across the tick wrap, sources, RTC writes (core/clock)
+TESTS   += clockTest
+clockTest: clockTest.c $(CORE)/clock/clock.c $(CORE)/clock/utc.c $(wildcard $(CORE)/clock/*.h)
+	$(CC) $(CFLAGS) -DCONFIG_CLOCK=1 -DCONFIG_SATELLITE_TLE=1 -DCONFIG_DEBUGLINK=1 -DCONFIG_POSITION=1 -I$(ROOT)/hal -I. -Wshadow -o $@ clockTest.c $(CORE)/clock/clock.c $(CORE)/clock/utc.c
+
 TESTS   += satelliteStoreTest
 SAT_STORE := $(CORE)/debuglink/debuglink_satellite.c $(CORE)/satellite/store.c $(CORE)/satellite/orbit.c \
 	$(CORE)/satellite/frequency.c $(CORE)/storage/storage.c sim/sim_flash.c
@@ -1604,7 +1609,7 @@ TESTS   += satelliteChannelsTest
 TESTS   += satelliteOrbitTest
 TESTS   += satelliteServiceTest
 SAT_ORBIT := $(CORE)/satellite/orbit.c $(CORE)/satellite/pass.c $(CORE)/satellite/doppler.c \
-	$(CORE)/satellite/tracking.c
+	$(CORE)/satellite/tracking.c $(CORE)/clock/utc.c
 SAT_SERVICE := $(CORE)/satellite/service.c $(SAT_ORBIT)
 
 satelliteStoreTest: satelliteStoreTest.c $(SAT_STORE) \
@@ -1612,7 +1617,8 @@ satelliteStoreTest: satelliteStoreTest.c $(SAT_STORE) \
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -I. -Wshadow -DCONFIG_SATELLITE_TLE=1 -o $@ satelliteStoreTest.c $(SAT_STORE)
 
 run: run-satellite
-run-satellite: satelliteStoreTest satelliteChannelsTest satelliteOrbitTest satelliteServiceTest
+run-satellite: clockTest satelliteStoreTest satelliteChannelsTest satelliteOrbitTest satelliteServiceTest
+	./clockTest
 	./satelliteStoreTest
 	./satelliteChannelsTest
 	./satelliteOrbitTest

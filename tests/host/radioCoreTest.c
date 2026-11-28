@@ -52,6 +52,9 @@
 #include "dmr/trunk/t3_sys.h"
 #endif
 #include "fuzz.h"
+#if CONFIG_CLOCK
+#include "clock/clock.h"
+#endif
 #include "position/position.h"
 #include "radio/beep.h"
 
@@ -4640,6 +4643,27 @@ static void test_position(void)
 #endif
 	position_nmea(rmc, strlen(rmc), true, now);
 	CHECK(ui_svc_position(&up) && up.fix && up.sats == 8 && up.lat_e7 == 481173000 && up.lon_e7 == 115166666);
+#if CONFIG_CLOCK
+	// The clock takes a receiver's time only with a fix (status A) and a plausible date: 1994 is a receiver's default
+	static const char rmc_2026[] = "$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,271126,003.1,W*64";
+	static const char rmc_2026_void[] = "$GPRMC,123519,V,,,,,,,271126,,,N*5F";
+	const int64_t utc_2026 = INT64_C(1795737600) + 12 * 3600 + 35 * 60 + 19;	// 2026-11-27 12:35:19
+	int64_t clock_utc;
+	uint8_t clock_src;
+	clock_init(now);
+	position_nmea(rmc, strlen(rmc), true, now);
+	CHECK(!clock_now(&clock_utc, NULL, now));
+	position_nmea(rmc_2026_void, strlen(rmc_2026_void), true, now);
+	CHECK(!clock_now(&clock_utc, NULL, now));
+	CHECK(clock_set(utc_2026 - 600, CLOCK_SRC_MANUAL, now));
+	position_nmea(rmc_2026_void, strlen(rmc_2026_void), true, now);
+	CHECK(clock_now(&clock_utc, &clock_src, now) && clock_utc == utc_2026 - 600 && clock_src == CLOCK_SRC_MANUAL);
+	position_nmea(rmc_2026, strlen(rmc_2026), true, now);
+	CHECK(clock_now(&clock_utc, &clock_src, now) && clock_utc == utc_2026 && clock_src == CLOCK_SRC_GPS);
+	// GPS lost: the time goes on
+	CHECK(clock_now(&clock_utc, NULL, now + 3600000u) && clock_utc == utc_2026 + 3600);
+	position_nmea(rmc, strlen(rmc), true, now);
+#endif
 	CHECK(up.alt_ok && up.alt_m == 545 && up.course == 84);
 	position_cfg_t original_cfg;
 	position_get_cfg(&original_cfg);
