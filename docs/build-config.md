@@ -154,6 +154,7 @@ below are for an STM32F4 radio.
 | `CONFIG_NXDN_SCRAMBLER` | = NXDN | 15-bit NXDN Scrambler for conventional voice calls. Needs `NXDN`. |
 | `CONFIG_YSF` | = DMR | YSF (C4FM) DN voice (`docs/spec/ysf.md`): the frame codec, receive, the call layer and its engine, and the air interface under them. The radio core's YSF mode (the VFO's mode tile, a temporary mode change, the debug link), RAM DG-IDs, the home screen, the radio ID made from the MCU's unique ID; YSF channels in the codeplug (`docs/spec/ysf-codeplug.md`); voice through the DMR side's vocoder path. Needs `DMR`. Runs in P25's memory, or with no lending vocoder in a block it shares with NXDN |
 | `CONFIG_YSF_VW` | = YSF and P25 | YSF VW (Voice Wide, data type 3) calls received and sent (`docs/spec/ysf.md` 3.5, 4.4, 5.5): their voice through P25's full-rate IMBE path, which the radio core switches to from the DMR side's for a call heard, and keeps on a VW channel. Off, a VW channel sends DN. With no lending vocoder the YSF engine moves to a block of its own in the board's CPU RAM where it has one (about 4.2 KB, taken from the RTOS heap; the link fails below the heap's floor) so the IMBE path can use P25's memory. Needs `YSF` and `P25`. Off: VW calls show as not played |
+| `CONFIG_M17` | n | M17 (`docs/spec/m17.md`), being written ([ADR 006](crucible/adr/006-m17.md)): the frame codec and the station addresses, the Codec 2 3200 voice path (codec2-fixed-point, LGPL-2.1, about 27 KB of flash), the air interface under them, and the debug link's Codec 2 benchmark (RADIO op 45, the `m17` view section). Nothing a user sees yet. The codec runs in the memory the board's vocoder lends, else P25's, else a block of its own |
 | `CONFIG_MBE2400` | n | the 2400 bit/s MBE voice codec, compatible with D-STAR's voice frames (`core/mbe/mbe2400.h`, `docs/spec/mbe-2400.md`): the encoder, the decoder and the frame's FEC on the MBE core. No mode uses the codec yet |
 | `CONFIG_AIR_RAW` | n | diagnostics: debug link commands that open an air interface session and move raw symbols and tap samples, for bench tests (`docs/spec/debuglink.md`). Needs P25 or NXDN (an air-framed mode) and DEBUGLINK |
 | `CONFIG_AIR_RX_ADAPT` | = YSF | the soft modem's adaptive receive options: an equalizer and a CTCSS / DCS remover that a mode's profile asks for in `rx_opts`, in memory its engine lends (`docs/spec/air-interface.md` 6.1). On with YSF, the mode that asks for them; P25 and NXDN don't. Needs P25, NXDN or YSF (an air-framed mode) and `SUBTONE` (the standard tone and code lists) |
@@ -217,7 +218,8 @@ below are for an STM32F4 radio.
 
 Derived (not set by hand): `CONFIG_DMR_DATA_CORE`, the shared packet data / CSBK code, on when any data feature is;
 `CONFIG_DMR_AIR_QUEUE`, the data service's TX queue (`docs/spec/dmr-data.md` 12.6), on with `CONFIG_DMR_IP_GATEWAY` or
-`CONFIG_ZONE_SHARE`. `CONFIG_AIR` (the air interface) is on with `CONFIG_P25`, `CONFIG_NXDN` or `CONFIG_YSF`;
+`CONFIG_ZONE_SHARE`. `CONFIG_AIR` (the air interface) is on with `CONFIG_P25`, `CONFIG_NXDN`, `CONFIG_YSF` or
+`CONFIG_M17`;
 `CONFIG_IMBE` (the full-rate voice decoder) follows `CONFIG_P25`, `CONFIG_MBE` (the MBE core) `CONFIG_IMBE` or
 `CONFIG_MBE2400`; a command line or a board's `config.mk` that sets one stops the build. `CONFIG_MBE_OPTS` (the MBE
 core's per-frame options, `docs/spec/mbe.md` 1.1) is on with `CONFIG_MBE2400`, derived in `core/config.h`.
