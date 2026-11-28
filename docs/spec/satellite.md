@@ -1,5 +1,6 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 The RadioFoundry Authors -->
+<!-- Copyright (c) 2026 David Behnke -->
 
 # Satellite Tracking
 
@@ -116,6 +117,30 @@ selected profiles. `tools/satellite_tle.py sync` can install TLE data without fr
 No valid TLE, expired TLE, invalid UTC, stale observer position, non-finite calculation or out-of-range target means no
 automatic retune. The user-visible state should distinguish unavailable tracking from a valid pass below the horizon.
 Reacquiring valid inputs may resume tracking only while the same satellite and frequency pair remain selected.
+
+### Pass squelch
+
+A satellite signal fades and flutters through a pass, and a level squelch chops it. While a tracked satellite is up
+(tracking status `VISIBLE`, AOS to LOS) on the tracked channel, the FM squelch uses the Pass squelch setting instead of
+the radio's own level.
+
+| Setting | Stored (`settings_t.sat_squelch`) | During a pass |
+|---|---|---|
+| Open (default) | 0 | Squelch open: the receiver plays all the time, as with Monitor held |
+| 1 to 9 | 1 to 9 | That squelch level |
+| Normal | 10 | The radio's own squelch, as outside a pass |
+
+- The override is applied in one place, the radio core's effective squelch for the FM open and close decision. The
+  radio's own level (`view.squelch`, the one the screens show) is not changed. Monitor still opens the squelch as usual.
+- A squelch change by the user during the pass (the squelch keys, or Default squelch) hands the squelch back to the
+  user's level for the rest of that pass. LOS and every end of the session (stop, another satellite, a channel or VFO
+  change) clear this, so the next pass starts on the setting again.
+- A change of the setting applies at once, also to a pass under way. It goes to the radio core as its own request
+  (`RREQ_SATELLITE_SQUELCH`), not as a settings reload: a reload reads the channel again, which ends the tracking
+  session.
+- Below the horizon, with tracking unavailable, or with tracking off, the radio's own squelch applies.
+- Debug link view key `satellite.squelch`: the level in force (0 open to 9), or `none` when the radio's own squelch
+  applies.
 
 ## 5. User-facing behavior
 

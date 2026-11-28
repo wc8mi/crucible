@@ -41,6 +41,9 @@
 #include "radio/sigtone.h"
 #include "radio/vibe.h"	// vibe_t (vibe_play only with CONFIG_VIBRATE)
 #include "radio/tx_limit.h"	// the test TX limit (radio-features.md 3.1)
+#if CONFIG_SATELLITE_TLE
+#include "satellite/tracking.h"	// SATELLITE_TRACKING_VISIBLE: the pass squelch's AOS to LOS
+#endif
 #if CONFIG_P25 || CONFIG_NXDN || CONFIG_YSF
 #include "air/air_session.h"	// air_tx_state_t
 #endif
@@ -977,7 +980,47 @@ static bool satellite_tx_active(const radio_sm_t *sm)
 }
 
 static void satellite_apply_pending(radio_sm_t *sm, uint32_t now_ms);
+
+// The pass squelch (satellite.md, Pass squelch): its level while the tracked satellite is up, AOS to LOS, on the
+// tracked channel, unless the setting is Normal or the user changed the squelch during this pass;
+// RADIO_SAT_SQUELCH_NONE otherwise
+static uint8_t satellite_pass_squelch(const radio_sm_t *sm)
+{
+	if (!sm->satellite_session || sm->satellite_view.status != SATELLITE_TRACKING_VISIBLE ||
+	    sm->satellite_squelch_yield || sm->satellite_squelch > RADIO_SQUELCH_MAX || !satellite_same_channel(sm))
+		return RADIO_SAT_SQUELCH_NONE;
+	return sm->satellite_squelch;
+}
+
+// A session ended, or the pass did (LOS): the next pass starts on the setting again
+static void satellite_squelch_reset(radio_sm_t *sm)
+{
+	sm->satellite_squelch_yield = false;
+	sm->satellite_view.squelch = RADIO_SAT_SQUELCH_NONE;
+}
+
+// The user changed the squelch: during a pass the setting yields to theirs for the rest of it
+static void satellite_squelch_user(radio_sm_t *sm)
+{
+	if (satellite_pass_squelch(sm) != RADIO_SAT_SQUELCH_NONE) {
+		sm->satellite_squelch_yield = true;
+		sm->satellite_view.squelch = RADIO_SAT_SQUELCH_NONE;
+		changed(sm);
+	}
+}
 #endif
+
+// The FM squelch level in force: the pass squelch during a satellite pass, else the radio's own (view.squelch, which
+// the screens show and the user changes)
+static uint8_t effective_squelch(const radio_sm_t *sm)
+{
+#if CONFIG_SATELLITE_TLE
+	uint8_t pass = satellite_pass_squelch(sm);
+	if (pass != RADIO_SAT_SQUELCH_NONE)
+		return pass;
+#endif
+	return sm->view.squelch;
+}
 
 static void tune(radio_sm_t *sm, uint32_t now_ms)
 {
@@ -992,6 +1035,7 @@ static void tune(radio_sm_t *sm, uint32_t now_ms)
 		sm->satellite_view.tracking = false;
 		sm->satellite_view.status = 0;
 		sm->satellite_view.rx_offset_hz = sm->satellite_view.tx_offset_hz = 0;
+		satellite_squelch_reset(sm);
 	}
 	#endif
 	sm->retune_pending = sm->retune_due = false;	// this tune is the one they wait for
@@ -1133,6 +1177,7 @@ void radio_sm_satellite_update(radio_sm_t *sm, bool enabled, uint8_t record_inde
 		sm->satellite_view.tracking = false;
 		sm->satellite_view.status = 0;
 		sm->satellite_view.rx_offset_hz = sm->satellite_view.tx_offset_hz = 0;
+		satellite_squelch_reset(sm);
 		satellite_apply_pending(sm, now_ms);
 		return;
 	}
@@ -1143,6 +1188,7 @@ void radio_sm_satellite_update(radio_sm_t *sm, bool enabled, uint8_t record_inde
 		sm->satellite_view.tracking = false;
 		sm->satellite_view.status = 0;
 		sm->satellite_view.rx_offset_hz = sm->satellite_view.tx_offset_hz = 0;
+		satellite_squelch_reset(sm);
 		changed(sm);
 		return;
 	}
@@ -1170,6 +1216,7 @@ void radio_sm_satellite_update(radio_sm_t *sm, bool enabled, uint8_t record_inde
 		sm->satellite_applied_tx_hz = sm->view.ch.tx_hz;
 		sm->satellite_config_pending = true;
 		sm->satellite_restore_config_pending = false;
+		satellite_squelch_reset(sm);
 	}
 	sm->satellite_view.tracking = true;
 	sm->satellite_view.index = record_index;
@@ -1200,6 +1247,9 @@ void radio_sm_satellite_update(radio_sm_t *sm, bool enabled, uint8_t record_inde
 		sm->satellite_view.rx_offset_hz = 0;
 		sm->satellite_view.tx_offset_hz = 0;
 	}
+	if (sm->satellite_view.status != SATELLITE_TRACKING_VISIBLE)
+		satellite_squelch_reset(sm);	// LOS (or no valid pass): a change made in the pass is forgotten
+	sm->satellite_view.squelch = satellite_pass_squelch(sm);
 	sm->satellite_pending = true;
 	sm->satellite_pending_rx_hz = rx_hz;
 	sm->satellite_pending_tx_hz = tx_hz;
@@ -7764,7 +7814,15 @@ static void apply_prefs(radio_sm_t *sm, const settings_t *st)
 #endif
 	master_power = st->master_power;
 	sm->vol_step = radio_volume_step(st->volume);
+#if CONFIG_SATELLITE_TLE
+	sm->satellite_squelch = st->sat_squelch <= SETTINGS_SAT_SQUELCH_NORMAL ? st->sat_squelch :
+				SETTINGS_SAT_SQUELCH_OPEN;
+	sm->satellite_view.squelch = satellite_pass_squelch(sm);	// a new setting applies to the pass under way
+#endif
 	if (st->squelch <= RADIO_SQUELCH_MAX && sm->base_squelch != st->squelch) {
+#if CONFIG_SATELLITE_TLE
+		satellite_squelch_user(sm);	// the Default squelch changed during a pass
+#endif
 		sm->base_squelch = st->squelch;
 		if (!sm->temp_squelch) {
 			sm->view.squelch = st->squelch;
@@ -8669,6 +8727,9 @@ void radio_sm_init(radio_sm_t *sm, uint32_t now_ms)
 #endif
 	sm->rx_open_out = -1;
 	sm->sql_floor = INT16_MAX;	// not known yet: no voice peak hold before an idle poll measured it
+#if CONFIG_SATELLITE_TLE
+	sm->satellite_view.squelch = RADIO_SAT_SQUELCH_NONE;	// 0 would read as an open pass squelch
+#endif
 	sm->green_out = -1;
 #if CONFIG_BCAST_FM
 	sm->bcast_audio_out = -1;
@@ -9137,6 +9198,9 @@ static void power_request(radio_sm_t *sm, const radio_req_t *req)
 
 static void squelch_request(radio_sm_t *sm, const radio_req_t *req)
 {
+#if CONFIG_SATELLITE_TLE
+	satellite_squelch_user(sm);	// even at the end of the range: the press asks for the radio's squelch back
+#endif
 	int s = sm->view.squelch + req->arg;
 	if (s < 0) {
 		s = 0;
@@ -9828,6 +9892,12 @@ void radio_sm_request(radio_sm_t *sm, const radio_req_t *req, uint32_t now_ms)
 #endif
 #if CONFIG_SATELLITE_TLE && CONFIG_FM_TX_TONES
 	case RREQ_SATELLITE_ARM: satellite_arm(sm, now_ms); break;
+	case RREQ_SATELLITE_SQUELCH:
+		sm->satellite_squelch = req->arg >= 0 && req->arg <= (int32_t)SETTINGS_SAT_SQUELCH_NORMAL ?
+					(uint8_t)req->arg : SETTINGS_SAT_SQUELCH_OPEN;
+		sm->satellite_view.squelch = satellite_pass_squelch(sm);	// the pass under way takes it at once
+		changed(sm);
+		break;
 #endif
 #if CONFIG_DTMF
 	case RREQ_DTMF: dtmf_key(sm, (char)(req->arg & 0xFF), (req->arg & 0x100) != 0, now_ms); break;
@@ -10501,7 +10571,7 @@ void radio_sm_poll(radio_sm_t *sm, uint32_t now_ms)
 
 	// Open on carrier (noise below the level's threshold) and the RX tone, both; the monitor overrides (outputs())
 	follow_tone(sm, st.tone_ok);
-	uint8_t sq = sm->view.squelch;
+	uint8_t sq = effective_squelch(sm);
 	uint8_t open_below = radio_sm_squelch_open_below(sq);
 	bool listening = bcast_listening(sm);
 	bool opens = (listening || (sm->view.tone_ok && (sq == 0 || st.noise < open_below))) && !dual_peeking(sm) &&

@@ -190,6 +190,8 @@ typedef enum {
 	RREQ_SATELLITE_SCAN,	// satellite pass picker: arg = start/cancel
 #if CONFIG_SATELLITE_TLE
 	RREQ_SATELLITE_ARM,	// SO-50: explicitly transmit the two-second timer-arm tone
+	RREQ_SATELLITE_SQUELCH,	// the Pass squelch setting changed: arg = settings_t.sat_squelch (no reload:
+				// that reads the channel again, which ends a tracking session)
 #endif
 	RREQ_T3,		// a trunked system (CONFIG_DMR_TRUNK): arg = radio_t3_cmd_t
 	RREQ_T3_POLL,		// poll MS arg2 for its short data, as the system's poll setting says (CONFIG_DMR_TRUNK_TX)
@@ -636,6 +638,10 @@ typedef struct {
 	radio_satellite_tracking_view_t satellite_view;
 	uint32_t satellite_applied_rx_hz, satellite_applied_tx_hz;
 	uint32_t satellite_pending_rx_hz, satellite_pending_tx_hz;
+	// Pass squelch (satellite.md, Pass squelch): the setting (settings_t.sat_squelch), and whether the user changed
+	// the squelch during this pass, which hands it back to theirs until LOS or the session ends
+	uint8_t satellite_squelch;
+	bool satellite_squelch_yield;
 #if CONFIG_FM_TX_TONES
 	bool satellite_arm_active;
 	uint32_t satellite_arm_end_ms;

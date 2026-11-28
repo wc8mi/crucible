@@ -33,7 +33,9 @@ typedef struct {
 	uint8_t status;
 	uint32_t nominal_rx_hz, nominal_tx_hz;
 	int64_t rx_offset_hz, tx_offset_hz;
+	uint8_t squelch;	// the pass squelch in force (0 open .. 9), RADIO_SAT_SQUELCH_NONE: the radio's own
 } radio_satellite_tracking_view_t;
+#define RADIO_SAT_SQUELCH_NONE	0xFFu
 typedef struct {
 	radio_satellite_tracking_view_t tracking;
 	bool valid, visible_now, los_known, horizon_clipped;
@@ -662,6 +664,7 @@ void radio_req_vfo_copy(void);
 #if CONFIG_SATELLITE_TLE
 bool radio_req_satellite_tracking(bool enabled, uint8_t record_index);
 void radio_req_satellite_arm(void);
+void radio_req_satellite_squelch(uint8_t value);	// the Pass squelch setting (settings_t.sat_squelch) changed
 #endif
 typedef enum {
 	VFO_COPY_OK,

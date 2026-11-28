@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The radio core's task: a request queue in front of the state machine (radio_sm.c), a status poll every
 // RADIO_POLL_MS, the DMR call stack every RADIO_TICK_MS, and a snapshot of the view that other tasks copy under a
 // mutex. It also implements the hotspot's radio operations (hotspot_radio_ops_t): they post requests and never wait,
@@ -698,6 +699,7 @@ bool radio_req_satellite_tracking(bool enabled, uint8_t record_index)
 	return send(&req, 0);
 }
 void radio_req_satellite_arm(void) { post(RREQ_SATELLITE_ARM, 0, 0); }
+void radio_req_satellite_squelch(uint8_t value) { post(RREQ_SATELLITE_SQUELCH, value, 0); }
 #endif
 
 radio_vfo_copy_t radio_req_vfo_copy_checked(void)
