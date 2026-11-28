@@ -13,3 +13,6 @@
 [submodule "third_party/tinyusb"]
 	path = third_party/tinyusb
 	url = https://github.com/hathach/tinyusb.git
+[submodule "third_party/codec2-fixed-point"]
+	path = third_party/codec2-fixed-point
+	url = https://github.com/dbehnke/codec2-fixed-point

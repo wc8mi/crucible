@@ -218,7 +218,7 @@ VIEW_SECTIONS = ["core", "channel", "dmr", "dmr_call", "dmr_stats", "hotspot", "
                  "storage", "dmr_ext", "dmr_data_stats", "roam", "aprs", "aprs_set", "dmr_ip", "net", "snmp", "usrp",
                  "sfr", "tasks", "crash", "watchdog", "reset", "air", "net_svc", "net_link", "cps", "board", "audio", "t3",
                  "t3_svc", "t3_roam", "voice_cap", "t3_msg", "t3_ra", "p25", "p25_trunk", "nxdn", "dmr_tx_audio", "power", "ysf",
-                 "dmrip"]
+                 "m17", "dmrip"]
 
 OP_CHANNEL_STEP, OP_ZONE_POS, OP_ZONE, OP_VFO, OP_VFO_SET, OP_VFO_STEP, OP_POWER, OP_SQUELCH, OP_BANDWIDTH, \
     OP_TONE, OP_MONITOR, OP_CLEAR_TEMP, OP_REPLY_CANCEL, OP_HOTSPOT_EXIT, OP_DMR_TARGET, OP_DMR_CONTACT, \
@@ -244,6 +244,7 @@ OP_VFO_SFR = 38
 OP_P25 = 42
 OP_NXDN = 43
 OP_YSF = 44
+OP_M17_BENCH = 45
 P25_TALKAROUND = {"auto": 0, "on": 1, "off": 2}
 CHANNEL_MODES = {"fm": 0, "dmr": 1, "p25": 2, "nxdn": 3, "ysf": 4}
 # The VFO's SFR role names (sfrRole_t, docs/spec/sfr.md 4): off, user, user of an ERDM repeater, repeater, ERDM style
@@ -1504,6 +1505,22 @@ class DebugLink:
         cur.update(kw)
         self.ysf_settings(**cur)
 
+    def m17_bench(self, timeout=60.0):
+        """The Codec 2 benchmark (RADIO op 45; debuglink.md 3.8; ADR 006 5, the CPU gate): starts it, waits for its end
+        and returns the m17 view section's keys. m17.bench_ok=1: the codec computed what it computes on a host; the
+        *_pct keys are the share of a 20 ms frame, the gate's measure."""
+        self.radio(OP_M17_BENCH)
+        end = time.monotonic() + timeout
+        while True:
+            v = self.view(["m17"])
+            if v.get("m17.built") != "1":
+                raise DebugLinkError("unavailable")
+            if v.get("m17.bench") != "running":
+                return {k: x for k, x in v.items() if k.startswith("m17.")}
+            if time.monotonic() > end:
+                raise DebugLinkError("m17 benchmark still running after %.0f s" % timeout)
+            time.sleep(0.5)
+
     def vfo_sfr(self, role, inbound_ts=1, framing=0, hang=0):
         """The VFO's SFR role (RADIO op 38; sfr.md 4), saved with the VFO: role a SFR_ROLES name or 0..4, the inbound
         slot 1 / 2, framing 0..3, hang 0..3: a codeplug channel's SFR byte A. The outbound color code is the VFO's own.
@@ -2283,6 +2300,9 @@ def cmd_radio(link, a):
             else:
                 raise SystemExit("ysf [dgid=N] [tx_dgid=N] [rx_dgid=N] [eq=on|off] [tone=on|off] [dcs=on|off]")
         link.ysf_settings_update(**kw)
+    elif op == "m17-bench":           # m17-bench: the Codec 2 benchmark, its result
+        for k, x in link.m17_bench().items():
+            print(f"{k}={x}")
     elif op == "cc":                  # cc 0..15
         link.dmr_fields(cc=num(0))
     elif op == "ts":                  # ts 1|2
@@ -3232,7 +3252,7 @@ def main(argv=None):
                                   "target-clear", "privacy", "scan", "scan-vfo", "beep", "burst", "set", "usb",
                                   "usb-settings", "ppp", "vibrate", "mode", "cc", "ts", "sfr", "copy-vfo", "voice-test", "dtmf",
                                   "tx-limit", "tx-drive", "pa-keyup", "pa-sweep", "pa-keyrun", "p25", "nxdn", "ysf",
-                                  "roam"])
+                                  "m17-bench", "roam"])
     p.add_argument("args", nargs="*")
     p = sub.add_parser("data", help="DMR data: sms, call alert, radio check, settings, inbox")
     p.add_argument("op", choices=["sms", "alert", "check", "settings", "inbox", "read", "emergency", "em-settings",

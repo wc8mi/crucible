@@ -536,6 +536,14 @@ uint8_t debuglink_radio_feature_op(uint8_t op, const uint8_t *a, uint16_t len)
 		return DL_ST_UNAVAILABLE;
 #endif
 	}
+	case DL_OP_M17_BENCH:
+		// No arguments: the Codec 2 benchmark (docs/spec/debuglink.md 3.8), run in a task of its own; the m17 view
+		// section shows its progress and result
+#if CONFIG_M17
+		return debuglink_m17_bench();
+#else
+		return DL_ST_UNAVAILABLE;
+#endif
 	case DL_OP_VFO_SFR:
 		// u8: the VFO's SFR role as a channel's SFR byte A (sfr.h; role bits 0 = none). The radio core refuses it
 		// outside the VFO; dmr.sfr_role shows what it took

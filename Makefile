@@ -130,6 +130,15 @@ endif
 ifeq ($(CONFIG_YSF),y)
 CORE_DIRS += core/ysf
 endif
+# M17 and its Codec 2 3200 codec: codec2-fixed-point's native API only (codec2_fxp.h), without its libcodec2 layer
+# (codec2_compat.c). Named one by one: $(wildcard) can't see a submodule read through RFOUNDRY_THIRD_PARTY
+ifeq ($(CONFIG_M17),y)
+CORE_DIRS += core/m17
+M17_CODEC_SRC := $(addprefix third_party/codec2-fixed-point/src/,analysis.c codec2_fxp.c delta_lsp_cb.c \
+	fxp_analysis_tables.c fxp_fft.c fxp_fft_tables.c fxp_lpc_tables.c fxp_lpcspec.c fxp_math.c fxp_math_tables.c \
+	fxp_nlp_tables.c fxp_rdft.c interp.c lpc.c nlp.c quantise.c synthesis.c)
+PLATFORM_3P_SRC += $(M17_CODEC_SRC)
+endif
 ifeq ($(CONFIG_MBE),y)
 CORE_DIRS += core/mbe
 endif
@@ -261,7 +270,8 @@ APP_SRC += core/debuglink/dl_fmt.c
 endif
 endif
 
-INCLUDES := $(call TP_INCLUDES,-Ihal -Icore -Idrivers -Iboards/$(BOARD) -Iplatform/$(PLATFORM) -I$(BUILD)/gen $(PLATFORM_INC))
+INCLUDES := $(call TP_INCLUDES,-Ihal -Icore -Idrivers -Iboards/$(BOARD) -Iplatform/$(PLATFORM) -I$(BUILD)/gen $(PLATFORM_INC) \
+	$(if $(filter y,$(CONFIG_M17)),-Ithird_party/codec2-fixed-point/include))
 
 # Firmware version: the commit, with -dirty when tracked files differ from it or untracked sources sit in the built
 # directories (both end up in the image). Only the files that use RFOUNDRY_GIT or RFOUNDRY_RELEASE get it, through
@@ -409,6 +419,9 @@ ABOUT_MAINTAINERS := $(firstword $(wildcard MAINTAINERS) AUTHORS)
 ABOUT_MORE :=
 ifeq ($(CONFIG_MBE),y)
 ABOUT_MORE += core/mbe/THIRD_PARTY
+endif
+ifeq ($(CONFIG_M17),y)
+ABOUT_MORE += core/m17/THIRD_PARTY
 endif
 $(shell python3 tools/gen_about.py $(ABOUT_MAINTAINERS) platform/$(PLATFORM)/THIRD_PARTY $(BUILD)/gen/rfoundry_about.h $(ABOUT_MORE) | grep -q changed \
 	&& rm -f $(ABOUT_OBJ))
