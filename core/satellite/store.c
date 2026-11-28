@@ -25,11 +25,11 @@
 #define SAT_PENDING		(SAT_COMMIT | 0x80000000u)
 #define SAT_STAGE_MAGIC		0x31475453u
 #define SAT_VERSION		4u
-#define SAT_ENTRY_ID_MASK	0x1FFFFu
-#define SAT_ENTRY_OFFSET_SHIFT	17u
-#define SAT_ENTRY_OFFSET_MASK	0x3FFFu
+#define SAT_ENTRY_ID_MASK	0x7FFFFu	// 19 bits: catalog numbers up to SATELLITE_CATALOG_ID_MAX
+#define SAT_ENTRY_OFFSET_SHIFT	19u
+#define SAT_ENTRY_OFFSET_MASK	0xFFFu
 #define SAT_ENTRY_NEEDS_ARM	0x80000000u
-#if SAT_MAX_DATA > (SAT_ENTRY_OFFSET_MASK + 1u)
+#if SATELLITE_CATALOG_ID_MAX > SAT_ENTRY_ID_MASK || SAT_MAX_DATA > (SAT_ENTRY_OFFSET_MASK + 1u)
 #error "Satellite store offsets exceed the compact entry format"
 #endif
 typedef struct {
@@ -205,7 +205,7 @@ static bool validate_record(const uint8_t *p, uint16_t len, sat_entry_t *entry)
 	uint32_t id = get32(p);
 	uint8_t name_len = p[4];
 	uint16_t expected = (uint16_t)(5u + name_len + 2u * SAT_TLE_LINE);
-	if (id == 0u || id > 99999u || name_len == 0u || name_len > SAT_MAX_NAME || len != expected ||
+	if (id == 0u || id > SATELLITE_CATALOG_ID_MAX || name_len == 0u || name_len > SAT_MAX_NAME || len != expected ||
 	    !utf8_name(p + 5, name_len)) {
 		return false;
 	}
@@ -285,12 +285,15 @@ static bool valid_profiles(uint8_t count, const uint32_t *ids)
 	return true;
 }
 
+// TX 0 is a listen-only profile: no uplink the radio may use (an SSTV or telemetry downlink, a failed receiver, an
+// uplink outside every band). Tracking then tunes no TX frequency and PTT is refused
 static bool valid_profile_values(uint32_t catalog_id, uint32_t rx_hz, uint32_t tx_hz, uint16_t tone_tenths)
 {
-	return catalog_id != 0u && rx_hz != 0u && rx_hz < 1000000000u && tx_hz != 0u &&
+	return catalog_id != 0u && catalog_id <= SATELLITE_CATALOG_ID_MAX && rx_hz != 0u && rx_hz < 1000000000u &&
 	       tx_hz < 1000000000u &&
-	       (tone_tenths == 0u || (tone_tenths >= 600u && tone_tenths <= 2600u)) &&
-	       (board_band_count() == 0u || (board_in_band(rx_hz, false) && board_in_band(tx_hz, true)));
+	       (tone_tenths == 0u || (tx_hz != 0u && tone_tenths >= 600u && tone_tenths <= 2600u)) &&
+	       (board_band_count() == 0u ||
+		(board_in_band(rx_hz, false) && (tx_hz == 0u || board_in_band(tx_hz, true))));
 }
 
 static bool valid_frequency_profiles(uint8_t count, const satellite_frequency_profile_t *profiles)

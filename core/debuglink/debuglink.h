@@ -62,6 +62,7 @@ enum {
 	DL_VIEW_DMR_TX_AUDIO,	// the AMBE input gain and peak limiter (debuglink_view_dmr.c)
 	DL_VIEW_POWER,		// complete supported power labels and the configured default
 	DL_VIEW_YSF,		// YSF on the channel: the call, our callsign and radio ID, DG-IDs, engine counters (debuglink_view_ysf.c)
+	DL_VIEW_M17,		// M17: the Codec 2 benchmark's result (debuglink_view_m17.c)
 	// New sections go above: dmrip, only in builds with the switch, stays last so no other section's number moves
 #if CONFIG_DEBUGLINK_DMRIP
 	DL_VIEW_DMRIP,		// the debug link over the air: its counters and the detour (debuglink_dmrip.c)
@@ -103,6 +104,10 @@ void debuglink_view_nxdn(const radio_view_t *v, dl_text_t *t);
 void debuglink_nxdn_reset(void);
 // The ysf section (debuglink_view_ysf.c; "ysf.built=0" without CONFIG_YSF) and its counter reset
 void debuglink_view_ysf(const radio_view_t *v, dl_text_t *t);
+void debuglink_view_m17(dl_text_t *t);
+// RADIO op 45: start the Codec 2 benchmark in a task of its own (DL_ST_OK); DL_ST_BUSY running or no heap for its
+// stack, DL_ST_REFUSED not on an FM channel, DL_ST_UNAVAILABLE no voice block
+uint8_t debuglink_m17_bench(void);
 void debuglink_ysf_reset(void);
 void debuglink_view_keys(dl_text_t *t);
 // RADIO operations (DL_CMD_RADIO, first payload byte; docs/spec/debuglink.md 3.6): 1-19, 25, 27, 28 in debuglink.c,
@@ -137,6 +142,7 @@ enum {
 	DL_OP_P25 = 42,
 	DL_OP_NXDN = 43,
 	DL_OP_YSF = 44,
+	DL_OP_M17_BENCH = 45,
 };
 uint8_t debuglink_radio_feature_op(uint8_t op, const uint8_t *args, uint16_t len);
 // After a reply: the host port's reattach a PA key run asked for (PA_KEYRUN_FLAG_REATTACH); else a no-op
@@ -148,7 +154,7 @@ static inline bool debuglink_is_feature_op(uint8_t op)
 	       op == DL_OP_DMR_FIELDS || op == DL_OP_VFO_COPY || op == DL_OP_VOICE_TEST || op == DL_OP_DTMF ||
 	       op == DL_OP_TX_LIMIT || op == DL_OP_TX_DRIVE || op == DL_OP_PA_KEYUP || op == DL_OP_VFO_SFR ||
 	       op == DL_OP_PA_SWEEP || op == DL_OP_PA_KEYRUN || op == DL_OP_VOICE_CAPTURE ||
-	       op == DL_OP_P25 || op == DL_OP_NXDN || op == DL_OP_YSF;
+	       op == DL_OP_P25 || op == DL_OP_NXDN || op == DL_OP_YSF || op == DL_OP_M17_BENCH;
 }
 // VERSION's codec= (hal_vocoder_id; the name the host tests use)
 static inline const char *debuglink_codec_id(const hal_vocoder_t *v)

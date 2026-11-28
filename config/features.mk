@@ -348,15 +348,23 @@ CONFIG_NXDN_SCRAMBLER ?= $(CONFIG_NXDN)
 # interface, and the YSF channel mode. Voice frames go to and from the vocoder the board already hosts for DMR, through
 # the DMR voice path, as NXDN's do. Needs DMR
 CONFIG_YSF ?= $(CONFIG_DMR)
+# YSF VW (Voice Wide, data type 3, docs/spec/ysf.md): its calls received through P25's full-rate IMBE voice path,
+# which the radio core switches to from the DMR side's for the call. Needs YSF and P25 (the codec). A radio short of
+# flash or heap sets it n in its config.mk; off, VW calls show as not played
+CONFIG_YSF_VW ?= $(if $(filter y,$(CONFIG_YSF)),$(CONFIG_P25),n)
 # The 2400 bit/s MBE voice codec (core/mbe/mbe2400*, docs/spec/mbe-2400.md), compatible with D-STAR's voice frames:
 # the encoder, the decoder and the frame's FEC on the MBE core. No mode uses the codec yet; the first one turns this on
 CONFIG_MBE2400 ?= n
+# M17 voice (core/m17, docs/spec/m17.md): its frames, addresses and the Codec 2 3200 codec
+# (third_party/codec2-fixed-point, LGPL-2.1), on the air interface. Its own codec: needs no DMR. Off until its receive
+# path lands (ADR 006 step 2); on, it builds the codec and the debug link's CPU benchmark (docs/spec/debuglink.md)
+CONFIG_M17 ?= n
 # Derived, never set by hand (a command line or a board's config.mk that sets one stops the build): AIR the air
-# interface, on with any air-framed mode (P25, NXDN, YSF); IMBE the full-rate voice decoder, with P25; MBE the MBE
+# interface, on with any air-framed mode (P25, NXDN, YSF, M17); IMBE the full-rate voice decoder, with P25; MBE the MBE
 # core, with IMBE or MBE2400
 $(foreach f,AIR IMBE MBE,$(if $(filter-out undefined,$(origin CONFIG_$(f))),$(error CONFIG_$(f) is derived from CONFIG_P25, \
-	CONFIG_NXDN, CONFIG_YSF and CONFIG_MBE2400 ($(origin CONFIG_$(f))): set those instead)))
-CONFIG_AIR := $(if $(filter y,$(CONFIG_P25) $(CONFIG_NXDN) $(CONFIG_YSF)),y,n)
+	CONFIG_NXDN, CONFIG_YSF, CONFIG_M17 and CONFIG_MBE2400 ($(origin CONFIG_$(f))): set those instead)))
+CONFIG_AIR := $(if $(filter y,$(CONFIG_P25) $(CONFIG_NXDN) $(CONFIG_YSF) $(CONFIG_M17)),y,n)
 CONFIG_IMBE := $(CONFIG_P25)
 CONFIG_MBE := $(if $(filter y,$(CONFIG_IMBE) $(CONFIG_MBE2400)),y,n)
 # diagnostics: debug link commands that open an air interface session and move raw symbols, for bench tests (needs an
@@ -385,7 +393,7 @@ CONFIG_CLOCK ?= $(if $(and $(filter y,$(CONFIG_SATELLITE_TLE)),$(filter y,$(CONF
 
 FEATURES := RX_AGC USB_SERIAL_REQUEST FM SUBTONE DMR DMR_PRIVACY DMR_AES DMR_TALKER_ALIAS DMR_GPS DMR_SMS DMR_TMS DMR_ARS DMR_LRRP DMR_SIGNALING DMR_EMERGENCY DMR_ROAMING DMR_TRUNK DMR_TRUNK_TX DMR_TRUNK_SUPL DMR_TRUNK_GW VOICE_CAPTURE DMR_IP_GATEWAY ZONE_SHARE DMR_UDP_COMPRESS NET_TCP NET_KISS NET_HTTP NET_HTTP_GZIP NET_WEBCTL NET_RIGCTL NET_APRSIS NET_USRP MDNS TFTP TFTP_IDDB IDDB_COMPACT DMR_CONTROL_STATION SNMP SFR SFR_DUALPATH_RX SFR_CWID TASK_STACKS \
 	USB HOSTLINK USB_NETWORK NET_PPP HOTSPOT HOTSPOT_SPLIT DEBUGLINK DEBUGLINK_DMRIP CPS_OPENFW CPS_FAST VFO VFO_FM VFO_DMR DIAG BACKLIGHT_TEST FONT_XL FONT_AA FONT_BIG LANG_ES LANG_IT LANG_FR LANG_ZH CJK_GLYPHS LANG_DEFAULT_ES LANG_DEFAULT_IT LANG_DEFAULT_FR LANG_DEFAULT_ZH UI_COLOR UI_SETTINGS SCAN DUAL_WATCH BEEP SIG_TONES FM_TX_TONES DTMF \
-	RX_EXT VOX REF_TRIM BATTERY_SAVE VIBRATE GPS AUDIO_PROBE STUB_ENTRY NAND_STORAGE CRASH_LOG CRASH_SCREEN CRASH_REPORT WATCHDOG SUPPORT_INFO FAULT_TRACE AM_RX BCAST_FM APRS APRS_AFSK APRS_DMR APRS_RX APRS_IGATE GPS_SKY SATELLITE_TLE CLOCK KEY_ASSIGN TX_POWER_MENU CHANNEL_LIST CHANNEL_EDIT ZONE_EDIT CONTACT_EDIT VOLUME_BAR TX_MIC_LIMITER P25 P25_ID_LOOKUP CALLER_DETAILS SIGNAL_METER TX_DC_BLOCK P25_TX_AGC P25_PARROT P25_TRUNK NXDN NXDN_SCRAMBLER AIR_RAW AIR_RX_ADAPT YSF MBE2400
+	RX_EXT VOX REF_TRIM BATTERY_SAVE VIBRATE GPS AUDIO_PROBE STUB_ENTRY NAND_STORAGE CRASH_LOG CRASH_SCREEN CRASH_REPORT WATCHDOG SUPPORT_INFO FAULT_TRACE AM_RX BCAST_FM APRS APRS_AFSK APRS_DMR APRS_RX APRS_IGATE GPS_SKY SATELLITE_TLE CLOCK KEY_ASSIGN TX_POWER_MENU CHANNEL_LIST CHANNEL_EDIT ZONE_EDIT CONTACT_EDIT VOLUME_BAR TX_MIC_LIMITER P25 P25_ID_LOOKUP CALLER_DETAILS SIGNAL_METER TX_DC_BLOCK P25_TX_AGC P25_PARROT P25_TRUNK NXDN NXDN_SCRAMBLER AIR_RAW AIR_RX_ADAPT YSF YSF_VW MBE2400 M17
 
 # The panel's width in pixels: the display class the board's board.toml names (hardware.gallery = "160x128", the width
 # first). Empty when it names none, which counts as a narrow panel
@@ -450,7 +458,7 @@ ifneq ($(call feature_on,HOTSPOT_SPLIT),)
   endif
 endif
 $(if $(and $(call feature_on,NXDN_SCRAMBLER),$(if $(call feature_on,NXDN),,x)),$(error CONFIG_NXDN_SCRAMBLER=y needs CONFIG_NXDN=y))
-$(if $(and $(call feature_on,AIR_RAW),$(if $(call feature_on,AIR),,x)),$(error CONFIG_AIR_RAW=y needs CONFIG_P25=y, CONFIG_NXDN=y or CONFIG_YSF=y (an air-framed mode)))
+$(if $(and $(call feature_on,AIR_RAW),$(if $(call feature_on,AIR),,x)),$(error CONFIG_AIR_RAW=y needs CONFIG_P25=y, CONFIG_NXDN=y, CONFIG_YSF=y or CONFIG_M17=y (an air-framed mode)))
 $(if $(and $(call feature_on,TX_MIC_LIMITER),$(if $(call feature_on,DMR),,x)),$(error CONFIG_TX_MIC_LIMITER=y needs CONFIG_DMR=y))
 $(foreach f,TX_DC_BLOCK P25_TX_AGC P25_PARROT,$(if $(and $(call feature_on,$(f)),$(if $(call feature_on,P25),,x)),$(error CONFIG_$(f)=y needs CONFIG_P25=y)))
 $(if $(and $(call feature_on,P25_TRUNK),$(if $(call feature_on,P25),,x)),$(error CONFIG_P25_TRUNK=y needs CONFIG_P25=y))
@@ -459,8 +467,9 @@ $(if $(and $(call feature_on,CALLER_DETAILS),$(if $(call feature_on,DMR),,x)),$(
 $(if $(and $(call feature_on,P25_ID_LOOKUP),$(if $(call feature_on,P25),,x)),$(error CONFIG_P25_ID_LOOKUP=y needs CONFIG_P25=y))
 $(if $(and $(call feature_on,NXDN),$(if $(call feature_on,DMR),,x)),$(error CONFIG_NXDN=y needs CONFIG_DMR=y (its voice is the DMR vocoder's)))
 $(if $(and $(call feature_on,YSF),$(if $(call feature_on,DMR),,x)),$(error CONFIG_YSF=y needs CONFIG_DMR=y (its voice is the DMR vocoder's)))
+$(if $(and $(call feature_on,YSF_VW),$(if $(and $(call feature_on,YSF),$(call feature_on,P25)),,x)),$(error CONFIG_YSF_VW=y needs CONFIG_YSF=y and CONFIG_P25=y (its voice is P25's IMBE codec)))
 $(if $(and $(call feature_on,AIR_RAW),$(if $(call feature_on,DEBUGLINK),,x)),$(error CONFIG_AIR_RAW=y needs CONFIG_DEBUGLINK=y))
-$(if $(and $(call feature_on,AIR_RX_ADAPT),$(if $(call feature_on,AIR),,x)),$(error CONFIG_AIR_RX_ADAPT=y needs CONFIG_P25=y, CONFIG_NXDN=y or CONFIG_YSF=y (an air-framed mode)))
+$(if $(and $(call feature_on,AIR_RX_ADAPT),$(if $(call feature_on,AIR),,x)),$(error CONFIG_AIR_RX_ADAPT=y needs CONFIG_P25=y, CONFIG_NXDN=y, CONFIG_YSF=y or CONFIG_M17=y (an air-framed mode)))
 $(if $(and $(call feature_on,AIR_RX_ADAPT),$(if $(call feature_on,SUBTONE),,x)),$(error CONFIG_AIR_RX_ADAPT=y needs CONFIG_SUBTONE=y (the standard tone and code lists, core/radio/tones.c)))
 ifneq ($(call feature_on,DEBUGLINK),)
   ifeq ($(call feature_on,HOSTLINK),)

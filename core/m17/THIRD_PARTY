@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (c) 2026 David Behnke
+# Third-party code in M17, shown on Settings > Advanced > About (tools/gen_about.py): the Codec 2 3200 codec,
+# third_party/codec2-fixed-point (Codec 2 by David Rowe, the M17 Project's Codec2-mod, made integer-only). The notice
+# itself: third_party/codec2-fixed-point/LICENSE
+Codec 2: LGPL-2.1

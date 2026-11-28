@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // YSF DN on a channel, the radio core's side (docs/spec/ysf.md 5): the engine (core/ysf/ysf_engine.h) on
 // the memory it runs in, its voice frames to and from the vocoder the board hosts for DMR (core/dmr/ambe), the
 // channel's DG-IDs, who we are on air (callsign and radio ID), and a compact view for the radio view. radio_sm.c
@@ -27,6 +28,8 @@
 typedef struct {
 	uint8_t tx_dgid;	// 0..99
 	uint8_t rx_dgid;	// 0..99; 0 hears every DG-ID
+	uint8_t voice;		// ysf_cp_voice_t: what PTT sends (VW kept here in a build without it, sent as DN)
+	bool narrow;		// half deviation (ADR 005 5)
 	// A stored channel's DG-ID for now (quick settings): both ways on channel temp_chan while it is in use; another
 	// channel taken drops it. 0: none
 	uint16_t temp_chan;
@@ -38,7 +41,7 @@ typedef struct {
 #define RADIO_YSF_RX		0x02u	// a call is being received
 #define RADIO_YSF_PLAYED	0x04u	// ... and passes the DG-ID (its voice plays)
 #define RADIO_YSF_LATE		0x08u	// ... was entered without its header
-#define RADIO_YSF_NOT_DN	0x10u	// ... is not DN voice (VW or data: shown, not played)
+#define RADIO_YSF_NOT_DN	0x10u	// ... is voice or data this build doesn't play (data, or VW without CONFIG_YSF_VW)
 #define RADIO_YSF_NO_CALL	0x20u	// we have no callsign: PTT refused
 #define RADIO_YSF_RID_WEAK	0x40u	// our RID comes from the fallback, not the MCU's unique ID
 #define RADIO_YSF_DATA		0x80u	// the call heard is a data transmission (room data): no voice
@@ -48,7 +51,11 @@ typedef struct {
 	uint8_t flags;		// RADIO_YSF_*
 	uint8_t tx;		// air_tx_state_t of the engine
 	uint8_t dgid;		// of the call heard
+	uint8_t dt;		// of the call heard: its data type (YSF_DT_*: V/D mode 1, data, DN, VW)
+	uint8_t path;		// the voice path running (YSF_PATH_*: the DMR side's, P25's IMBE for VW, none mid-switch)
 	uint8_t rx_dgid, tx_dgid;	// in force
+	uint8_t voice;		// in force: ysf_cp_voice_t, what PTT sends
+	bool narrow;		// in force: half deviation
 	uint16_t fit;		// what the board's provider gives YSF (AIR_FIT_*), 0: nothing
 	char src[RADIO_YSF_CALL_LEN + 1];	// the caller, "" not known yet
 	char src_rid[RADIO_YSF_RID_LEN + 1];	// the caller's radio ID, "" not known yet
@@ -59,6 +66,10 @@ typedef struct {
 	radio_air_counts_t air;		// rx_calls, tx_calls, tx_filler; the session's rx_chunks, tx_underruns, tx_syms
 	uint32_t frames, fich_fail, csd_fail, dch_fail, voice, voice_held, fec_bits, vch_fixed;	// the call layer's
 	uint32_t begins, begin_fails;
+	uint32_t vd1_frames, vw_frames, vw_fec_bits;	// the call layer's: V/D mode 1 and VW voice frames, VW bits fixed
+	// The voice path (CONFIG_YSF_VW): switches made, switches to IMBE that found no memory, VCH dropped while a
+	// switch was due
+	uint32_t path_switches, path_fails, path_drops;
 } radio_ysf_stats_t;
 
 #if CONFIG_YSF

@@ -2478,6 +2478,7 @@ typedef struct {
 	bool not_dn, data;
 	const char *call;
 	int16_t dgid;
+	uint8_t dt;		// YSF's data type (YSF_DT_*): the voice mode shown
 #endif
 } air_call_t;
 
@@ -2492,6 +2493,7 @@ static bool air_call(const radio_view_t *v, air_call_t *c)
 		c->data = (v->ysf.flags & RADIO_YSF_DATA) != 0;
 		c->call = v->ysf.src;
 		c->dgid = v->ysf.dgid;
+		c->dt = v->ysf.dt;
 		return true;
 	}
 #endif
@@ -2550,16 +2552,21 @@ static void air_call_line(const air_call_t *c, const font_t *f, int y)
 #endif
 #if CONFIG_YSF
 	if (c->call != NULL) {
-		// YSF: "N0CALL > DG-ID 12", or "N0RPT > Data" for a data transmission (room data); the callsign kept longest
-		for (int with_dgid = 1; with_dgid >= 0; with_dgid--) {
+		// YSF: "N0CALL > DG-ID 12 VW" with the voice mode (ysf.md 3.5: DN, VW, V/D1), or "N0RPT > Data" for a data
+		// transmission (room data); the mode goes first, the callsign is kept longest
+		static const char *const mode[4] = { " V/D1", "", " DN", " VW" };
+
+		for (int keep = 2; keep >= 0; keep--) {
 			sb_init(&b, buf, sizeof buf);
 			sb_str(&b, c->call[0] ? c->call : "?");
-			if (with_dgid && c->data) {
+			if (keep && c->data) {
 				sb_str(&b, " " GLYPH_ARROW " ");
 				sb_str(&b, TR(CALL_VALUE_DATA, "Data"));
-			} else if (with_dgid) {
+			} else if (keep) {
 				sb_str(&b, " " GLYPH_ARROW " DG-ID ");
 				sb_u32(&b, (uint32_t)c->dgid, 2);
+				if (keep == 2)
+					sb_str(&b, mode[c->dt & 3u]);
 			}
 			if (gfx_text_width(f, buf) <= gfx_width())
 				break;

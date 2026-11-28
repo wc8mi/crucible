@@ -32,7 +32,7 @@ line, add the user's copyright below ours, never in place of it, and tell the us
    `codecs/` and `build/` are ignored for that reason. Don't weaken those ignore rules. The one exception is the
    synthesized test speech in `tests/data/voice`, tracked by name with `git add -f`
    ([its README](tests/data/voice/README.md)).
-3. **SPDX header on every new file**: `// SPDX-License-Identifier: GPL-3.0-or-later` and
+3. **SPDX header on every new file**: <!-- REUSE-IgnoreStart -->`// SPDX-License-Identifier: GPL-3.0-or-later`<!-- REUSE-IgnoreEnd --> and
    `// Copyright (c) 2026 David Behnke` (`#` for scripts and makefiles, `<!-- -->` for Markdown). A file from
    RadioFoundry keeps its MIT header; add `// Copyright (c) 2026 David Behnke` below the existing lines. When GPL code
    goes into such a file, its identifier becomes `MIT AND GPL-3.0-or-later` and the GPL source's copyright line is
