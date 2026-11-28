@@ -5,7 +5,7 @@
 
 | | |
 |---|---|
-| Status | Proposed |
+| Status | Accepted (KF8S, 2026-11-27) |
 | Date | 2026-11-27 |
 | Decides | How Crucible receives and sends YSF VW (Voice Wide) and V/D mode 1 calls, which code it takes from the DM32-nxdn-p25 fork, and in what order the work lands |
 
