@@ -15,6 +15,9 @@
 #include "radio/radio_sfr.h"
 #include "radio/radio_bands.h"
 #include "radio/tones.h"
+#if CONFIG_SATELLITE_TLE
+#include "satellite/tracking.h"	// SATELLITE_TRACKING_*: the pass squelch test
+#endif
 #include "dmr/call/dmr_call.h"
 #include "dmr/call/dmr_lc.h"
 #include "dmr/ambe/ambeVoice.h"
@@ -983,6 +986,95 @@ static void test_startup(void)
 }
 
 #if CONFIG_SATELLITE_TLE
+static void sat_pass(uint8_t status)
+{
+	radio_sm_satellite_update(&sm, true, 2u, status, 437800000u, 145990000u, 670u, true, 437800000u, 145990000u,
+				  0, 0, now);
+}
+
+static void sat_squelch_setting(uint8_t v)
+{
+	settings_begin()->sat_squelch = v;
+	settings_end(now);
+	req(RREQ_SATELLITE_SQUELCH, v);
+}
+
+// Pass squelch (satellite.md, Pass squelch): AOS to LOS the FM squelch is the setting's (Open by default), not the
+// radio's; Normal leaves the radio's; a squelch change during the pass yields to the user until LOS or the session ends
+static void test_satellite_pass_squelch(void)
+{
+	setup_codeplug();
+	start();
+	CHECK(sm.satellite_view.squelch == RADIO_SAT_SQUELCH_NONE);
+	rx_signal(120, true);				// no carrier: over every level's line
+	sat_pass(SATELLITE_TRACKING_BELOW_HORIZON);
+	poll_for(4 * RADIO_POLL_MS);
+	CHECK(sm.view.state == RS_IDLE && sm.satellite_view.squelch == RADIO_SAT_SQUELCH_NONE);
+
+	sat_pass(SATELLITE_TRACKING_VISIBLE);		// AOS: open
+	poll_for(RADIO_POLL_MS);
+	CHECK(sm.view.state == RS_RX && sm.satellite_view.squelch == 0);
+	CHECK(sm.view.squelch == RADIO_SQUELCH_DEFAULT && !sm.temp_squelch);	// the radio's own is untouched
+
+	sat_pass(SATELLITE_TRACKING_BELOW_HORIZON);	// LOS: the radio's squelch closes on the noise
+	poll_for(20 * RADIO_POLL_MS);
+	CHECK(sm.view.state == RS_IDLE && sm.satellite_view.squelch == RADIO_SAT_SQUELCH_NONE);
+
+	// A level: a signal the level opens on and the default doesn't
+	sat_squelch_setting(3);
+	uint8_t n = radio_sm_squelch_open_below(RADIO_SQUELCH_DEFAULT);
+	CHECK(n < radio_sm_squelch_open_below(3));
+	rx_signal(n, true);
+	poll_for(4 * RADIO_POLL_MS);
+	CHECK(sm.view.state == RS_IDLE);
+	sat_pass(SATELLITE_TRACKING_VISIBLE);
+	poll_for(RADIO_POLL_MS);
+	CHECK(sm.view.state == RS_RX && sm.satellite_view.squelch == 3);
+
+	// Normal: the radio's own squelch through the pass (an open one holds on that signal: its hysteresis), so the
+	// same signal no longer opens it
+	sat_squelch_setting(SETTINGS_SAT_SQUELCH_NORMAL);
+	CHECK(sm.satellite_view.squelch == RADIO_SAT_SQUELCH_NONE);
+	rx_signal(120, true);
+	poll_for(20 * RADIO_POLL_MS);
+	CHECK(sm.view.state == RS_IDLE);
+	rx_signal(n, true);
+	poll_for(4 * RADIO_POLL_MS);
+	CHECK(sm.view.state == RS_IDLE);
+
+	// The user's change during the pass: theirs until LOS
+	sat_squelch_setting(SETTINGS_SAT_SQUELCH_OPEN);
+	rx_signal(120, true);
+	poll_for(RADIO_POLL_MS);
+	CHECK(sm.view.state == RS_RX && sm.satellite_view.squelch == 0);
+	req(RREQ_SQUELCH, 1);
+	CHECK(sm.view.squelch == RADIO_SQUELCH_DEFAULT + 1 && sm.satellite_view.squelch == RADIO_SAT_SQUELCH_NONE);
+	poll_for(20 * RADIO_POLL_MS);
+	CHECK(sm.view.state == RS_IDLE);
+	sat_pass(SATELLITE_TRACKING_VISIBLE);		// still the same pass
+	poll_for(4 * RADIO_POLL_MS);
+	CHECK(sm.view.state == RS_IDLE);
+	sat_pass(SATELLITE_TRACKING_BELOW_HORIZON);	// LOS, then the next pass opens again
+	sat_pass(SATELLITE_TRACKING_VISIBLE);
+	poll_for(RADIO_POLL_MS);
+	CHECK(sm.view.state == RS_RX && sm.satellite_view.squelch == 0);
+
+	// At the end of the range the press still hands the squelch back; the session's end forgets it
+	req(RREQ_SQUELCH, -9);
+	req(RREQ_SQUELCH, -1);
+	CHECK(sm.view.squelch == 0 && sm.satellite_squelch_yield);
+	radio_sm_satellite_update(&sm, false, 0u, 0u, 0u, 0u, 0u, false, 0u, 0u, 0, 0, now);
+	CHECK(!sm.satellite_squelch_yield && sm.satellite_view.squelch == RADIO_SAT_SQUELCH_NONE);
+
+	sat_squelch_setting(7);				// kept across a restart
+	boot();
+	CHECK(sm.satellite_squelch == 7);
+
+	settings_defaults(settings_begin());
+	settings_end(now);
+	setup_codeplug();
+}
+
 // A listen-only profile (TX 0): tracking tunes the downlink and PTT is refused as receive only, whatever the channel
 static void test_satellite_listen_only_refuses_ptt(void)
 {
@@ -4317,6 +4409,9 @@ uint8_t radio_p25_parrot_state(void) { return sm.p25_parrot ? P25_PARROT_READY :
 #endif
 void radio_req_monitor(bool down) { req(RREQ_MONITOR, down); }
 void radio_req_reload(void) { req(RREQ_RELOAD, 0); }
+#if CONFIG_SATELLITE_TLE
+void radio_req_satellite_squelch(uint8_t value) { req(RREQ_SATELLITE_SQUELCH, value); }
+#endif
 void radio_req_volume(uint8_t step) { req(RREQ_VOLUME, step); }
 void radio_req_volume_override(int8_t step) { req(RREQ_VOLUME_OVERRIDE, step); }
 void radio_req_volume_hold(bool hold) { req(RREQ_VOLUME_HOLD, hold); }
@@ -13184,6 +13279,7 @@ int main(void)
 	test_startup();
 #if CONFIG_SATELLITE_TLE
 	test_satellite_override();
+	test_satellite_pass_squelch();
 	test_satellite_listen_only_refuses_ptt();
 #if CONFIG_FM_TX_TONES
 	test_so50_arm();

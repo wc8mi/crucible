@@ -556,6 +556,10 @@ typedef enum {
 	// Scan: the resume mode (scan_resume_t: 0 time, 1 carrier, 2 stop) and time mode's hold, s (0 to
 	// RADIO_SCAN_HOLD_MAX_S); radio_settings_t.scan_resume and scan_hold_s, CONFIG_SCAN. Appended like the ones above
 	UI_SET_SCAN_RESUME, UI_SET_SCAN_HOLD_S,
+	// Pass squelch (CONFIG_SATELLITE_TLE; satellite.md, Pass squelch): the FM squelch while a tracked satellite is
+	// up, settings_t.sat_squelch: 0 Open, 1 to 9 a level, SETTINGS_SAT_SQUELCH_NORMAL the radio's own. Appended
+	// like the ones above
+	UI_SET_SAT_SQUELCH,
 	UI_SET_COUNT
 } ui_setting_t;
 

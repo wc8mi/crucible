@@ -42,6 +42,7 @@ _Static_assert(offsetof(settings_t, agc_marker) == 424, "Digital AGC block offse
 _Static_assert(offsetof(settings_t, nxdn_marker) == 428, "NXDN radio default block offset (Crucible)");
 _Static_assert(offsetof(settings_t, nxdn_tg) == 432, "NXDN talk group offset (Crucible)");
 _Static_assert(offsetof(settings_t, mic_input) == 434, "Mic input offset (Crucible)");
+_Static_assert(offsetof(settings_t, sat_squelch) == 435, "Pass squelch offset (Crucible)");
 _Static_assert(offsetof(settings_t, aprs_cp_freq) == 399, "upstream's APRS codeplug frequency mark offset");
 _Static_assert(offsetof(settings_t, aes_mi_res) + sizeof(uint32_t) == UPSTREAM_BYTES, "upstream's record ends after aes_mi_res");
 _Static_assert(sizeof(settings_t) == 436, "settings_t changed size: update docs/spec/settings-store.md 3 and this");
@@ -186,7 +187,7 @@ static int8_t mic_input_in_range(int8_t v) { return v >= HAL_MIC_INPUT_MIN && v 
 // Crucible release that kept mic_input at 399: it comes across and the APRS mark reads none yet
 static void nxdn_block_check(settings_t *s, size_t bytes)
 {
-	if (bytes < offsetof(settings_t, nxdn_reserved) + sizeof s->nxdn_reserved ||
+	if (bytes < offsetof(settings_t, sat_squelch) + sizeof s->sat_squelch ||
 	    s->nxdn_marker != SETTINGS_NXDN_MARKER) {
 		int8_t mic = 0;
 		if (bytes > UPSTREAM_BYTES) {
@@ -199,7 +200,7 @@ static void nxdn_block_check(settings_t *s, size_t bytes)
 		s->nxdn_tx_ran = SETTINGS_NXDN_TX_RAN;
 		s->nxdn_tg = SETTINGS_NXDN_TG;
 		s->mic_input = mic_input_in_range(mic);
-		memset(s->nxdn_reserved, 0, sizeof s->nxdn_reserved);
+		s->sat_squelch = SETTINGS_SAT_SQUELCH_OPEN;
 		return;
 	}
 	s->nxdn_flags &= SETTINGS_NXDN_9600;
@@ -210,6 +211,8 @@ static void nxdn_block_check(settings_t *s, size_t bytes)
 	if (s->nxdn_tg == 0 || (s->nxdn_tg > SETTINGS_NXDN_TG_MAX && s->nxdn_tg != SETTINGS_NXDN_TG_ALL))
 		s->nxdn_tg = SETTINGS_NXDN_TG;
 	s->mic_input = mic_input_in_range(s->mic_input);
+	if (s->sat_squelch > SETTINGS_SAT_SQUELCH_NORMAL)
+		s->sat_squelch = SETTINGS_SAT_SQUELCH_OPEN;
 }
 
 static void aes_migration_check(settings_t *s, size_t bytes)

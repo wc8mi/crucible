@@ -4293,6 +4293,11 @@ msgid "Default squelch"
 msgstr "Squelch predef."
 
 #: core/ui/ui_menus.c
+msgctxt "SET_LABEL_PASS_SQUELCH"
+msgid "Pass squelch"
+msgstr "Squelch passag."
+
+#: core/ui/ui_menus.c
 msgctxt "SET_LABEL_VFO_STEP"
 msgid "VFO step"
 msgstr "Passo VFO"
@@ -4771,6 +4776,16 @@ msgstr " passo"
 msgctxt "SIG_UNIT_STEPS"
 msgid " steps"
 msgstr " passi"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_VALUE_SQUELCH_OPEN"
+msgid "Open"
+msgstr "Aperto"
+
+#: core/ui/ui_menus.c
+msgctxt "SET_VALUE_SQUELCH_NORMAL"
+msgid "Normal"
+msgstr "Normale"
 
 #: core/ui/ui_menus.c
 msgctxt "NXDN_VALUE_ANY_RAN"

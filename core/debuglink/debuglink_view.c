@@ -111,6 +111,11 @@ static void core_section(const radio_view_t *v, dl_text_t *t)
 	dl_text(t, "satellite.tracking=%u\nsatellite.index=%u\nsatellite.status=%u\nsatellite.pass_valid=%u\n",
 		satellite.tracking.tracking, satellite.tracking.index, satellite.tracking.status,
 		have_satellite && satellite.valid);
+	// The pass squelch in force (0 open .. 9), none: the radio's own squelch (satellite.md, Pass squelch)
+	if (satellite.tracking.tracking && satellite.tracking.squelch <= 9u)
+		dl_text(t, "satellite.squelch=%u\n", satellite.tracking.squelch);
+	else
+		dl_text(t, "satellite.squelch=none\n");
 #endif
 #if CONFIG_CLOCK
 	{
