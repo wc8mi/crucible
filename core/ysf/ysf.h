@@ -48,6 +48,7 @@
 #define YSF_MR_UP_FREE		1		// to a repeater, which is idle
 #define YSF_MR_UP_BUSY		2
 #define YSF_FT_DN		6		// the DCH cycle of a DN call: frames FN 0..6
+#define YSF_FT_VD1		2		// ... of a V/D mode 1 call: FN 0..2 (voice only, no data frames)
 #define YSF_DGID_MAX		99
 #define YSF_DGID_ALL		0		// a receiver's DG-ID 0 takes every one
 
@@ -132,6 +133,7 @@ typedef struct {
 } ysf_rx_t;
 
 extern const air_mode_t ysf_air_mode;
+extern const air_mode_t ysf_air_mode_narrow;	// half deviation (ADR 005 5)
 
 void ysf_rx_init(ysf_rx_t *rx, void (*frame)(const ysf_rx_frame_t *f, void *ctx), void (*lost)(void *ctx), void *ctx);
 
@@ -195,6 +197,9 @@ typedef struct {
 typedef struct {
 	uint8_t state;
 	bool ending;
+	uint8_t dt;			// YSF_DT_VD2 (DN), _VD1 or _VW: the voice frames' kind (ysf.md 4.4)
+	bool narrow;			// FICH DEV
+	bool sub;			// VW: the communications frame in hand is the sub-header
 	uint8_t fn;			// of the communications frame in hand
 	uint8_t nvoice;			// VCH filled in it
 	uint16_t nsyms, ready, sent, pre_left;
@@ -206,7 +211,8 @@ typedef struct {
 	uint8_t frame[YSF_FRAME_BYTES];
 } ysf_call_tx_t;
 
-void ysf_call_tx_begin(ysf_call_tx_t *t, const ysf_tx_id_t *id);
+// dt: YSF_DT_VD2 (DN), YSF_DT_VD1 or YSF_DT_VW; narrow: FICH DEV
+void ysf_call_tx_begin(ysf_call_tx_t *t, const ysf_tx_id_t *id, uint8_t dt, bool narrow);
 // A data transmission instead (ysf.md 9.1): preamble, header, data frames FN 0 to the last, terminator; it ends by
 // itself, no voice asked for
 void ysf_call_tx_begin_data(ysf_call_tx_t *t, const ysf_tx_id_t *id, const uint8_t *data, uint8_t len);
@@ -214,11 +220,12 @@ uint16_t ysf_call_tx_ready(const ysf_call_tx_t *t, uint16_t *first);
 const uint8_t *ysf_call_tx_syms(const ysf_call_tx_t *t);
 void ysf_call_tx_sent(ysf_call_tx_t *t, uint16_t n);
 bool ysf_call_tx_wants_voice(const ysf_call_tx_t *t);
-// v: a voice frame of the DMR side's voice path. False when the call takes none now
-bool ysf_call_tx_voice(ysf_call_tx_t *t, const uint8_t v[YSF_VOICE_BYTES]);
-// The operator let go: the frame in hand is filled with silence (one without voice yet is dropped), then the
-// terminator
-void ysf_call_tx_end(ysf_call_tx_t *t, const uint8_t silence[YSF_VOICE_BYTES]);
+// v: a voice frame of the call's path: the DMR side's (YSF_VOICE_BYTES) for DN and V/D mode 1, an IMBE frame
+// (YSF_VW_BYTES) for VW. False when the call takes none now
+bool ysf_call_tx_voice(ysf_call_tx_t *t, const uint8_t *v);
+// The operator let go: the frame in hand is filled with silence of the same kind (one without voice yet is dropped),
+// then the terminator
+void ysf_call_tx_end(ysf_call_tx_t *t, const uint8_t *silence);
 bool ysf_call_tx_done(const ysf_call_tx_t *t);
 
 // The DCH a DN transmission sends at FN 0..6 (docs/spec/ysf.md 4), and the header's two long channels

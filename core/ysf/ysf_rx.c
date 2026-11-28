@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // YSF receive (ysf.h): the framer's table for the mode and its hooks. The sync is 20 symbols; the head
 // hook takes a frame once the FICH behind it decodes (four Golay words and a CRC), or, inside a call, places a frame
 // whose FICH is lost in a fade by the call's order for a few frames.
@@ -54,35 +55,39 @@ static void rx_lost(void *ctx)
 		rx->lost(rx->ctx);
 }
 
-const air_mode_t ysf_air_mode = {
-	.name = "YSF",
-	.profile = {
-		.sym_rate = 4800,
-		.levels = 4,
-		.shape = AIR_SHAPE_RRC,		// ysf.md 2: root raised cosine 0.2
-		.shape_param = 20,
-		.dev_outer_hz = 2700,
-		.timing = AIR_TIMING_CONTINUOUS,
-		.bw = RADIO_BW_12K5,
-		.sync_every_syms = 0,		// no 24-symbol pattern
-		.sync_any_syms = YSF_FRAME_SYMS,	// a sync opens every frame
-		.idle = 0x77,			// +3 -3 +3 -3: the preamble's pattern
-		// A soft modem adds its equalizer and tone notch (ysf.md 5.4): repeaters cut the 4FSK's upper band and some
-		// send a CTCSS tone under it
-		.rx_opts = AIR_RX_EQ | AIR_RX_TONE | AIR_RX_DCS,
-		.nsyncs = 1,
-		.sync = {
-			// D4 71 C9 63 4D: 40 bits, 20 symbols
-			{ .id = 0, .nsyms = 20, .max_errs = 3, .frame_at = 0, .syms = { 0xD4, 0x71, 0xC9, 0x63, 0x4D } },
-		},
-	},
-	.frame_syms = YSF_FRAME_SYMS,
-	.head_syms = YSF_HEAD_SYMS,
-	.lost_frames = 4,			// 400 ms without a sync
-	.head = rx_head,
-	.rx_frame = rx_frame,
-	.rx_lost = rx_lost,
-};
+// The mode at an outer deviation: Wide 2700 Hz, Narrow 1350 Hz (ADR 005 5); everything else the same
+#define YSF_AIR_MODE(dev) { \
+	.name = "YSF", \
+	.profile = { \
+		.sym_rate = 4800, \
+		.levels = 4, \
+		.shape = AIR_SHAPE_RRC,		/* ysf.md 2: root raised cosine 0.2 */ \
+		.shape_param = 20, \
+		.dev_outer_hz = (dev), \
+		.timing = AIR_TIMING_CONTINUOUS, \
+		.bw = RADIO_BW_12K5, \
+		.sync_every_syms = 0,		/* no 24-symbol pattern */ \
+		.sync_any_syms = YSF_FRAME_SYMS,	/* a sync opens every frame */ \
+		.idle = 0x77,			/* +3 -3 +3 -3: the preamble's pattern */ \
+		/* A soft modem adds its equalizer and tone notch (ysf.md 5.4): repeaters cut the 4FSK's upper band and some */ \
+		/* send a CTCSS tone under it */ \
+		.rx_opts = AIR_RX_EQ | AIR_RX_TONE | AIR_RX_DCS, \
+		.nsyncs = 1, \
+		.sync = { \
+			/* D4 71 C9 63 4D: 40 bits, 20 symbols */ \
+			{ .id = 0, .nsyms = 20, .max_errs = 3, .frame_at = 0, .syms = { 0xD4, 0x71, 0xC9, 0x63, 0x4D } }, \
+		}, \
+	}, \
+	.frame_syms = YSF_FRAME_SYMS, \
+	.head_syms = YSF_HEAD_SYMS, \
+	.lost_frames = 4,			/* 400 ms without a sync */ \
+	.head = rx_head, \
+	.rx_frame = rx_frame, \
+	.rx_lost = rx_lost, \
+}
+
+const air_mode_t ysf_air_mode = YSF_AIR_MODE(2700);
+const air_mode_t ysf_air_mode_narrow = YSF_AIR_MODE(1350);
 
 void ysf_rx_init(ysf_rx_t *rx, void (*frame)(const ysf_rx_frame_t *f, void *ctx), void (*lost)(void *ctx), void *ctx)
 {

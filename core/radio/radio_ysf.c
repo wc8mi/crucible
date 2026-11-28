@@ -17,6 +17,7 @@
 #include "dmr/call/dmr_call.h"
 #if CONFIG_YSF_VW
 #include "p25/p25Voice.h"
+#include "mbe/imbe.h"
 #endif
 
 // The voice frame YSF hands on is the one the DMR side's voice path takes and gives (ysf.h)
@@ -88,11 +89,13 @@ void radio_ysf_set_settings(const radio_ysf_settings_t *s)
 		set.rx_dgid = 0;
 	if (set.temp_dgid > RADIO_YSF_DGID_MAX)
 		set.temp_chan = 0;
+	if (set.voice > YSF_CP_VOICE_VD1)
+		set.voice = YSF_CP_VOICE_DN;
 }
 
 uint32_t radio_ysf_fit(void)
 {
-	return board.air != NULL ? ysf_engine_fit(board.air) : 0;
+	return board.air != NULL ? ysf_engine_fit(board.air, false) : 0;
 }
 
 bool radio_ysf_fits(void)
@@ -143,7 +146,7 @@ void radio_ysf_callsign(const char *radio_name, char out[RADIO_YSF_CALL_LEN + 1]
 }
 
 // The engine's configuration for channel ch at number (0: the VFO): a live stored YSF channel's tag gives the
-// DG-IDs (or the quick settings' DG-ID for it, for now), else the settings
+// DG-IDs (or the quick settings' DG-ID for it, for now), the voice mode and the deviation, else the settings
 static void params(const channel_t *ch, uint16_t number, const char *radio_name, ysf_engine_cfg_t *c)
 {
 	ysf_chan_t yc;
@@ -151,18 +154,28 @@ static void params(const channel_t *ch, uint16_t number, const char *radio_name,
 
 	memset(c, 0, sizeof *c);
 	c->silence = dmr_ambe_silence;
+#if CONFIG_YSF_VW
+	c->silence_vw = imbe_silence;
+#endif
 	if (number != set.temp_chan)
 		set.temp_chan = 0;	// another channel (or the VFO): the quick DG-ID was for the one left
-	if (number != 0 && number == set.temp_chan) {
-		c->rx_dgid = set.temp_dgid;
-		c->tx.dgid = set.temp_dgid;
-	} else if (number != 0 && ysf_chan_load(number, ch, &yc)) {
+	if (number != 0 && ysf_chan_load(number, ch, &yc)) {
 		c->rx_dgid = yc.rx_dgid;
 		c->tx.dgid = yc.tx_dgid;
+		c->voice = yc.voice;
+		c->narrow = yc.narrow;
 	} else {
 		c->rx_dgid = set.rx_dgid;
 		c->tx.dgid = set.tx_dgid;
+		c->voice = set.voice;
+		c->narrow = set.narrow;
 	}
+	if (number != 0 && number == set.temp_chan) {
+		c->rx_dgid = set.temp_dgid;	// the quick DG-ID: the channel's voice mode and deviation stay
+		c->tx.dgid = set.temp_dgid;
+	}
+	if (c->voice > YSF_CP_VOICE_VD1 || (!CONFIG_YSF_VW && c->voice == YSF_CP_VOICE_VW))
+		c->voice = YSF_CP_VOICE_DN;	// only a mode this build sends (ADR 005 6: a VW channel sends DN without VW)
 	c->tx.mr = YSF_MR_DIRECT;
 	radio_ysf_callsign(radio_name, c->tx.callsign);
 	radio_ysf_rid(c->tx.radio_id, &weak);
@@ -192,7 +205,16 @@ static void v_identify(const ysf_call_t *c) { (void)c; }
 #endif
 static void v_start(const ysf_call_t *c, void *ctx) { (void)ctx; v_identify(c); }
 static void v_voice(const uint8_t v[YSF_VOICE_BYTES], void *ctx) { (void)ctx; radio_air_voice_rx_frame(v); }
-static bool v_tx(uint8_t v[YSF_VOICE_BYTES], void *ctx) { (void)ctx; return radio_air_voice_tx_next(v); }
+// The encoder of the transmission's path: P25's for VW (at P25's TX level: one encoder, ADR 005 4), else the DMR side's
+static bool v_tx(uint8_t *v, void *ctx)
+{
+#if CONFIG_YSF_VW
+	if (eng->tx.dt == YSF_DT_VW)
+		return p25VoiceHooks()->tx_voice(v, ctx);
+#endif
+	(void)ctx;
+	return radio_air_voice_tx_next(v);
+}
 
 // The call's voice opens on a path before its first frame there and closes at the call's end (ysf_engine.h): the
 // stream's call boundaries, so a call that switched paths ends on each
@@ -334,21 +356,21 @@ static bool path_start(uint8_t path)
 	return true;
 }
 
-// The radio task's side of a switch (ysf_engine.h): the call heard wants the other path, and nothing is transmitted.
-// The engine drops frames from the close; once no hook is left on the old path it stops and the new one starts. A
-// path that can't start (no memory) leaves the DMR side's, whose frames this call doesn't use: its voice is lost,
-// and no switch is tried again until the call wanting it ends
-static uint8_t sw_to, sw_token;
-static bool sw_busy, sw_failed;
+// The radio task's side of a switch (ysf_engine.h): the call heard wants the other path, or the call ended and the
+// engine wants the home path back, and nothing is transmitted. The engine drops frames from the close; once no hook
+// is left on the old path it stops and the new one starts. A path that can't start (no memory) leaves the DMR side's:
+// a call's voice on it is lost, PTT on a VW channel is refused, and it isn't tried again while it is still wanted
+static uint8_t sw_to, sw_token, sw_failed;	// sw_failed: that path, else YSF_PATH_NONE
+static bool sw_busy;
 
 static void path_service(void)
 {
 	uint8_t want = ysf_engine_path_want(eng);
 
 	if (!sw_busy) {
-		if (want == YSF_PATH_AMBE)
-			sw_failed = false;
-		if (want == path_on || sw_failed || ysf_engine_tx_state(eng) != AIR_TX_IDLE)
+		if (want != sw_failed)
+			sw_failed = YSF_PATH_NONE;
+		if (want == path_on || want == sw_failed || ysf_engine_tx_state(eng) != AIR_TX_IDLE)
 			return;
 		sw_to = want;
 		sw_token = ysf_engine_path_close(eng);
@@ -361,7 +383,7 @@ static void path_service(void)
 	path_on = sw_to;
 	if (!path_start(path_on)) {
 		stats.path_fails++;
-		sw_failed = true;
+		sw_failed = path_on;
 		path_on = YSF_PATH_AMBE;
 		ambeVoiceStart();
 	}
@@ -369,6 +391,53 @@ static void path_service(void)
 	ysf_engine_path_open(eng, path_on);
 }
 #endif
+
+// The engine began on its home path with the DMR side's stream running: on a VW channel P25's takes its place
+static void path_home(void)
+{
+	path_on = YSF_PATH_AMBE;
+#if CONFIG_YSF_VW
+	sw_busy = false;
+	sw_failed = YSF_PATH_NONE;
+	if (ysf_engine_path_home(eng) != YSF_PATH_IMBE)
+		return;
+	ambeVoiceStop();
+	if (path_start(YSF_PATH_IMBE)) {
+		path_on = YSF_PATH_IMBE;
+		return;
+	}
+	stats.path_fails++;
+	sw_failed = YSF_PATH_IMBE;
+	ambeVoiceStart();
+	ysf_engine_path_open(eng, YSF_PATH_AMBE);
+#endif
+}
+
+// PTT needs the channel's transmit path in place: not while a call heard holds the other one, or a switch is due
+static bool path_settled(void)
+{
+	uint8_t home = ysf_engine_path_home(eng);
+
+#if CONFIG_YSF_VW
+	if (sw_busy)
+		return false;
+#endif
+	return path_on == home && ysf_engine_path_want(eng) == home;
+}
+
+// The voice path's encoder from the header on, so the first voice frames are ready when the engine asks
+static void voice_tx(bool on)
+{
+#if CONFIG_YSF_VW
+	if (path_on == YSF_PATH_IMBE) {
+		p25VoiceTx(on);
+		return;
+	}
+#endif
+	if (on)
+		ambeVoiceTxProfile(AMBE_TX_YSF);	// its own leveling target (ambeVoice.h); begin() takes it
+	radio_air_voice_tx(on);
+}
 
 bool radio_ysf_begin(const channel_t *ch, uint16_t number, const char *radio_name)
 {
@@ -380,7 +449,7 @@ bool radio_ysf_begin(const channel_t *ch, uint16_t number, const char *radio_nam
 		rid_update();	// the fallback follows the codeplug
 	params(ch, number, radio_name, &cfg);
 	eng = engine_mem();
-	if (eng == NULL || board.air == NULL || ysf_engine_fit(board.air) == 0) {
+	if (eng == NULL || board.air == NULL || ysf_engine_fit(board.air, cfg.narrow) == 0) {
 		eng = NULL;
 		stats.begin_fails++;
 		return false;
@@ -392,7 +461,7 @@ bool radio_ysf_begin(const channel_t *ch, uint16_t number, const char *radio_nam
 		stats.begin_fails++;
 		return false;
 	}
-	path_on = YSF_PATH_AMBE;
+	path_home();
 	memset(&call_base, 0, sizeof call_base);
 	memset(&air_base, 0, sizeof air_base);
 	drops_base = 0;
@@ -410,7 +479,8 @@ void radio_ysf_end(void)
 	path_stop();
 	path_on = YSF_PATH_AMBE;
 #if CONFIG_YSF_VW
-	sw_busy = sw_failed = false;
+	sw_busy = false;
+	sw_failed = YSF_PATH_NONE;
 #endif
 	eng = NULL;
 }
@@ -470,6 +540,8 @@ bool radio_ysf_poll(radio_ysf_view_t *v)
 		n.tx = AIR_TX_IDLE;
 		n.rx_dgid = set.rx_dgid;
 		n.tx_dgid = set.tx_dgid;
+		n.voice = set.voice;
+		n.narrow = set.narrow;
 	} else {
 #if CONFIG_YSF_VW
 		path_service();
@@ -499,6 +571,8 @@ bool radio_ysf_poll(radio_ysf_view_t *v)
 		n.path = eng->path;
 		n.rx_dgid = eng->cfg.rx_dgid;
 		n.tx_dgid = eng->cfg.tx.dgid;
+		n.voice = eng->cfg.voice;
+		n.narrow = eng->cfg.narrow;
 		memcpy(n.src, ev.rx.src, sizeof n.src);
 		memcpy(n.src_rid, ev.rx.src_id, sizeof n.src_rid);
 	}
@@ -518,8 +592,9 @@ static bool ysf_no_tx(void)
 
 static bool ysf_tx_prepare(void)
 {
-	// Transmit is DN (or room data) on the DMR side's path: refused while a VW call has P25's, or a switch is due
-	if (eng == NULL || path_on != YSF_PATH_AMBE || ysf_engine_path_want(eng) != YSF_PATH_AMBE)
+	// Voice in the channel's data type on its path (P25's for VW), or room data: refused while a call heard holds the
+	// other path, or a switch is due
+	if (eng == NULL || !path_settled())
 		return false;
 	if (wx_cmd != YSF_WX_NONE) {
 		// A room command armed: this transmission is it, and ends by itself
@@ -538,8 +613,7 @@ static bool ysf_tx_prepare(void)
 	}
 	if (!ysf_engine_tx_prepare(eng))
 		return false;
-	ambeVoiceTxProfile(AMBE_TX_YSF);	// its own leveling target (ambeVoice.h); begin() takes it
-	radio_air_voice_tx(true);
+	voice_tx(true);
 	return true;
 }
 
@@ -551,7 +625,7 @@ static bool ysf_tx_go(void)
 static void ysf_tx_stop(void)
 {
 	if (eng != NULL) {
-		radio_air_voice_tx(false);
+		voice_tx(false);
 		ysf_engine_tx_stop(eng);
 	}
 }
@@ -559,7 +633,7 @@ static void ysf_tx_stop(void)
 static void ysf_tx_abort(void)
 {
 	if (eng != NULL) {
-		radio_air_voice_tx(false);
+		voice_tx(false);
 		ysf_engine_tx_abort(eng);
 	}
 }
@@ -572,7 +646,7 @@ static uint8_t ysf_tx_state(void)
 static void ysf_tx_clear(void)
 {
 	if (eng != NULL) {
-		radio_air_voice_tx(false);
+		voice_tx(false);
 		ysf_engine_tx_clear(eng);
 	}
 }
