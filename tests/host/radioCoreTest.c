@@ -9483,11 +9483,18 @@ static void test_nxdn_tx(void)
 	run(100);
 
 	// PTT: keyed on the channel's TX frequency at 12.5 kHz, its power, no tone; the provider starts inside the key
+	ambe_voice_stats_t vs0, vs1;
+	ambeVoiceGetStats(&vs0);
 	req(RREQ_PTT, 1);
 	CHECK(sm.view.state == RS_TX && hw.tx_calls == 1 && hw.keyed && fair[0].on && fair[0].begins == 1);
 	CHECK(hw.tx_hz == 446100000 && hw.tx_bw == RADIO_BW_12K5 && hw.tx_tone.type == TONE_NONE && hw.tx_power == 2);
 	CHECK(hw.led[LED_RED] && v->tx != AIR_TX_IDLE);
-	run(1000);
+	// The lead-in (200 ms of the reference pattern) goes first; the encoder starts once it is all queued, so the
+	// voice waits no longer in the encoder's queue than without it
+	run(40);
+	ambeVoiceGetStats(&vs1);
+	CHECK(vs1.tx_frames == vs0.tx_frames && fair[0].sent > 0);
+	run(960);
 	CHECK(sm.view.state == RS_TX && fair[0].underruns == 0);
 	// The far radio hears the call: RAN 1, unit 1, group 1; its voice is the encoder's frames
 	CHECK(nfar_heard.starts == 1 && nfar_heard.ends == 0 && nfar_heard.call.ran == 1);
@@ -9539,6 +9546,37 @@ static void test_nxdn_tx(void)
 	req(RREQ_PTT, 0);
 	run(800);
 	CHECK(sm.view.state == RS_IDLE && !hw.keyed && nfar_heard.starts == 1 && nfar_heard.ends == 1);
+
+	// Unit 0 (the radio default's own): the DMR ID where it fits, else 1 (ADR 007, 1a). The engine takes it with
+	// its settings
+	codeplug_set_dmr_id(31234);
+	s.unit_id = 0;
+	radio_req_nxdn_settings(&s);
+	nfar_begin(false, 1, 2001, false, 1);
+	req(RREQ_PTT, 1);
+	run(600);
+	CHECK(nfar_heard.starts == 1 && nfar_heard.call.vcall.src == 31234);
+	req(RREQ_PTT, 0);
+	run(800);
+	codeplug_set_dmr_id(3123456);	// too long for NXDN
+	s.unit_id = 1;
+	radio_req_nxdn_settings(&s);
+	s.unit_id = 0;
+	radio_req_nxdn_settings(&s);
+	nfar_begin(false, 1, 2001, false, 1);
+	req(RREQ_PTT, 1);
+	run(600);
+	CHECK(nfar_heard.starts == 1 && nfar_heard.call.vcall.src == 1);
+	req(RREQ_PTT, 0);
+	run(800);
+	codeplug_set_dmr_id(9996543);
+	s.unit_id = 1;
+	radio_req_nxdn_settings(&s);
+	CHECK(sm.view.state == RS_IDLE && !hw.keyed);
+	// At both rates the encoder starts after the lead-in is queued: no frame waits in its queue long enough to be
+	// dropped (at 4800 bit/s the header alone is 80 ms)
+	ambeVoiceGetStats(&vs1);
+	CHECK(vs1.tx_overflows == vs0.tx_overflows && vs1.tx_frames > vs0.tx_frames);
 
 	// A provider that transmits the rate only (no receive): the engine runs, PTT keys, the far radio hears it
 	air_fit2400[0] = AIR_FIT_TX;
@@ -9608,11 +9646,16 @@ static void test_nxdn_mode(void)
 	radio_nxdn_settings(&s);
 	CHECK(!s.rate9600 && s.rx_ran == 7 && s.tx_ran == 7 && s.unit_id == 1234 && s.tx_dst == 55 && !s.unit_call);
 	CHECK(radio_nxdn_running() && !(sm.view.nxdn.flags & RADIO_NXDN_9600) && sm.view.nxdn.rx_ran == 7);
-	static const uint8_t bad_ran[] = { 0x01, 64, 1, 0, 0, 1, 0, 1, 0 }, bad_unit[] = { 0x01, 1, 1, 0, 0, 0, 0, 1, 0 },
+	static const uint8_t bad_ran[] = { 0x01, 64, 1, 0, 0, 1, 0, 1, 0 }, bad_unit[] = { 0x01, 1, 1, 0, 0, 0xF0, 0xFF, 1, 0 },
 			     bad_flag[] = { 0x08, 1, 1, 0, 0, 1, 0, 1, 0 };
 	CHECK(debuglink_radio_feature_op(DL_OP_NXDN, bad_ran, sizeof bad_ran) == DL_ST_BAD_ARG);
 	CHECK(debuglink_radio_feature_op(DL_OP_NXDN, bad_unit, sizeof bad_unit) == DL_ST_BAD_ARG);
 	CHECK(debuglink_radio_feature_op(DL_OP_NXDN, bad_flag, sizeof bad_flag) == DL_ST_BAD_ARG);
+	// Unit 0: the radio's own, from the codeplug (ADR 007)
+	static const uint8_t own_unit[] = { 0x00, 7, 7, 0, 0, 0, 0, 55, 0 };
+	CHECK(debuglink_radio_feature_op(DL_OP_NXDN, own_unit, sizeof own_unit) == DL_ST_OK);
+	radio_nxdn_settings(&s);
+	CHECK(s.unit_id == 0);
 	CHECK(debuglink_radio_feature_op(DL_OP_NXDN, op, 8) == DL_ST_BAD_ARG);
 	CHECK(debuglink_is_feature_op(DL_OP_NXDN));
 	nxdn_defaults();
@@ -9657,6 +9700,11 @@ bool nxdn_conv_load(uint16_t number, const channel_t *ch, nxdn_conv_cfg_t *out)
 		return false;
 	*out = stored_nxdn[number];
 	return true;
+}
+// The radio-wide record is absent here: the DMR ID where it fits, else 1 (nxdn_unit_id_decode)
+uint16_t nxdn_radio_unit_id(void)
+{
+	return own_dmr_id >= 1 && own_dmr_id <= RADIO_NXDN_UNIT_MAX ? (uint16_t)own_dmr_id : 1u;
 }
 bool nxdn_system_load(uint8_t system, uint16_t *own_id)
 {

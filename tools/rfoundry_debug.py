@@ -1461,15 +1461,16 @@ class DebugLink:
         cur.update(kw)
         self.p25_settings(**cur)
 
-    def nxdn_settings(self, rate9600=True, rx_ran=0, tx_ran=1, rx_gid=0, unit_call=False, tx_dst=1, unit_id=1,
+    def nxdn_settings(self, rate9600=True, rx_ran=0, tx_ran=1, rx_gid=0, unit_call=False, tx_dst=1, unit_id=0,
                       emergency=False):
         """The NXDN settings (RADIO op 43; debuglink.md 3.8; RAM only, the nxdn view section shows them): 9600 or
         4800 bit/s, the RAN received (0: any) and sent (0..63), rx_gid 0 every call of the RAN or only this group and
-        calls to us, PTT calls the unit tx_dst (unit_call) or the group tx_dst, our unit ID 1..65519, emergency calls.
+        calls to us, PTT calls the unit tx_dst (unit_call) or the group tx_dst, our unit ID 1..65519 (0: the radio's own,
+        from the codeplug; nxdn.radio_unit_id shows it), emergency calls.
         The engine takes them when it isn't transmitting; a new rate starts it over."""
-        if not (0 <= rx_ran <= 63 and 0 <= tx_ran <= 63 and 0 <= rx_gid <= 0xFFFF and 1 <= unit_id <= 65519 and
+        if not (0 <= rx_ran <= 63 and 0 <= tx_ran <= 63 and 0 <= rx_gid <= 0xFFFF and 0 <= unit_id <= 65519 and
                 0 <= tx_dst <= 0xFFFF):
-            raise ValueError("nxdn_settings: RANs 0..63, rx_gid and tx_dst 0..65535, unit_id 1..65519")
+            raise ValueError("nxdn_settings: RANs 0..63, rx_gid and tx_dst 0..65535, unit_id 0..65519")
         flags = (1 if rate9600 else 0) | (2 if unit_call else 0) | (4 if emergency else 0)
         self.radio(OP_NXDN, struct.pack("<BBBHHH", flags, rx_ran, tx_ran, rx_gid, unit_id, tx_dst))
 

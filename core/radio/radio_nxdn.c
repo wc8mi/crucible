@@ -21,8 +21,12 @@
 _Static_assert(NXDN_EHR_BYTES == DMR_AMBE_FRAME_BYTES, "one voice frame size");
 
 
+// The reference pattern ahead of each transmission's preamble: a repeater's or hotspot's receiver settles in it and
+// hears the header (ADR 007, 1b; the value from the fork CREDITS.md names). Tuned on a repeater in ADR 007 step 3
+#define RADIO_NXDN_LEAD_IN_MS	200u
+
 static const radio_nxdn_settings_t defaults = {
-	.rate9600 = false, .rx_ran = NXDN_RAN_ANY, .tx_ran = 1, .rx_gid = 0, .unit_id = 1, .unit_call = false,
+	.rate9600 = false, .rx_ran = NXDN_RAN_ANY, .tx_ran = 1, .rx_gid = 0, .unit_id = 0, .unit_call = false,
 	.tx_dst = 1, .emergency = false,
 };
 static radio_nxdn_settings_t set;
@@ -56,8 +60,8 @@ void radio_nxdn_set_settings(const radio_nxdn_settings_t *s)
 		set.rx_ran = NXDN_RAN_ANY;
 	if (set.tx_ran > RADIO_NXDN_RAN_MAX)
 		set.tx_ran = 1;
-	if (set.unit_id == 0 || set.unit_id > RADIO_NXDN_UNIT_MAX)
-		set.unit_id = defaults.unit_id;
+	if (set.unit_id > RADIO_NXDN_UNIT_MAX)
+		set.unit_id = 0;	// the radio's own (nxdn_radio_unit_id)
 	if (set.tx_dst == 0)
 		set.tx_dst = defaults.tx_dst;	// no call goes to 0
 }
@@ -99,6 +103,7 @@ static void params(const channel_t *ch, uint16_t number, nxdn_engine_cfg_t *c)
 
 	memset(c, 0, sizeof(*c));
 	c->silence = dmr_ambe_silence;
+	c->lead_in_ms = RADIO_NXDN_LEAD_IN_MS;
 #if CONFIG_NXDN_SCRAMBLER
 	c->system = CODEPLUG_SYSTEM_NONE;
 #endif
@@ -130,7 +135,7 @@ static void params(const channel_t *ch, uint16_t number, nxdn_engine_cfg_t *c)
 	c->rx_ran = set.rx_ran;
 	c->tx_ran = set.tx_ran;
 	c->rx_gid = set.rx_gid;
-	c->unit_id = set.unit_id;
+	c->unit_id = set.unit_id != 0 ? set.unit_id : nxdn_radio_unit_id();
 	c->tx_call_type = set.unit_call ? NXDN_CALL_INDIVIDUAL : NXDN_CALL_GROUP;
 	c->tx_dst = set.tx_dst;
 	c->emergency = set.emergency;
@@ -302,10 +307,19 @@ static void settings_view(radio_nxdn_view_t *n)
 		n->flags |= RADIO_NXDN_9600;
 }
 
+// The encoder waits for the lead-in to be queued (nxdn_engine_tx_leading); the radio task's poll starts it
+static bool voice_wait;
+
 bool radio_nxdn_poll(radio_nxdn_view_t *v)
 {
 	nxdn_engine_view_t ev;
 	radio_nxdn_view_t n;
+
+	if (voice_wait && (eng == NULL || !nxdn_engine_tx_leading(eng))) {
+		voice_wait = false;
+		if (eng != NULL)
+			radio_air_voice_tx(true);
+	}
 
 	if (eng == NULL) {
 		n = *v;		// the last call heard stays
@@ -349,7 +363,9 @@ static bool nxdn_tx_prepare(void)
 	if (eng == NULL || !nxdn_engine_tx_prepare(eng))
 		return false;
 	ambeVoiceTxProfile(AMBE_TX_NXDN);	// its own leveling target (ambeVoice.h); begin() takes it
-	radio_air_voice_tx(true);
+	voice_wait = nxdn_engine_tx_leading(eng);
+	if (!voice_wait)
+		radio_air_voice_tx(true);
 	return true;
 }
 
@@ -361,6 +377,7 @@ static bool nxdn_tx_go(void)
 static void nxdn_tx_stop(void)
 {
 	if (eng != NULL) {
+		voice_wait = false;
 		radio_air_voice_tx(false);	// the engine fills the frame on air with silence
 		nxdn_engine_tx_stop(eng);
 	}
@@ -369,6 +386,7 @@ static void nxdn_tx_stop(void)
 static void nxdn_tx_abort(void)
 {
 	if (eng != NULL) {
+		voice_wait = false;
 		radio_air_voice_tx(false);
 		nxdn_engine_tx_abort(eng);
 	}
@@ -382,6 +400,7 @@ static uint8_t nxdn_tx_state(void)
 static void nxdn_tx_clear(void)
 {
 	if (eng != NULL) {
+		voice_wait = false;
 		radio_air_voice_tx(false);
 		nxdn_engine_tx_clear(eng);
 	}

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // NXDN conventional channels in the codeplug (nxdn_codeplug.h, docs/spec/nxdn-codeplug.md)
 #include <string.h>
 #include "config.h"
@@ -54,14 +55,17 @@ uint16_t nxdn_unit_id_decode(const uint8_t *b, int len, uint32_t dmr_id)
 	return unit_ok(dmr_id) ? (uint16_t)dmr_id : 1u;
 }
 
-// Our unit ID: the channel's (the record's own ID), else the radio-wide NXDN one, else the DMR ID, else 1
-static uint16_t unit_id(const channel_t *ch)
+uint16_t nxdn_radio_unit_id(void)
 {
 	uint8_t b[8];
 
-	if (unit_ok(ch->dmr_id))
-		return (uint16_t)ch->dmr_id;
 	return nxdn_unit_id_decode(b, codeplug_mode_settings(CODEPLUG_KIND_NXDN, b, sizeof b), codeplug_dmr_id());
+}
+
+// Our unit ID: the channel's (the record's own ID), else the radio's (nxdn_radio_unit_id)
+static uint16_t unit_id(const channel_t *ch)
+{
+	return unit_ok(ch->dmr_id) ? (uint16_t)ch->dmr_id : nxdn_radio_unit_id();
 }
 
 // The talk target from the record's contact (2): a group, a unit, all call; none or an ID out of range = group 1

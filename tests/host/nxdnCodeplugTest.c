@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // NXDN in the codeplug (core/nxdn/nxdn_codeplug.c, docs/spec/nxdn-codeplug.md) on a simulated NOR flash: the shared
 // vectors (tests/vectors/channel-modes.txt, also read by the Codeplug Editor's tests), defaults, zeroed and short
 // blocks, a channel's set-up from its tag, the radio-wide record and its record, and a channel written from the radio
@@ -155,13 +156,13 @@ static void test_conv_load(void)
 	CHECK(nxdn_conv_load(10, &c, &cfg));
 	CHECK(!cfg.conv.rate9600 && cfg.conv.rx_ran == 9 && cfg.conv.tx_ran == 5 &&
 	      cfg.conv.squelch == NXDN_SQUELCH_SELECTIVE);
-	CHECK(cfg.unit_id == 1000 && cfg.target == NXDN_CP_GROUP_DEFAULT && !cfg.target_unit);
+	CHECK(cfg.unit_id == 1000 && cfg.target == NXDN_CP_GROUP_DEFAULT && !cfg.target_unit && nxdn_radio_unit_id() == 1000);
 	// A DMR ID too long for NXDN: unit 1; the radio-wide unit ID, then the channel's own where it fits
 	CHECK(codeplug_set_dmr_id(3101276));
-	CHECK(nxdn_conv_load(10, &c, &cfg) && cfg.unit_id == 1);
+	CHECK(nxdn_conv_load(10, &c, &cfg) && cfg.unit_id == 1 && nxdn_radio_unit_id() == 1);
 	uint8_t u[2] = { 0x39, 0x30 };	// 12345
 	CHECK(codeplug_kv_set((uint16_t)(CODEPLUG_KEY_MODE_SET + CODEPLUG_KIND_NXDN), u, 2));
-	CHECK(nxdn_conv_load(10, &c, &cfg) && cfg.unit_id == 12345);
+	CHECK(nxdn_conv_load(10, &c, &cfg) && cfg.unit_id == 12345 && nxdn_radio_unit_id() == 12345);
 	c.dmr_id = 7654321;		// out of range: not the channel's NXDN ID
 	CHECK(nxdn_conv_load(10, &c, &cfg) && cfg.unit_id == 12345);
 	c.dmr_id = 4321;

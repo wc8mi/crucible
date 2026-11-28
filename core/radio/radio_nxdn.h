@@ -25,7 +25,7 @@ typedef struct {
 	uint8_t rx_ran;		// 0 (every RAN) to 63
 	uint8_t tx_ran;		// 1 to 63 (0 sends RAN 0)
 	uint16_t rx_gid;	// 0: every call of the RAN (the RAN squelch); else group calls to it, to all and to us
-	uint16_t unit_id;	// ours, the source of what we send: 1 to 65519
+	uint16_t unit_id;	// ours, the source of what we send: 1 to 65519, 0 the radio's (nxdn_radio_unit_id)
 	bool unit_call;		// PTT calls the unit tx_dst (individual), else the group tx_dst
 	uint16_t tx_dst;
 	bool emergency;		// what we send has the emergency bit

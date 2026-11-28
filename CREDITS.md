@@ -12,7 +12,7 @@ wrote it, and this page names each project Crucible builds on or takes code from
 | Project | Authors | License | What Crucible uses |
 |---|---|---|---|
 | [RadioFoundry](https://github.com/radiofoundry/radiofoundry) | The RadioFoundry Authors ([AUTHORS](AUTHORS), [CONTRIBUTORS](CONTRIBUTORS)) | MIT ([LICENSE-MIT](LICENSE-MIT)) | The whole base: core, drivers, platforms, boards, site, tools. Merged from `upstream/main` |
-| [DM32-nxdn-p25](https://github.com/donttellmeimcute/DM32-nxdn-p25) | lyra XE1POC | GPL-3.0-or-later ([LICENSE](LICENSE)) | `core/fec/imbe88.{c,h}` (MIT, The RadioFoundry Authors: P25's voice code words moved out of `p25_unit.c`); the YSF VW voice channel interleave in `core/ysf/ysf_vw.c`, which the fork gives as the permutation of MMDVMHost (GPL-2.0-or-later) and DSD-FME (GPL-2.0-or-later) |
+| [DM32-nxdn-p25](https://github.com/donttellmeimcute/DM32-nxdn-p25) | lyra XE1POC | GPL-3.0-or-later ([LICENSE](LICENSE)) | `core/fec/imbe88.{c,h}` (MIT, The RadioFoundry Authors: P25's voice code words moved out of `p25_unit.c`); the YSF VW voice channel interleave in `core/ysf/ysf_vw.c`, which the fork gives as the permutation of MMDVMHost (GPL-2.0-or-later) and DSD-FME (GPL-2.0-or-later); the NXDN repeater access design of its `digital-repeater-interop` patch: a lead-in of the reference pattern before the preamble (200 ms, its value) and the unit ID falling back to the radio's own (`air_session_tx_lead_in` and `nxdn_radio_unit_id` written here, [ADR 007](docs/crucible/adr/007-nxdn-conventional.md)) |
 
 Third-party libraries and fonts (FreeRTOS, TinyUSB, the STM32 HAL and CMSIS, the fonts) keep their own licenses, in
 [LICENSES/](LICENSES/), in each submodule and in `platform/<platform>/THIRD_PARTY`.

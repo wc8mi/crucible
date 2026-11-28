@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The NXDN engine (core/nxdn/nxdn_engine.c) and the air interface session under it: two engines on two made-up
 // providers whose transmit queues feed each other's receivers a chunk at a time. A call from one is heard by the
 // other with its fields and its voice in order; an encoder that stalls is covered with silence and never underruns
@@ -41,6 +42,7 @@ typedef struct {
 	uint32_t underruns, sent_syms, now_us;
 	bool keyed;
 	uint32_t keyed_violations;
+	uint8_t cap[512];		// the first symbols of the transmission, as sent
 } prov_t;
 static prov_t prov[2];
 
@@ -96,6 +98,8 @@ static void step(uint8_t i)
 	air_tx_chunk_t c = p->q[0];
 
 	memmove(p->q, p->q + 1, (size_t)(--p->qn) * sizeof(c));
+	for (uint16_t k = 0; k < c.nsyms && p->sent_syms + k < sizeof(p->cap) * 4u; k++)
+		air_sym_put(p->cap, (uint16_t)(p->sent_syms + k), air_sym_get(c.syms, k));
 	p->sent_syms += c.nsyms;
 	deliver(far, c.syms, c.nsyms);
 	if (c.flags & AIR_TX_LAST) {
@@ -401,6 +405,61 @@ static void testCall(bool rate9600)
 	       first * 20, bad);
 	CHECK(r[1].starts == 1 && r[1].call.late && r[1].ends == 1 && bad == 0 && first >= 40 && first <= 49 + 40,
 	      "%s: late entry: starts %u late %u first %u", name, r[1].starts, r[1].call.late, first);
+	nxdn_engine_end(&r[0].e);
+	nxdn_engine_end(&r[1].e);
+}
+
+// A transmission with a lead-in (ADR 007, 1b): 200 ms of the reference pattern, then the standard preamble and the
+// header. The far radio hears the call from its header (not a late entry), its voice in order; a second over has its
+// own lead-in, the same length
+static void testLeadIn(bool rate9600)
+{
+	nxdn_engine_cfg_t cfg = base_cfg(rate9600);
+	const char *name = rate9600 ? "9600" : "4800";
+	uint16_t lead = (uint16_t)((nxdn_engine_mode(rate9600)->profile.sym_rate * 200u / 1000u) & ~3u), first;
+
+	cfg.lead_in_ms = 200;
+	begin(0, &cfg, &hooks);
+	cfg.unit_id = 2002;
+	begin(1, &cfg, &hooks);
+	for (uint8_t o = 0; o < 2; o++) {
+		r[1].starts = r[1].ends = 0;
+		r[1].nvoice = 0;
+		r[0].enc_made = r[0].enc_taken = 0;
+		prov[0].sent_syms = 0;
+		memset(prov[0].cap, 0, sizeof prov[0].cap);
+		CHECK(nxdn_engine_tx_prepare(&r[0].e) && nxdn_engine_tx_leading(&r[0].e), "%s: lead-in queued first", name);
+		prov[0].keyed = true;
+		CHECK(nxdn_engine_tx_go(&r[0].e), "go");
+		uint16_t n;
+		for (n = 0; n < 600; n++) {
+			if (n == 60)
+				nxdn_engine_tx_stop(&r[0].e);
+			if (n < 60 && !nxdn_engine_tx_leading(&r[0].e))	// the encoder starts after it, as the radio's does
+				encode(&r[0], (uint8_t)(1 + (n & 1)));
+			steps(1);
+			if (nxdn_engine_tx_state(&r[0].e) == AIR_TX_DONE) {
+				prov[0].keyed = false;
+				nxdn_engine_tx_clear(&r[0].e);
+				break;
+			}
+		}
+		steps(20);
+		// On air: `lead` symbols of 5F (+3 +3 -3 -3), then the preamble from its start
+		uint16_t k = 0;
+		while (k < lead + NXDN_PREAMBLE_SYMS && air_sym_get(prov[0].cap, k) == air_sym_get(nxdn_preamble, (uint16_t)(k & 3u)))
+			k++;
+		bool pre = true;
+		for (uint16_t j = 0; j < NXDN_PREAMBLE_SYMS; j++)
+			pre = pre && air_sym_get(prov[0].cap, (uint16_t)(lead + j)) == air_sym_get(nxdn_preamble, j);
+		CHECK(k >= lead + 12 && pre, "%s over %u: %u symbols of the pattern, then the preamble at %u", name, o, k, lead);
+		CHECK(prov[0].underruns == 0 && !nxdn_engine_tx_leading(&r[0].e), "%s over %u: underruns %u", name, o,
+		      prov[0].underruns);
+		CHECK(r[1].starts == 1 && r[1].ends == 1 && !r[1].call.late && r[1].call.vcall.src == 1001 &&
+		      check_order(&r[1], &r[0], &first) == 0 && first == 0 && r[1].nvoice + 4 >= r[0].enc_made,
+		      "%s over %u: heard starts %u late %u, %u of %u frames", name, o, r[1].starts, r[1].call.late, r[1].nvoice,
+		      r[0].enc_made);
+	}
 	nxdn_engine_end(&r[0].e);
 	nxdn_engine_end(&r[1].e);
 }
@@ -750,6 +809,8 @@ int main(void)
 	testSystemKeys(true);
 	testCall(false);
 	testCall(true);
+	testLeadIn(false);
+	testLeadIn(true);
 	testSquelch();
 	testSoftModem();
 	printf("nxdnEngineTest: %d checks, %d failed\n", checks, failures);
