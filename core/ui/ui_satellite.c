@@ -165,6 +165,10 @@ static void satellite_frequency_rows(int *y, char *value, size_t value_len, cons
 	sb_freq(&b, satellite_target_hz(satellite->nominal_rx_hz, satellite->rx_offset_hz));
 	sb_str(&b, " MHz");
 	row(y, "RX", value, ui_col.fg);
+	if (satellite->nominal_tx_hz == 0u) {
+		row(y, "TX", TR(WORD_RX_ONLY, "RX only"), ui_col.warn);
+		return;
+	}
 	sb_init(&b, value, value_len);
 	uint32_t tx_hz = view->state == RS_TX ? view->ch.tx_hz :
 		satellite_target_hz(satellite->nominal_tx_hz, satellite->tx_offset_hz);
@@ -203,8 +207,12 @@ static void satellite_small_frequency_row(int *y, const radio_view_t *view,
 		satellite_target_hz(satellite->nominal_tx_hz, satellite->tx_offset_hz);
 	sb_init(&b, tx, sizeof(tx));
 	sb_str(&b, "TX ");
-	sb_freq(&b, tx_hz);
-	sb_str(&b, " MHz");
+	if (satellite->nominal_tx_hz == 0u) {
+		sb_str(&b, TR(WORD_RX_ONLY, "RX only"));
+	} else {
+		sb_freq(&b, tx_hz);
+		sb_str(&b, " MHz");
+	}
 
 	const font_t *font = ui_layout.tiny;
 	gfx_text_fit(font, rx, gfx_width() - font->w, rx_fit, sizeof(rx_fit));

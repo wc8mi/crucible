@@ -980,6 +980,23 @@ static void test_startup(void)
 }
 
 #if CONFIG_SATELLITE_TLE
+// A listen-only profile (TX 0): tracking tunes the downlink and PTT is refused as receive only, whatever the channel
+static void test_satellite_listen_only_refuses_ptt(void)
+{
+	setup_codeplug();
+	start();
+	CHECK(sm.view.ch.tx_hz != 0u);
+	radio_sm_satellite_update(&sm, true, 1u, 3u, 145880000u, 0u, 0u,
+				 true, 145880010u, 0u, 10, 0, now);
+	CHECK(sm.satellite_view.tracking && sm.view.ch.rx_hz == 145880010u && sm.view.ch.tx_hz == 0u);
+	int tx_calls = hw.tx_calls;
+	req(RREQ_PTT, 1);
+	CHECK(sm.view.state == RS_TX_DENIED && sm.view.tx_deny == TXDENY_RX_ONLY && hw.tx_calls == tx_calls);
+	req(RREQ_PTT, 0);
+	radio_sm_satellite_update(&sm, false, 0u, 0u, 0u, 0u, 0u, false, 0u, 0u, 0, 0, now + 10u);
+	CHECK(!sm.satellite_view.tracking && sm.view.ch.tx_hz != 0u);
+}
+
 static void test_satellite_override(void)
 {
 	setup_codeplug();
@@ -13070,6 +13087,7 @@ int main(void)
 	test_startup();
 #if CONFIG_SATELLITE_TLE
 	test_satellite_override();
+	test_satellite_listen_only_refuses_ptt();
 #if CONFIG_FM_TX_TONES
 	test_so50_arm();
 #endif

@@ -1788,10 +1788,18 @@ run-cpsfast: cpsFastTest
 # debug link's VERSION, CODEPLUG and IDDB, for tools/cps_fast.py (cpsFastClientTest.py)
 PYTHON  ?= $(shell command -v python3)
 TESTS   += cpsSim
-SIMDL   := $(CPSF) $(CORE)/debuglink/dl_frame.c $(CORE)/debuglink/debuglink_iddb.c
+SIMDL   := $(CPSF) $(CORE)/debuglink/dl_frame.c $(CORE)/debuglink/debuglink_iddb.c $(CORE)/debuglink/dl_fmt.c \
+	   $(CORE)/debuglink/debuglink_view_power.c
 
 cpsSim: cpsSim.c $(CPS) $(SIMDL) $(CORE)/codeplug/dmr_iddb.c $(wildcard $(CORE)/cps/*.h $(CORE)/codeplug/*.h $(CORE)/settings/*.h $(CORE)/storage/*.h)
 	$(CC) $(CFLAGS) -I$(ROOT)/hal -I. -Wshadow -DCONFIG_TFTP=0 -o $@ cpsSim.c $(CPS) $(SIMDL) $(CORE)/codeplug/dmr_iddb.c
+
+# cpsSim as one real radio (site/tests/fixtures.py): SIM_RADIO_H its generated header (name, flash map, power levels,
+# features), SIM_DEFS the board's codeplug base defines (board.mk MCU_DEFS), SIM_OUT the program
+sim-radio: cpsSim.c $(CPS) $(SIMDL) $(CORE)/codeplug/dmr_iddb.c $(SIM_RADIO_H)
+	$(CC) $(CFLAGS) -I$(ROOT)/hal -I. -Wshadow -DCONFIG_TFTP=0 -DSIM_RADIO_H='"$(SIM_RADIO_H)"' $(SIM_DEFS) -o $(SIM_OUT) \
+		cpsSim.c $(CPS) $(SIMDL) $(CORE)/codeplug/dmr_iddb.c
+.PHONY: sim-radio
 
 run: run-cpsclient
 run-cpsclient: cpsSim

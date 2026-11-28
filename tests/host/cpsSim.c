@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 The RadioFoundry Authors
+// Copyright (c) 2026 David Behnke
 // The open-firmware CPS shim on a simulated 16 MB flash with the DM-1701 map, served on stdin / stdout, so host tools
 // (tools/cps_client.py --exec) can be tested without a radio. The debug link's frames on the same stream get VERSION
 // and the fast codeplug protocol (CODEPLUG, docs/spec/cps-fast.md; tools/cps_fast.py --exec):
@@ -14,6 +15,11 @@
 // 1) re-reads the settings and the codeplug, as the radio would after its restart. --no-staging takes the staging area
 // out of the map (a radio whose fast protocol writes go through the journal block by block). --features sets the
 // VERSION features list, so a host can be shown an older radio (without CPS_FAST or IDDB_COMPACT).
+//
+// Built with SIM_RADIO_H (make sim-radio), it is one real radio instead: that board's name, flash map, power levels
+// and features, from its sources (site/tests/fixtures.py sim_radios), and it answers GET_VIEW's power section with the
+// firmware's own text (debuglink_view_power.c). --board-name reports another name (older firmware's alias) and
+// --master N sets the radio's own default power level, the one a channel at Radio Default runs at.
 #include <errno.h>
 #include <poll.h>
 #include <stdio.h>
@@ -30,6 +36,11 @@
 #include "settings/settings.h"
 #include "storage/storage.h"
 #include "sim/sim_flash.h"
+#include "debuglink/debuglink.h"
+#include "debuglink/dl_fmt.h"
+#ifdef SIM_RADIO_H
+#include SIM_RADIO_H
+#endif
 
 void storage_lock(void) {}
 void storage_unlock(void) {}
@@ -38,6 +49,9 @@ void storage_quick_unlock(void) {}
 
 #define FLASH_SIZE	0x1000000u
 
+#ifdef SIM_RADIO_H
+static hal_flash_map_t map = { SIM_MAP };
+#else
 static hal_flash_map_t map = {
 	.settings_addr = 0x011000u, .settings_size = 0x008000u, .journal_addr = 0x019000u,
 	.openfw_eeprom = 0, .openfw_flash = 0x020000u, .openfw_end = 0xE00000u,
@@ -45,12 +59,21 @@ static hal_flash_map_t map = {
 	.native_addr = 0xE00000u, .native_size = 0x100000u,
 	.staging_addr = 0xF00000u, .staging_size = 0x040000u,
 };
+#endif
 
 static uint32_t radio_type(void) { return 8; }
 static const hal_cps_t cps_info = { .radio_type = radio_type };
 static band_t bands[] = { { 136000000, 174000000, true }, { 400000000, 480000000, true } };
+#ifdef SIM_RADIO_H
+const board_t board = { .name = SIM_NAME, .bands = bands, .band_count = 2, .flash = &sim_flash, .cps = &cps_info,
+			.power_count = SIM_POWER_COUNT, .power_names = sim_power_names, .power_bands = SIM_POWER_BANDS,
+			.power_band_count = SIM_POWER_BAND_COUNT, .power_default = SIM_POWER_DEFAULT };
+static const char *board_name = SIM_NAME;
+#else
 const board_t board = { .name = "sim", .bands = bands, .band_count = 2, .power_count = 9, .flash = &sim_flash,
 			.cps = &cps_info };
+static const char *board_name = "sim";
+#endif
 
 static uint32_t millis(void)
 {
@@ -241,17 +264,48 @@ static void detail(const uint32_t *ids, unsigned id_count)
 static dl_parser_t dl;
 static uint8_t dl_reply[DL_HDR + DL_REPLY_MAX + 2u];
 
+#ifdef SIM_RADIO_H
+static const char *features = SIM_FEATURES;
+#else
 static const char *features = "FM,DMR,CPS_FAST,"
 #if CONFIG_IDDB_COMPACT
 	"IDDB_COMPACT,"
 #endif
 	"HOSTLINK,DEBUGLINK";
+#endif
+
+// GET_VIEW as the radio answers it: status, its clock, the next section, then the text. Only the power section has a
+// body here (the firmware's own); the others name themselves so a host walks the sections as on the radio
+static size_t get_view(const uint8_t *req, uint16_t len, uint8_t *o, size_t cap)
+{
+	if (len < 1 || req[0] >= DL_VIEW_COUNT) {
+		o[0] = DL_ST_BAD_ARG;
+		return 1;
+	}
+	uint8_t section = req[0];
+	uint32_t now = millis();
+	o[0] = DL_ST_OK;
+	o[1] = (uint8_t)now;
+	o[2] = (uint8_t)(now >> 8);
+	o[3] = (uint8_t)(now >> 16);
+	o[4] = (uint8_t)(now >> 24);
+	o[5] = (uint8_t)(section + 1u < DL_VIEW_COUNT ? section + 1u : 0xFFu);
+	dl_text_t t;
+	dl_text_init(&t, (char *)o + 6, cap - 6);
+	if (section == DL_VIEW_POWER) {
+		dl_text(&t, "section=power\n");
+		debuglink_view_power(&t);
+	} else {
+		dl_text(&t, "section=%u\n", (unsigned)section);
+	}
+	return 6 + t.len;
+}
 
 static size_t dl_handle(uint8_t cmd, const uint8_t *req, uint16_t len, uint8_t *o, size_t cap)
 {
 	switch (cmd) {
 	case DL_CMD_VERSION: {
-		int n = snprintf((char *)o + 1, cap - 1, "proto=1\nboard=sim\nfeatures=%s\n", features);
+		int n = snprintf((char *)o + 1, cap - 1, "proto=1\nboard=%s\nfeatures=%s\n", board_name, features);
 		o[0] = DL_ST_OK;
 		return 1u + (size_t)(n < 0 ? 0 : n < (int)cap - 1 ? n : (int)cap - 2);
 	}
@@ -259,6 +313,8 @@ static size_t dl_handle(uint8_t cmd, const uint8_t *req, uint16_t len, uint8_t *
 		return cps_fast_cmd(req, len, o, cap, millis());
 	case DL_CMD_IDDB:
 		return debuglink_cmd_iddb(req, len, o, cap);
+	case DL_CMD_GET_VIEW:
+		return get_view(req, len, o, cap);
 	default:
 		o[0] = DL_ST_UNKNOWN_CMD;
 		return 1;
@@ -295,6 +351,7 @@ int main(int argc, char **argv)
 	bool demo = false, listing = false, details = false;
 	static uint32_t ids[64];
 	unsigned id_count = 0;
+	int master = -1;
 
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--populate") == 0) {
@@ -313,9 +370,13 @@ int main(int argc, char **argv)
 			map.staging_addr = map.staging_size = 0;
 		} else if (strcmp(argv[i], "--features") == 0 && i + 1 < argc) {
 			features = argv[++i];
+		} else if (strcmp(argv[i], "--board-name") == 0 && i + 1 < argc) {
+			board_name = argv[++i];
+		} else if (strcmp(argv[i], "--master") == 0 && i + 1 < argc) {
+			master = atoi(argv[++i]);
 		} else {
 			fprintf(stderr, "usage: cpsSim [--populate] [--image FILE] [--dump FILE] [--list] [--detail] [--iddb ID]... "
-				"[--no-staging] [--features LIST]\n");
+				"[--no-staging] [--features LIST] [--board-name NAME] [--master LEVEL]\n");
 			return 2;
 		}
 	}
@@ -334,6 +395,12 @@ int main(int argc, char **argv)
 	if (demo) {
 		populate();
 		boot();
+	}
+	if (master >= 0) {
+		settings_t *s = settings_begin();
+		s->master_power = (uint8_t)master;
+		settings_end(millis());
+		settings_flush();
 	}
 
 	if (listing || details) {

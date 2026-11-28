@@ -1,4 +1,6 @@
 <!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 The RadioFoundry Authors -->
+<!-- Copyright (c) 2026 David Behnke -->
 
 # Programming the Radio
 
@@ -56,6 +58,20 @@ compared with that radio's codeplug, not the last one's.
 The write dialog offers **Keep this radio's name, DMR ID and boot text** when the radio's differ from the file's. With
 it on, each radio keeps its own and gets everything else from the file. The editor remembers the choice for the next
 radio.
+
+Every radio stores the same codeplug, so one file works on each. **Made for** in the toolbar says which radios the
+file is for while no radio is connected: **Any radio**, **All radios** (every radio the site offers) or one radio.
+A radio with two power ratings is listed once for each rating, grouped under the radio. The editor remembers the
+choice. With radios picked:
+
+| Where | What it does |
+|---|---|
+| **Problems** | Warns about a channel that a picked radio can't use: a receive or transmit frequency outside its range, or a mode its firmware doesn't have. A receive frequency the radio reaches only with **RX past bands** turned on gets its own warning. Each warning names the radios. |
+| Channel form | **Power on each radio** shows the level the channel's power gives on each picked radio, in the channel's transmit band. It shows with two or more radios picked. For **Radio Default** it shows the level each radio starts with (**Factory**); the radio's own setting may differ. |
+| **Power** | With one radio picked, the selector names that radio's levels. |
+| **Mode** | A new channel offers the modes that at least one picked radio has. |
+
+With a radio connected, the editor checks the codeplug against that radio, and **Made for** shows it.
 
 The first write to a radio that came straight from its original firmware may ask to **Prepare Radio**. The original
 firmware's data is still in the area where RadioFoundry keeps its settings, and until that area is erased the radio
@@ -221,10 +237,15 @@ plan entry the radio uses the plan the control channel sends.
 follows calls to every talk group, not just the channel's. **Fallback channel** is kept in the codeplug; the radio
 doesn't use it yet and keeps hunting for a control channel. A trunked channel has no frequencies of its own.
 
-When connected to firmware that reports its power levels, the channel **Power** selector shows that radio's
-supported levels, with labels for the channel's transmit band. **Radio default** inherits its saved default.
-Without that metadata, the editor keeps the portable Min/Low/Mid/High/Max and numbered scale; the numbers
-are relative steps, not watts. Several portable steps may map to the same level on a radio with fewer levels.
+A channel stores its power as a step on a portable scale of 10, not in watts, so one codeplug suits radios with
+different levels. Each radio maps the step to its own levels: step 10 is the radio's highest level and step 1 its
+lowest. Several steps can give the same level on a radio with fewer levels. **Radio default** uses the default
+power set on the radio.
+
+When connected to firmware that reports its power levels, or with one radio picked in **Made for**, the channel
+**Power** selector shows that radio's levels, with labels for the channel's transmit band. Otherwise it shows the
+portable scale: Minimum (1), Low (3), Medium (6), High (9), Maximum (10) and the numbered steps between them. A CSV
+file writes the same scale: Min, Low, Mid, High, Max or the step's number.
 
 ### YSF
 
@@ -237,6 +258,11 @@ Pick **YSF** in the channel form's **Mode** for YSF (C4FM DN voice). Using it on
 |---|---|
 | TX DG-ID | DG-ID sent, 0-99 |
 | RX DG-ID | DG-ID heard, 0-99. 0 hears every DG-ID |
+| Voice mode | How PTT sends: **DN** (V/D mode 2, the default), **VW** (Voice Wide, full rate) or **V/D 1** |
+| Deviation | **Wide** (the default) or **Narrow**. Use Narrow only where the system asks for it |
+
+Firmware older than these two fields reads every YSF channel as DN Wide. Some firmware does not send VW or V/D 1 yet,
+and the radio then sends DN. CSV files carry both fields as **YSF Voice Mode** and **YSF Deviation**.
 
 **Radio tab:**
 
